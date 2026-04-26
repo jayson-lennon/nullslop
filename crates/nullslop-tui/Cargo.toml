@@ -1,0 +1,33 @@
+[package]
+name = "nullslop-tui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+nullslop-core = { workspace = true }
+nullslop-extension = { workspace = true }
+wherror = { workspace = true }
+error-stack = { workspace = true }
+ratatui = { workspace = true }
+crossterm = { workspace = true }
+ratatui-which-key = { workspace = true }
+ratatui-tabs = { workspace = true }
+ratatui-spatial-splits = { workspace = true }
+tokio = { workspace = true }
+kanal = { workspace = true }
+futures = { workspace = true }
+parking_lot = { workspace = true }
+derive_more = { workspace = true }
+dirs = { workspace = true }
+unicode-segmentation = { workspace = true }
+dialoguer = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+rstest = { workspace = true }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

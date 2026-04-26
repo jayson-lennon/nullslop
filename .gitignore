@@ -1,0 +1,23 @@
+# System
+.env
+
+# AI
+.kilo/
+.plans/
+.opencode/
+
+# Packaging
+/.build
+*.zst
+/pkg
+
+# Rust
+/target
+
+# Code analysis
+coverage.lcov
+debt.json
+/mutants.out
+/mutants.out.old
+
+# App

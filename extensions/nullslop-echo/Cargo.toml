@@ -1,0 +1,13 @@
+[package]
+name = "nullslop-echo"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+nullslop-extension = { workspace = true }
+nullslop-core = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,52 @@
+//! Thin wrapper around the message channel sender.
+
+use derive_more::Debug;
+
+use super::Msg;
+
+/// A sender for [`Msg`] values.
+///
+/// Wraps the channel sender to avoid leaking `kanal` internals.
+/// The underlying channel is unbounded, so [`Self::send`] never blocks.
+#[derive(Debug, Clone)]
+pub struct MsgSender {
+    #[debug(skip)]
+    inner: kanal::Sender<Msg>,
+}
+
+impl MsgSender {
+    pub(super) fn new(sender: kanal::Sender<Msg>) -> Self {
+        Self { inner: sender }
+    }
+
+    /// Sends a message into the channel.
+    ///
+    /// Non-blocking (unbounded channel). Discards send errors — if the
+    /// receiver has been dropped the message is simply lost.
+    pub fn send(&self, msg: Msg) {
+        let _ = self.inner.send(msg);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn msg_sender_sends_msg() {
+        // Given a MsgSender.
+        let (tx, rx) = kanal::unbounded();
+        let sender = MsgSender::new(tx);
+
+        // When sending an Input event.
+        let event = crossterm::event::Event::Key(crossterm::event::KeyEvent::new(
+            crossterm::event::KeyCode::Char('x'),
+            crossterm::event::KeyModifiers::NONE,
+        ));
+        sender.send(Msg::Input(event.clone()));
+
+        // Then recv returns that event.
+        let msg = rx.recv().expect("should receive");
+        assert!(matches!(msg, Msg::Input(e) if e == event));
+    }
+}
