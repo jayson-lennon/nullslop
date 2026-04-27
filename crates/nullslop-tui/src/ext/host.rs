@@ -162,7 +162,7 @@ async fn read_extension_stdout(
         if let Ok(Some(line)) = lines.next_line().await {
             match serde_json::from_str::<OutboundMessage>(&line) {
                 Ok(OutboundMessage::Command { command }) => {
-                    sender.send(crate::msg::Msg::ExtensionCommand(command));
+                    sender.send(crate::msg::Msg::Command(command));
                 }
                 Ok(OutboundMessage::Register { .. }) => {
                     // Unexpected after init — ignore.
@@ -184,9 +184,9 @@ async fn read_extension_stdout(
 /// Returns `None` for key events and other non-routable events.
 fn event_type_name(event: &Event) -> Option<&str> {
     match event {
-        Event::NewChatEntry { .. } => Some("NewChatEntry"),
-        Event::ApplicationReady => Some("ApplicationReady"),
-        Event::Custom { name, .. } => Some(name.as_str()),
+        Event::EventChatMessageSubmitted { .. } => Some("EventChatMessageSubmitted"),
+        Event::EventApplicationReady => Some("EventApplicationReady"),
+        Event::EventCustom { payload, .. } => Some(payload.name.as_str()),
         _ => None,
     }
 }
@@ -234,32 +234,37 @@ async fn send_shutdown(ext: &mut ManagedExtension) {
 mod tests {
     use super::*;
     use nullslop_core::{ChatEntry, Key, KeyEvent, Modifiers};
+    use nullslop_protocol::event::EventChatMessageSubmitted;
 
     #[test]
     fn new_chat_entry_maps_to_name() {
-        // Given a NewChatEntry event.
-        let event = Event::NewChatEntry {
-            entry: ChatEntry::user("test"),
+        // Given an EventChatMessageSubmitted event.
+        let event = Event::EventChatMessageSubmitted {
+            payload: EventChatMessageSubmitted {
+                entry: ChatEntry::user("test"),
+            },
         };
 
-        // Then event_type_name returns "NewChatEntry".
-        assert_eq!(event_type_name(&event), Some("NewChatEntry"));
+        // Then event_type_name returns "EventChatMessageSubmitted".
+        assert_eq!(event_type_name(&event), Some("EventChatMessageSubmitted"));
     }
 
     #[test]
     fn application_ready_maps_to_name() {
         assert_eq!(
-            event_type_name(&Event::ApplicationReady),
-            Some("ApplicationReady")
+            event_type_name(&Event::EventApplicationReady),
+            Some("EventApplicationReady")
         );
     }
 
     #[test]
     fn custom_event_maps_to_its_name() {
         // Given a Custom event.
-        let event = Event::Custom {
-            name: "my-event".to_string(),
-            data: serde_json::json!(null),
+        let event = Event::EventCustom {
+            payload: nullslop_protocol::event::EventCustom {
+                name: "my-event".to_string(),
+                data: serde_json::json!(null),
+            },
         };
 
         // Then event_type_name returns the custom name.
@@ -276,17 +281,20 @@ mod tests {
 
         // Then they return None (not routable to extensions).
         assert_eq!(
-            event_type_name(&Event::KeyDown {
-                key: key_event.clone()
+            event_type_name(&Event::EventKeyDown {
+                payload: nullslop_protocol::event::EventKeyDown {
+                    key: key_event.clone(),
+                },
             }),
             None
         );
         assert_eq!(
-            event_type_name(&Event::KeyUp {
-                key: key_event.clone()
+            event_type_name(&Event::EventKeyUp {
+                payload: nullslop_protocol::event::EventKeyUp {
+                    key: key_event.clone(),
+                },
             }),
             None
         );
-        assert_eq!(event_type_name(&Event::KeyPress { key: key_event }), None);
     }
 }

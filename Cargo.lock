@@ -1057,6 +1057,7 @@ dependencies = [
  "derive_more",
  "error-stack",
  "jiff",
+ "nullslop-protocol",
  "parking_lot",
  "rstest",
  "serde",
@@ -1070,6 +1071,7 @@ version = "0.1.0"
 dependencies = [
  "nullslop-core",
  "nullslop-extension",
+ "nullslop-protocol",
  "serde_json",
  "tracing",
 ]
@@ -1081,10 +1083,31 @@ dependencies = [
  "derive_more",
  "error-stack",
  "nullslop-core",
+ "nullslop-protocol",
  "rstest",
  "serde",
  "serde_json",
  "wherror",
+]
+
+[[package]]
+name = "nullslop-plugin"
+version = "0.1.0"
+dependencies = [
+ "nullslop-protocol",
+ "rstest",
+]
+
+[[package]]
+name = "nullslop-protocol"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "jiff",
+ "rstest",
+ "serde",
+ "serde_json",
+ "unicode-segmentation",
 ]
 
 [[package]]
@@ -1100,6 +1123,8 @@ dependencies = [
  "kanal",
  "nullslop-core",
  "nullslop-extension",
+ "nullslop-plugin",
+ "nullslop-protocol",
  "parking_lot",
  "ratatui",
  "ratatui-spatial-splits",

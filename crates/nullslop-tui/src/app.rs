@@ -2,28 +2,29 @@
 
 use derive_more::Debug;
 use nullslop_core::State;
+use nullslop_plugin::Bus;
+use nullslop_protocol::{Command, Mode};
 use ratatui::Frame;
 use ratatui_which_key::WhichKeyState;
 
-use crate::command::{self, TuiCommand};
 use crate::keymap;
 use crate::msg::Msg;
 use crate::render;
 use crate::scope::Scope;
 use crate::services::Services;
-use crate::suspend::Suspend;
+use crate::suspend::{Suspend, SuspendAction};
 use crate::{AppStatus, MsgHandler, TuiState};
 
 /// Type alias for the which-key state parameterized for nullslop.
 pub type WhichKeyInstance =
-    WhichKeyState<crossterm::event::KeyEvent, Scope, TuiCommand, crate::keymap::KeyCategory>;
+    WhichKeyState<crossterm::event::KeyEvent, Scope, Command, crate::keymap::KeyCategory>;
 
 /// Top-level application state and event loop.
 #[derive(Debug)]
 pub struct TuiApp {
     /// Shared domain state (chat history, extensions).
     pub state: State,
-    /// Ephemeral TUI state (input buffer, scroll offset).
+    /// Ephemeral TUI state (scroll offset).
     pub tui_state: TuiState,
     /// Message channel for the event loop.
     pub events: MsgHandler,
@@ -31,16 +32,17 @@ pub struct TuiApp {
     #[debug(skip)]
     pub which_key: WhichKeyInstance,
     /// Deferred suspend action queue (e.g., for external editor).
-    pub suspend: Suspend,
+    pub(crate) suspend: Suspend,
     /// Background event stream task handle. Set by [`run`](crate::run::run).
     #[debug(skip)]
     pub event_task: Option<tokio::task::JoinHandle<()>>,
     /// Runtime services (tokio handle, extension host). Set during startup.
     pub services: Option<Services>,
-    /// Whether the application should exit.
-    pub should_quit: bool,
     /// Current application lifecycle status.
     pub status: AppStatus,
+    /// Plugin command/event bus.
+    #[debug(skip)]
+    pub bus: Bus,
 }
 
 impl TuiApp {
@@ -49,6 +51,8 @@ impl TuiApp {
     pub fn new() -> Self {
         let keymap = keymap::init();
         let which_key = WhichKeyInstance::new(keymap, Scope::Normal);
+        let mut bus = Bus::new();
+        crate::plugin::register_all(&mut bus);
 
         Self {
             state: State::new(nullslop_core::AppData::new()),
@@ -58,8 +62,8 @@ impl TuiApp {
             suspend: Suspend::new(),
             event_task: None,
             services: None,
-            should_quit: false,
             status: AppStatus::Starting,
+            bus,
         }
     }
 
@@ -68,48 +72,44 @@ impl TuiApp {
         match msg {
             Msg::Tick => {}
             Msg::Input(event) => {
-                self.handle_input(&event);
+                if let crossterm::event::Event::Key(key) = event
+                    && key.kind == crossterm::event::KeyEventKind::Press
+                    && let Some(cmd) = self.which_key.handle_key(key)
+                {
+                    self.route_command(cmd);
+                }
             }
             Msg::Command(cmd) => {
-                command::dispatch(self, &cmd);
-            }
-            Msg::ExtensionCommand(cmd) => {
-                self.handle_extension_command(cmd);
+                self.route_command(cmd);
             }
             Msg::ExtensionsReady(registrations) => {
                 for reg in registrations {
-                    self.state.write().extensions.register(reg);
+                    self.state.write().extensions_mut().register(reg);
                 }
                 tracing::info!("extensions ready");
             }
         }
     }
 
-    /// Handles a command received from an extension.
-    fn handle_extension_command(&mut self, cmd: nullslop_core::Command) {
+    /// Routes a command to the appropriate handler.
+    ///
+    /// Commands that need `TuiApp`-level state (which-key toggle, editor suspend)
+    /// are handled directly. All other commands go through the bus.
+    fn route_command(&mut self, cmd: Command) {
         match cmd {
-            nullslop_core::Command::Custom { name, args } => {
-                if name == "echo"
-                    && let Some(text) = args.get("text").and_then(|v| v.as_str())
-                {
-                    self.state
-                        .write()
-                        .push_entry(nullslop_core::ChatEntry::system(text));
-                }
+            Command::AppToggleWhichKey => {
+                self.which_key.toggle();
+            }
+            Command::AppEditInput => {
+                let initial_content = self.state.read().input_buffer.clone();
+                self.suspend.request(SuspendAction::Edit {
+                    initial_content,
+                    on_result: Box::new(|result| result),
+                });
             }
             _ => {
-                tracing::warn!(?cmd, "unhandled extension command");
+                self.bus.submit_command(cmd);
             }
-        }
-    }
-
-    /// Handles a crossterm input event.
-    fn handle_input(&mut self, event: &crossterm::event::Event) {
-        if let crossterm::event::Event::Key(key) = event
-            && key.kind == crossterm::event::KeyEventKind::Press
-            && let Some(cmd) = self.which_key.handle_key(*key)
-        {
-            command::dispatch(self, &cmd);
         }
     }
 
@@ -125,19 +125,22 @@ impl Default for TuiApp {
     }
 }
 
+/// Returns the scope corresponding to the given mode.
+pub(crate) fn scope_for_mode(mode: Mode) -> Scope {
+    match mode {
+        Mode::Normal => Scope::Normal,
+        Mode::Input => Scope::Input,
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
     use super::*;
 
     fn key_event(code: KeyCode) -> crossterm::event::Event {
         crossterm::event::Event::Key(KeyEvent::new(code, KeyModifiers::NONE))
-    }
-
-    #[allow(dead_code)]
-    fn key_event_with_kind(code: KeyCode, kind: KeyEventKind) -> crossterm::event::Event {
-        crossterm::event::Event::Key(KeyEvent::new_with_kind(code, KeyModifiers::NONE, kind))
     }
 
     #[test]
@@ -147,7 +150,6 @@ mod tests {
 
         // Then which_key scope is Normal.
         assert_eq!(*app.which_key.scope(), Scope::Normal);
-        assert!(!app.should_quit);
     }
 
     #[test]
@@ -159,8 +161,14 @@ mod tests {
         // When pressing Enter.
         app.handle_msg(Msg::Input(key_event(KeyCode::Enter)));
 
-        // Then scope changes to Input.
-        assert_eq!(*app.which_key.scope(), Scope::Input);
+        // Then the bus processed AppSetMode(Input) — but scope is synced
+        // separately in run.rs. The command was submitted to the bus.
+        // Process the bus to verify state.
+        {
+            let mut guard = app.state.write();
+            app.bus.process_commands(&mut guard);
+        }
+        assert_eq!(app.state.read().mode, Mode::Input);
     }
 
     #[test]
@@ -171,8 +179,12 @@ mod tests {
         // When pressing Esc.
         app.handle_msg(Msg::Input(key_event(KeyCode::Esc)));
 
-        // Then should_quit is true.
-        assert!(app.should_quit);
+        // Then AppQuit was submitted to the bus. Process it.
+        {
+            let mut guard = app.state.write();
+            app.bus.process_commands(&mut guard);
+        }
+        assert!(app.state.read().should_quit);
     }
 
     #[test]
@@ -180,20 +192,23 @@ mod tests {
         // Given an App in Input scope with "hello" in buffer.
         let mut app = TuiApp::new();
         app.which_key.set_scope(Scope::Input);
-        app.tui_state.input_buffer = "hello".to_string();
+        app.state.write().input_buffer = "hello".to_string();
 
         // When pressing Enter.
         app.handle_msg(Msg::Input(key_event(KeyCode::Enter)));
 
-        // Then chat has entry and buffer cleared.
+        // Then process bus and verify.
+        {
+            let mut guard = app.state.write();
+            app.bus.process_commands(&mut guard);
+        }
         let guard = app.state.read();
         assert_eq!(guard.chat_history.len(), 1);
         assert_eq!(
             guard.chat_history[0].kind,
-            nullslop_core::ChatEntryKind::User("hello".to_string())
+            nullslop_protocol::ChatEntryKind::User("hello".to_string())
         );
-        drop(guard);
-        assert!(app.tui_state.input_buffer.is_empty());
+        assert!(guard.input_buffer.is_empty());
     }
 
     #[test]
@@ -205,8 +220,12 @@ mod tests {
         // When pressing Esc.
         app.handle_msg(Msg::Input(key_event(KeyCode::Esc)));
 
-        // Then scope is Normal.
-        assert_eq!(*app.which_key.scope(), Scope::Normal);
+        // Then AppSetMode(Normal) was submitted to the bus. Process it.
+        {
+            let mut guard = app.state.write();
+            app.bus.process_commands(&mut guard);
+        }
+        assert_eq!(app.state.read().mode, Mode::Normal);
     }
 
     #[test]
@@ -218,8 +237,12 @@ mod tests {
         // When pressing 'x'.
         app.handle_msg(Msg::Input(key_event(KeyCode::Char('x'))));
 
-        // Then buffer is "x".
-        assert_eq!(app.tui_state.input_buffer, "x");
+        // Then process bus and verify.
+        {
+            let mut guard = app.state.write();
+            app.bus.process_commands(&mut guard);
+        }
+        assert_eq!(app.state.read().input_buffer, "x");
     }
 
     #[test]
@@ -227,12 +250,61 @@ mod tests {
         // Given an App in Input scope with "ab" in buffer.
         let mut app = TuiApp::new();
         app.which_key.set_scope(Scope::Input);
-        app.tui_state.input_buffer = "ab".to_string();
+        app.state.write().input_buffer = "ab".to_string();
 
         // When pressing Backspace.
         app.handle_msg(Msg::Input(key_event(KeyCode::Backspace)));
 
-        // Then buffer is "a".
-        assert_eq!(app.tui_state.input_buffer, "a");
+        // Then process bus and verify.
+        {
+            let mut guard = app.state.write();
+            app.bus.process_commands(&mut guard);
+        }
+        assert_eq!(app.state.read().input_buffer, "a");
+    }
+
+    #[test]
+    fn app_toggle_which_key_handled_directly() {
+        // Given an App with inactive which_key.
+        let mut app = TuiApp::new();
+        assert!(!app.which_key.active);
+
+        // When routing AppToggleWhichKey directly.
+        app.route_command(Command::AppToggleWhichKey);
+
+        // Then which_key is active (handled directly, not through bus).
+        assert!(app.which_key.active);
+    }
+
+    #[test]
+    fn app_extension_command_routes_through_bus() {
+        // Given an App with services.
+        let mut app = TuiApp::new();
+
+        // When routing a CustomCommand (echo).
+        app.route_command(Command::CustomCommand {
+            payload: nullslop_protocol::command::CustomCommand {
+                name: "echo".to_string(),
+                args: serde_json::json!({"text": "hello"}),
+            },
+        });
+
+        // Then process bus and verify.
+        {
+            let mut guard = app.state.write();
+            app.bus.process_commands(&mut guard);
+        }
+        let guard = app.state.read();
+        assert_eq!(guard.chat_history.len(), 1);
+        assert_eq!(
+            guard.chat_history[0].kind,
+            nullslop_protocol::ChatEntryKind::System("hello".to_string())
+        );
+    }
+
+    #[test]
+    fn scope_for_mode_maps_correctly() {
+        assert_eq!(scope_for_mode(Mode::Normal), Scope::Normal);
+        assert_eq!(scope_for_mode(Mode::Input), Scope::Input);
     }
 }

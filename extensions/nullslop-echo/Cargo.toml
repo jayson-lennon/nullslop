@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 nullslop-extension = { workspace = true }
 nullslop-core = { workspace = true }
+nullslop-protocol = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
 

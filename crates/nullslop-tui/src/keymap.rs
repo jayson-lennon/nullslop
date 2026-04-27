@@ -1,12 +1,14 @@
 //! Keymap configuration and initialization.
 //!
 //! Defines the key categories and builds the keymap with all scope bindings
-//! using the `ratatui-which-key` crate.
+//! using the `ratatui-which-key` crate. Binds keys to [`Command`](nullslop_protocol::Command)
+//! variants instead of the old `TuiCommand`.
 
 use derive_more::Display;
+use nullslop_protocol::command::{AppSetMode, ChatBoxInsertChar, ChatBoxSubmitMessage};
+use nullslop_protocol::{Command, Mode};
 use ratatui_which_key::Keymap;
 
-use crate::command::TuiCommand;
 use crate::scope::Scope;
 
 /// Categories for keybinding grouping in the which-key popup.
@@ -20,39 +22,61 @@ pub enum KeyCategory {
 
 /// Builds and returns the full keymap with all scope bindings.
 #[must_use]
-pub fn init() -> Keymap<crossterm::event::KeyEvent, Scope, TuiCommand, KeyCategory> {
+pub fn init() -> Keymap<crossterm::event::KeyEvent, Scope, Command, KeyCategory> {
     let mut keymap = Keymap::new();
 
     keymap
         // Normal scope: navigation and commands
         .scope(Scope::Normal, |b| {
-            b.bind("<enter>", TuiCommand::EnterInput, KeyCategory::General)
-                .bind("<esc>", TuiCommand::Quit, KeyCategory::General)
-                .bind("?", TuiCommand::ToggleWhichKey, KeyCategory::General)
-                .bind("<c-e>", TuiCommand::EditInput, KeyCategory::Input);
+            b.bind(
+                "<enter>",
+                Command::AppSetMode {
+                    payload: AppSetMode { mode: Mode::Input },
+                },
+                KeyCategory::General,
+            )
+            .bind("<esc>", Command::AppQuit, KeyCategory::General)
+            .bind("?", Command::AppToggleWhichKey, KeyCategory::General)
+            .bind("<c-e>", Command::AppEditInput, KeyCategory::Input);
         })
         // Input scope: typing into the input buffer
         .scope(Scope::Input, |b| {
-            b.bind("<enter>", TuiCommand::SubmitChat, KeyCategory::Input)
-                .bind("<esc>", TuiCommand::BackToNormal, KeyCategory::General)
-                .bind("<c-e>", TuiCommand::EditInput, KeyCategory::Input)
-                .bind(
-                    "<backspace>",
-                    TuiCommand::DeleteGrapheme,
-                    KeyCategory::Input,
-                )
-                .catch_all(|key: crossterm::event::KeyEvent| {
-                    use crossterm::event::{KeyCode, KeyEventKind};
-                    // Only handle Press events (crossterm fires Release/Repeat too)
-                    if key.kind != KeyEventKind::Press {
-                        return None;
-                    }
-                    if let KeyCode::Char(c) = key.code {
-                        Some(TuiCommand::InsertChar(c))
-                    } else {
-                        None
-                    }
-                });
+            b.bind(
+                "<enter>",
+                Command::ChatBoxSubmitMessage {
+                    payload: ChatBoxSubmitMessage {
+                        text: String::new(),
+                    },
+                },
+                KeyCategory::Input,
+            )
+            .bind(
+                "<esc>",
+                Command::AppSetMode {
+                    payload: AppSetMode { mode: Mode::Normal },
+                },
+                KeyCategory::General,
+            )
+            .bind("<c-e>", Command::AppEditInput, KeyCategory::Input)
+            .bind(
+                "<backspace>",
+                Command::ChatBoxDeleteGrapheme,
+                KeyCategory::Input,
+            )
+            .catch_all(|key: crossterm::event::KeyEvent| {
+                use crossterm::event::{KeyCode, KeyEventKind};
+                // Only handle Press events (crossterm fires Release/Repeat too)
+                if key.kind != KeyEventKind::Press {
+                    return None;
+                }
+                if let KeyCode::Char(c) = key.code {
+                    Some(Command::ChatBoxInsertChar {
+                        payload: ChatBoxInsertChar { ch: c },
+                    })
+                } else {
+                    None
+                }
+            });
         });
 
     keymap
@@ -73,8 +97,13 @@ mod tests {
         // When navigating Normal scope with Enter key.
         let result = state.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
 
-        // Then returns TuiCommand::EnterInput.
-        assert_eq!(result, Some(TuiCommand::EnterInput));
+        // Then returns AppSetMode with Input mode.
+        assert!(matches!(
+            result,
+            Some(Command::AppSetMode {
+                payload: AppSetMode { mode: Mode::Input }
+            })
+        ));
     }
 
     #[test]
@@ -86,8 +115,8 @@ mod tests {
         // When navigating Input scope with Enter key.
         let result = state.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
 
-        // Then returns TuiCommand::SubmitChat.
-        assert_eq!(result, Some(TuiCommand::SubmitChat));
+        // Then returns ChatBoxSubmitMessage.
+        assert!(matches!(result, Some(Command::ChatBoxSubmitMessage { .. })));
     }
 
     #[test]
@@ -99,8 +128,13 @@ mod tests {
         // When pressing 'a' (no explicit binding).
         let result = state.handle_key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE));
 
-        // Then catch_all returns TuiCommand::InsertChar('a').
-        assert_eq!(result, Some(TuiCommand::InsertChar('a')));
+        // Then catch_all returns ChatBoxInsertChar with 'a'.
+        assert!(matches!(
+            result,
+            Some(Command::ChatBoxInsertChar {
+                payload: ChatBoxInsertChar { ch: 'a' }
+            })
+        ));
     }
 
     #[test]
@@ -112,7 +146,7 @@ mod tests {
         // When navigating Normal scope with Esc.
         let result = state.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
 
-        // Then returns TuiCommand::Quit.
-        assert_eq!(result, Some(TuiCommand::Quit));
+        // Then returns AppQuit.
+        assert!(matches!(result, Some(Command::AppQuit)));
     }
 }

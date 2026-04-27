@@ -1,0 +1,90 @@
+//! Plugin for commands received from extensions.
+//!
+//! Handles `CustomCommand` (e.g., the "echo" command) by adding
+//! system chat entries.
+
+use nullslop_plugin::{Out, define_plugin};
+use nullslop_protocol::CommandAction;
+use nullslop_protocol::command::CustomCommand;
+
+define_plugin! {
+    /// Handles commands from extensions.
+    pub(crate) struct ExtensionCommandPlugin;
+
+    commands {
+        CustomCommand: on_custom_command,
+    }
+
+    events {}
+}
+
+impl ExtensionCommandPlugin {
+    #[allow(clippy::unused_self, clippy::trivially_copy_pass_by_ref)]
+    fn on_custom_command(
+        &self,
+        cmd: &CustomCommand,
+        state: &mut nullslop_protocol::AppData,
+        _out: &mut Out,
+    ) -> CommandAction {
+        if cmd.name == "echo"
+            && let Some(text) = cmd.args.get("text").and_then(|v| v.as_str())
+        {
+            state.push_entry(nullslop_protocol::ChatEntry::system(text));
+        } else {
+            tracing::warn!(name = %cmd.name, "unhandled extension command");
+        }
+        CommandAction::Continue
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use nullslop_plugin::Bus;
+    use nullslop_protocol::Command;
+
+    use super::*;
+
+    #[test]
+    fn echo_command_adds_system_entry() {
+        // Given a bus with ExtensionCommandPlugin registered.
+        let mut bus = Bus::new();
+        ExtensionCommandPlugin.register(&mut bus);
+
+        // When processing a CustomCommand "echo" with text "hello".
+        bus.submit_command(Command::CustomCommand {
+            payload: CustomCommand {
+                name: "echo".to_string(),
+                args: serde_json::json!({"text": "hello"}),
+            },
+        });
+        let mut state = nullslop_protocol::AppData::new();
+        bus.process_commands(&mut state);
+
+        // Then chat_history has a System entry.
+        assert_eq!(state.chat_history.len(), 1);
+        assert_eq!(
+            state.chat_history[0].kind,
+            nullslop_protocol::ChatEntryKind::System("hello".to_string())
+        );
+    }
+
+    #[test]
+    fn unknown_command_logs_warning() {
+        // Given a bus with ExtensionCommandPlugin registered.
+        let mut bus = Bus::new();
+        ExtensionCommandPlugin.register(&mut bus);
+
+        // When processing an unknown CustomCommand.
+        bus.submit_command(Command::CustomCommand {
+            payload: CustomCommand {
+                name: "unknown".to_string(),
+                args: serde_json::json!({}),
+            },
+        });
+        let mut state = nullslop_protocol::AppData::new();
+        bus.process_commands(&mut state);
+
+        // Then no entry is added.
+        assert!(state.chat_history.is_empty());
+    }
+}

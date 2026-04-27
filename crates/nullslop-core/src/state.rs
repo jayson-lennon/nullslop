@@ -1,28 +1,42 @@
 //! Thread-safe application state wrapper.
 //!
-//! Provides [`State`] as a shared reference to [`AppData`] with
-//! read/write guards that don't expose the underlying lock implementation.
+//! Provides [`State`] as a shared reference to [`AppData`] and
+//! [`ExtensionRegistry`] with read/write guards that don't expose
+//! the underlying lock implementation.
 
 use std::sync::Arc;
 
 use parking_lot::RwLock;
 
-use crate::AppData;
+use crate::extension::ExtensionRegistry;
+use nullslop_protocol::AppData;
+
+/// Internal state combining domain data and extension registry.
+#[derive(Debug)]
+struct CoreState {
+    /// Domain data (from protocol).
+    data: AppData,
+    /// Extension registry (host-side concern).
+    extensions: ExtensionRegistry,
+}
 
 /// Thread-safe shared state wrapper.
+///
+/// Wraps [`AppData`] from `nullslop-protocol` and the host-side
+/// [`ExtensionRegistry`] in a single [`RwLock`] for consistent snapshots.
 #[derive(Debug, Clone)]
 pub struct State {
-    inner: Arc<RwLock<AppData>>,
+    inner: Arc<RwLock<CoreState>>,
 }
 
 /// Read guard for application data. Does not expose the underlying lock.
 pub struct StateReadGuard<'a> {
-    inner: parking_lot::RwLockReadGuard<'a, AppData>,
+    inner: parking_lot::RwLockReadGuard<'a, CoreState>,
 }
 
 /// Write guard for application data. Does not expose the underlying lock.
 pub struct StateWriteGuard<'a> {
-    inner: parking_lot::RwLockWriteGuard<'a, AppData>,
+    inner: parking_lot::RwLockWriteGuard<'a, CoreState>,
 }
 
 impl State {
@@ -30,7 +44,10 @@ impl State {
     #[must_use]
     pub fn new(data: AppData) -> Self {
         Self {
-            inner: Arc::new(RwLock::new(data)),
+            inner: Arc::new(RwLock::new(CoreState {
+                data,
+                extensions: ExtensionRegistry::new(),
+            })),
         }
     }
 
@@ -49,11 +66,33 @@ impl State {
     }
 }
 
+impl StateReadGuard<'_> {
+    /// Returns a reference to the extension registry.
+    #[must_use]
+    pub fn extensions(&self) -> &ExtensionRegistry {
+        &self.inner.extensions
+    }
+}
+
+impl StateWriteGuard<'_> {
+    /// Returns a reference to the extension registry.
+    #[must_use]
+    pub fn extensions(&self) -> &ExtensionRegistry {
+        &self.inner.extensions
+    }
+
+    /// Returns a mutable reference to the extension registry.
+    #[must_use]
+    pub fn extensions_mut(&mut self) -> &mut ExtensionRegistry {
+        &mut self.inner.extensions
+    }
+}
+
 impl std::ops::Deref for StateReadGuard<'_> {
     type Target = AppData;
 
     fn deref(&self) -> &AppData {
-        &self.inner
+        &self.inner.data
     }
 }
 
@@ -61,20 +100,20 @@ impl std::ops::Deref for StateWriteGuard<'_> {
     type Target = AppData;
 
     fn deref(&self) -> &AppData {
-        &self.inner
+        &self.inner.data
     }
 }
 
 impl std::ops::DerefMut for StateWriteGuard<'_> {
     fn deref_mut(&mut self) -> &mut AppData {
-        &mut self.inner
+        &mut self.inner.data
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ChatEntry;
+    use nullslop_protocol::ChatEntry;
 
     #[test]
     fn state_read_returns_app_data() {
@@ -138,5 +177,37 @@ mod tests {
 
         // Then we can only access AppData through Deref.
         let _history = &guard.chat_history;
+    }
+
+    #[test]
+    fn state_extensions_are_accessible() {
+        // Given a State.
+        let state = State::new(AppData::new());
+
+        // When reading extensions.
+        let guard = state.read();
+
+        // Then extensions are accessible.
+        assert!(guard.extensions().extensions().is_empty());
+    }
+
+    #[test]
+    fn state_extensions_are_mutable() {
+        // Given a State.
+        let state = State::new(AppData::new());
+
+        // When registering an extension.
+        {
+            let mut guard = state.write();
+            guard.extensions_mut().register(crate::RegisteredExtension {
+                name: "test".to_string(),
+                commands: vec!["echo".to_string()],
+                subscriptions: vec![],
+            });
+        }
+
+        // Then the extension is visible on next read.
+        let guard = state.read();
+        assert_eq!(guard.extensions().extensions().len(), 1);
     }
 }

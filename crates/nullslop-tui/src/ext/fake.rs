@@ -72,10 +72,12 @@ mod tests {
         let host = FakeExtensionHost::new();
 
         // When sending events.
-        host.send_event(&Event::ApplicationReady);
-        host.send_event(&Event::Custom {
-            name: "test".to_string(),
-            data: serde_json::json!({}),
+        host.send_event(&Event::EventApplicationReady);
+        host.send_event(&Event::EventCustom {
+            payload: nullslop_protocol::event::EventCustom {
+                name: "test".to_string(),
+                data: serde_json::json!({}),
+            },
         });
 
         // Then events_sent returns both.

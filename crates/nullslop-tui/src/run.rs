@@ -17,6 +17,7 @@ use tokio::runtime::Handle;
 use wherror::Error;
 
 use crate::TuiApp;
+use crate::app::scope_for_mode;
 
 /// Error type for TUI run operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
@@ -104,6 +105,28 @@ fn run_main_loop(
             app.handle_msg(event);
         }
 
+        // Process the bus: commands then events.
+        {
+            let mut guard = app.state.write();
+            app.bus.process_commands(&mut guard);
+            app.bus.process_events(&mut guard);
+        }
+
+        // Sync which_key scope from AppData.mode.
+        let scope = scope_for_mode(app.state.read().mode);
+        app.which_key.set_scope(scope);
+
+        // Forward processed events to extension host.
+        let processed_events = app.bus.drain_processed_events();
+        if !processed_events.is_empty()
+            && let Some(svc) = app.services.as_ref()
+            && let Some(ext) = svc.ext_host()
+        {
+            for evt in &processed_events {
+                ext.send_event(evt);
+            }
+        }
+
         // Check for pending suspend after event batch processing.
         if let Some(action) = app.suspend.take_action() {
             handle_suspend_action(terminal, app, action, handle)?;
@@ -116,7 +139,8 @@ fn run_main_loop(
             .change_context(TuiRunError)
             .attach("failed to draw frame")?;
 
-        if app.should_quit {
+        // Check should_quit from AppData (set by CoreDispatcher plugin).
+        if app.state.read().should_quit {
             break;
         }
     }
@@ -130,10 +154,10 @@ fn run_main_loop(
 /// 2. Drains stale messages from the channel
 /// 3. Suspends the terminal via [`TerminalGuard`](crate::terminal::TerminalGuard)
 /// 4. Runs the external editor via `dialoguer::Editor`
-/// 5. Invokes the `on_result` closure to produce a [`TuiCommand`]
+/// 5. Invokes the `on_result` closure to produce the new input buffer content
 /// 6. Restarts the event stream task
 /// 7. Redraws the terminal
-/// 8. Dispatches the resulting command (if any)
+/// 8. Writes the result directly to `AppData.input_buffer`
 fn handle_suspend_action(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     app: &mut TuiApp,
@@ -146,7 +170,7 @@ fn handle_suspend_action(
     }
     app.events.drain();
 
-    let result_cmd = crate::terminal::suspend_and_run(terminal, || match action {
+    let result_content = crate::terminal::suspend_and_run(terminal, || match action {
         crate::suspend::SuspendAction::Edit {
             initial_content,
             on_result,
@@ -173,8 +197,9 @@ fn handle_suspend_action(
         .change_context(TuiRunError)
         .attach("failed to redraw after suspend")?;
 
-    if let Some(cmd) = result_cmd {
-        crate::command::dispatch(app, &cmd);
+    // Handle the suspend result directly — set input_buffer on AppData.
+    if let Some(content) = result_content {
+        app.state.write().input_buffer = content;
     }
 
     Ok(())

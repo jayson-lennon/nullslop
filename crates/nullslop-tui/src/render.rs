@@ -56,11 +56,11 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
         .chat_history
         .iter()
         .map(|entry| match &entry.kind {
-            nullslop_core::ChatEntryKind::User(text) => Line::from(Span::styled(
+            nullslop_protocol::ChatEntryKind::User(text) => Line::from(Span::styled(
                 format!("> {text}"),
                 Style::default().add_modifier(Modifier::BOLD),
             )),
-            nullslop_core::ChatEntryKind::System(text) => Line::from(Span::styled(
+            nullslop_protocol::ChatEntryKind::System(text) => Line::from(Span::styled(
                 format!("  {text}"),
                 Style::default().fg(ratatui::style::Color::DarkGray),
             )),
@@ -74,7 +74,7 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
     frame.render_widget(chat_widget, layout.chat);
 
     // Input box
-    let input_text = format!("> {}", app.tui_state.input_buffer);
+    let input_text = format!("> {}", state.input_buffer);
     let input_widget = Paragraph::new(input_text)
         .block(Block::default().borders(Borders::TOP))
         .style(Style::default());

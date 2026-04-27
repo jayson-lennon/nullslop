@@ -10,31 +10,29 @@
 
 use derive_more::Debug;
 
-use crate::TuiCommand;
-
 /// An action requesting the TUI temporarily suspend itself.
 ///
 /// The event loop consumes this to exit raw mode, leave the alternate screen,
 /// spawn the requested external process, and restore the TUI on completion.
 ///
-/// The `on_result` closure maps the editor's output to a [`TuiCommand`] that
-/// the main loop dispatches immediately after the suspend completes.
+/// The `on_result` closure maps the editor's output to the new input buffer
+/// content (or `None` if no change).
 #[derive(Debug)]
-pub enum SuspendAction {
+pub(crate) enum SuspendAction {
     /// Open `$EDITOR` with the given initial content.
     Edit {
         /// The text to pre-fill in the editor.
         initial_content: String,
-        /// Maps the edited content (if changed) to a [`TuiCommand`].
+        /// Maps the edited content (if changed) to the new buffer content.
         /// Receives `Some(content)` if the user made changes, `None` otherwise.
         #[debug("<closure>")]
-        on_result: Box<dyn FnOnce(Option<String>) -> Option<TuiCommand>>,
+        on_result: Box<dyn FnOnce(Option<String>) -> Option<String>>,
     },
 }
 
 /// Holds an optional deferred suspend action to be consumed by the event loop.
 #[derive(Debug, Default)]
-pub struct Suspend {
+pub(crate) struct Suspend {
     action: Option<SuspendAction>,
 }
 

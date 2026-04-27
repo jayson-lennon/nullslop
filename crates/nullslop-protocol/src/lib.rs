@@ -1,0 +1,23 @@
+//! nullslop-protocol: shared types for the nullslop plugin system.
+//!
+//! This crate contains all command types, event types, wrapper enums,
+//! [`Mode`], [`CommandAction`], and [`AppData`]. It is the single import
+//! point for everything the plugin system needs. Both the TUI host and
+//! extensions depend on this crate for wire-protocol types.
+
+pub mod action;
+pub mod app_data;
+pub mod chat;
+pub mod command;
+pub mod event;
+pub mod key;
+pub mod mode;
+
+// Re-export primary types
+pub use action::CommandAction;
+pub use app_data::AppData;
+pub use chat::{ChatEntry, ChatEntryKind};
+pub use command::Command;
+pub use event::Event;
+pub use key::{Key, KeyEvent, Modifiers};
+pub use mode::Mode;

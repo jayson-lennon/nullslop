@@ -1,17 +1,14 @@
 [package]
-name = "nullslop-core"
+name = "nullslop-protocol"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-nullslop-protocol = { workspace = true }
-wherror = { workspace = true }
-error-stack = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-parking_lot = { workspace = true }
 jiff = { workspace = true }
 derive_more = { workspace = true }
+unicode-segmentation = { workspace = true }
 
 [dev-dependencies]
 rstest = { workspace = true }

@@ -108,6 +108,7 @@ pub fn write_message(msg: &OutboundMessage) -> Result<(), Report<CodecError>> {
 mod tests {
     use super::*;
     use nullslop_core::Command;
+    use nullslop_protocol::command::CustomCommand;
 
     #[test]
     fn inbound_initialize_roundtrip() {
@@ -126,9 +127,11 @@ mod tests {
     fn inbound_command_roundtrip() {
         // Given a Command message.
         let msg = InboundMessage::Command {
-            command: Command::Custom {
-                name: "echo".to_string(),
-                args: serde_json::json!({"text": "hi"}),
+            command: Command::CustomCommand {
+                payload: CustomCommand {
+                    name: "echo".to_string(),
+                    args: serde_json::json!({"text": "hi"}),
+                },
             },
         };
 
@@ -139,8 +142,8 @@ mod tests {
         // Then it preserves the command.
         match back {
             InboundMessage::Command { command } => match command {
-                Command::Custom { name, .. } => assert_eq!(name, "echo"),
-                other => panic!("expected Custom, got {other:?}"),
+                Command::CustomCommand { payload } => assert_eq!(payload.name, "echo"),
+                other => panic!("expected CustomCommand, got {other:?}"),
             },
             other => panic!("expected Command, got {other:?}"),
         }
@@ -175,7 +178,7 @@ mod tests {
     fn outbound_command_roundtrip() {
         // Given a Command outbound message.
         let msg = OutboundMessage::Command {
-            command: Command::Quit,
+            command: Command::AppQuit,
         };
 
         // When serialized and deserialized.
@@ -185,7 +188,7 @@ mod tests {
         // Then it preserves the command.
         match back {
             OutboundMessage::Command { command } => {
-                assert!(matches!(command, Command::Quit));
+                assert!(matches!(command, Command::AppQuit));
             }
             other => panic!("expected Command, got {other:?}"),
         }

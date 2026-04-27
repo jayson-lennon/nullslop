@@ -19,9 +19,11 @@ nullslop-cli = { workspace = true }
 
 [workspace.dependencies]
 # Internal
+nullslop-protocol = { path = "crates/nullslop-protocol" }
 nullslop-core = { path = "crates/nullslop-core" }
 nullslop-tui = { path = "crates/nullslop-tui" }
 nullslop-extension = { path = "crates/nullslop-extension" }
+nullslop-plugin = { path = "crates/nullslop-plugin" }
 nullslop-cli = { path = "crates/nullslop-cli" }
 
 # Error handling

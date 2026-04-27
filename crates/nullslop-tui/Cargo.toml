@@ -5,7 +5,9 @@ edition = "2024"
 
 [dependencies]
 nullslop-core = { workspace = true }
+nullslop-protocol = { workspace = true }
 nullslop-extension = { workspace = true }
+nullslop-plugin = { workspace = true }
 wherror = { workspace = true }
 error-stack = { workspace = true }
 ratatui = { workspace = true }
