@@ -101,7 +101,8 @@ impl<E: Clone + 'static> EventHandler<E> for FakeEventHandler<E> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nullslop_protocol::command::AppQuit;
+    use npr::command::AppQuit;
+    use nullslop_protocol as npr;
 
     #[test]
     fn fake_command_handler_records_call() {
@@ -149,7 +150,7 @@ mod tests {
     #[test]
     fn fake_event_handler_records_call() {
         // Given a fake event handler.
-        use nullslop_protocol::event::EventApplicationReady;
+        use npr::event::EventApplicationReady;
         let (handler, calls) = FakeEventHandler::<EventApplicationReady>::new();
         let mut state = AppData::new();
         let mut out = Out::new();

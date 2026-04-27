@@ -136,6 +136,7 @@ pub(crate) fn scope_for_mode(mode: Mode) -> Scope {
 #[cfg(test)]
 mod tests {
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use nullslop_protocol as npr;
 
     use super::*;
 
@@ -206,7 +207,7 @@ mod tests {
         assert_eq!(guard.chat_history.len(), 1);
         assert_eq!(
             guard.chat_history[0].kind,
-            nullslop_protocol::ChatEntryKind::User("hello".to_string())
+            npr::ChatEntryKind::User("hello".to_string())
         );
         assert!(guard.input_buffer.is_empty());
     }
@@ -283,7 +284,7 @@ mod tests {
 
         // When routing a CustomCommand (echo).
         app.route_command(Command::CustomCommand {
-            payload: nullslop_protocol::command::CustomCommand {
+            payload: npr::command::CustomCommand {
                 name: "echo".to_string(),
                 args: serde_json::json!({"text": "hello"}),
             },
@@ -298,7 +299,7 @@ mod tests {
         assert_eq!(guard.chat_history.len(), 1);
         assert_eq!(
             guard.chat_history[0].kind,
-            nullslop_protocol::ChatEntryKind::System("hello".to_string())
+            npr::ChatEntryKind::System("hello".to_string())
         );
     }
 

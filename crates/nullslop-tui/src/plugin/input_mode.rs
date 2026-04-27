@@ -3,9 +3,10 @@
 //! Handles inserting characters, deleting graphemes, and submitting messages
 //! in the chat input buffer.
 
+use npr::CommandAction;
+use npr::command::{ChatBoxDeleteGrapheme, ChatBoxInsertChar, ChatBoxSubmitMessage};
 use nullslop_plugin::{Out, define_plugin};
-use nullslop_protocol::CommandAction;
-use nullslop_protocol::command::{ChatBoxDeleteGrapheme, ChatBoxInsertChar, ChatBoxSubmitMessage};
+use nullslop_protocol as npr;
 
 define_plugin! {
     /// Handles chat input commands.
@@ -21,43 +22,37 @@ define_plugin! {
 }
 
 impl InputModePlugin {
-    #[allow(clippy::unused_self, clippy::trivially_copy_pass_by_ref)]
     fn on_insert_char(
-        &self,
         cmd: &ChatBoxInsertChar,
-        state: &mut nullslop_protocol::AppData,
+        state: &mut npr::AppData,
         _out: &mut Out,
     ) -> CommandAction {
         state.input_buffer.push(cmd.ch);
         CommandAction::Continue
     }
 
-    #[allow(clippy::unused_self, clippy::trivially_copy_pass_by_ref)]
     fn on_delete_grapheme(
-        &self,
         _cmd: &ChatBoxDeleteGrapheme,
-        state: &mut nullslop_protocol::AppData,
+        state: &mut npr::AppData,
         _out: &mut Out,
     ) -> CommandAction {
         state.pop_grapheme();
         CommandAction::Continue
     }
 
-    #[allow(clippy::unused_self, clippy::trivially_copy_pass_by_ref)]
     fn on_submit_message(
-        &self,
         _cmd: &ChatBoxSubmitMessage,
-        state: &mut nullslop_protocol::AppData,
+        state: &mut npr::AppData,
         out: &mut Out,
     ) -> CommandAction {
         let text = state.input_buffer.clone();
         if !text.is_empty() {
-            let entry = nullslop_protocol::ChatEntry::user(&text);
+            let entry = npr::ChatEntry::user(&text);
             state.push_entry(entry.clone());
             state.input_buffer.clear();
 
-            out.submit_event(nullslop_protocol::Event::EventChatMessageSubmitted {
-                payload: nullslop_protocol::event::EventChatMessageSubmitted { entry },
+            out.submit_event(npr::Event::EventChatMessageSubmitted {
+                payload: npr::event::EventChatMessageSubmitted { entry },
             });
         }
         CommandAction::Continue
@@ -66,9 +61,10 @@ impl InputModePlugin {
 
 #[cfg(test)]
 mod tests {
+    use npr::Command;
+    use npr::command::{ChatBoxInsertChar, ChatBoxSubmitMessage};
     use nullslop_plugin::Bus;
-    use nullslop_protocol::Command;
-    use nullslop_protocol::command::{ChatBoxInsertChar, ChatBoxSubmitMessage};
+    use nullslop_protocol as npr;
 
     use super::*;
 
@@ -82,7 +78,7 @@ mod tests {
         bus.submit_command(Command::ChatBoxInsertChar {
             payload: ChatBoxInsertChar { ch: 'x' },
         });
-        let mut state = nullslop_protocol::AppData::new();
+        let mut state = npr::AppData::new();
         bus.process_commands(&mut state);
 
         // Then input_buffer contains "x".
@@ -103,7 +99,7 @@ mod tests {
             payload: ChatBoxInsertChar { ch: 'b' },
         });
         bus.submit_command(Command::ChatBoxDeleteGrapheme);
-        let mut state = nullslop_protocol::AppData::new();
+        let mut state = npr::AppData::new();
         bus.process_commands(&mut state);
 
         // Then input_buffer is "a".
@@ -116,7 +112,7 @@ mod tests {
         let mut bus = Bus::new();
         InputModePlugin.register(&mut bus);
 
-        let mut state = nullslop_protocol::AppData::new();
+        let mut state = npr::AppData::new();
         state.input_buffer = "hello".to_string();
 
         // When processing ChatBoxSubmitMessage.
@@ -131,7 +127,7 @@ mod tests {
         assert_eq!(state.chat_history.len(), 1);
         assert_eq!(
             state.chat_history[0].kind,
-            nullslop_protocol::ChatEntryKind::User("hello".to_string())
+            npr::ChatEntryKind::User("hello".to_string())
         );
         assert!(state.input_buffer.is_empty());
     }
@@ -148,7 +144,7 @@ mod tests {
                 text: String::new(),
             },
         });
-        let mut state = nullslop_protocol::AppData::new();
+        let mut state = npr::AppData::new();
         bus.process_commands(&mut state);
 
         // Then no entry is added and no event is emitted.
@@ -162,7 +158,7 @@ mod tests {
         let mut bus = Bus::new();
         InputModePlugin.register(&mut bus);
 
-        let mut state = nullslop_protocol::AppData::new();
+        let mut state = npr::AppData::new();
         state.input_buffer = "hello".to_string();
 
         // When processing ChatBoxSubmitMessage.
@@ -184,7 +180,7 @@ mod tests {
         assert_eq!(processed.len(), 1);
         assert!(matches!(
             &processed[0],
-            nullslop_protocol::Event::EventChatMessageSubmitted { .. }
+            npr::Event::EventChatMessageSubmitted { .. }
         ));
     }
 }

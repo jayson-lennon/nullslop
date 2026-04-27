@@ -3,6 +3,8 @@
 //! Provides a unified message type that merges crossterm terminal events,
 //! periodic tick messages, and commands into a single stream.
 
+use nullslop_protocol as npr;
+
 pub mod handler;
 pub mod sender;
 
@@ -20,7 +22,7 @@ pub enum Msg {
     /// A crossterm terminal event (key press, resize, etc.).
     Input(crossterm::event::Event),
     /// A command from key handling or an extension.
-    Command(nullslop_protocol::Command),
+    Command(npr::Command),
     /// All extensions have been discovered, spawned, and registered.
     /// Contains the list of registered extensions to add to state.
     ExtensionsReady(Vec<nullslop_core::RegisteredExtension>),
@@ -29,12 +31,12 @@ pub enum Msg {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nullslop_protocol::command::CustomCommand;
+    use npr::command::CustomCommand;
 
     #[test]
     fn command_message_carries_command() {
         // Given a Command message with a custom command.
-        let msg = Msg::Command(nullslop_protocol::Command::CustomCommand {
+        let msg = Msg::Command(npr::Command::CustomCommand {
             payload: CustomCommand {
                 name: "echo".to_string(),
                 args: serde_json::json!({"text": "hello"}),
@@ -43,7 +45,7 @@ mod tests {
 
         // Then it matches and the name is accessible.
         match msg {
-            Msg::Command(nullslop_protocol::Command::CustomCommand { payload }) => {
+            Msg::Command(npr::Command::CustomCommand { payload }) => {
                 assert_eq!(payload.name, "echo");
             }
             _ => panic!("expected Command"),

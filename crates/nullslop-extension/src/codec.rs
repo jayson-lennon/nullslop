@@ -107,8 +107,9 @@ pub fn write_message(msg: &OutboundMessage) -> Result<(), Report<CodecError>> {
 #[allow(clippy::match_wildcard_for_single_variants)]
 mod tests {
     use super::*;
+    use npr::command::CustomCommand;
     use nullslop_core::Command;
-    use nullslop_protocol::command::CustomCommand;
+    use nullslop_protocol as npr;
 
     #[test]
     fn inbound_initialize_roundtrip() {

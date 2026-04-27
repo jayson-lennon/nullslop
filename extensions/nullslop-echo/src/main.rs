@@ -4,9 +4,10 @@
 //! → echo extension receives event → echo sends `CustomCommand` → host adds
 //! system chat entry.
 
+use npr::event::EventChatMessageSubmitted;
 use nullslop_core::{ChatEntryKind, Command, Event};
 use nullslop_extension::{Context, Extension, run};
-use nullslop_protocol::event::EventChatMessageSubmitted;
+use nullslop_protocol as npr;
 
 /// Reference extension that echoes user messages back as system messages.
 struct EchoExtension;
@@ -29,7 +30,7 @@ impl Extension for EchoExtension {
         } = event
             && let ChatEntryKind::User(text) = &entry.kind
             && let Err(e) = ctx.send_command(Command::CustomCommand {
-                payload: nullslop_protocol::command::CustomCommand {
+                payload: npr::command::CustomCommand {
                     name: "echo".to_string(),
                     args: serde_json::json!({ "text": format!("echo: {text}") }),
                 },

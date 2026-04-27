@@ -1,5 +1,6 @@
 //! Layout computation and rendering for the application.
 
+use nullslop_protocol as npr;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Modifier;
@@ -56,11 +57,11 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
         .chat_history
         .iter()
         .map(|entry| match &entry.kind {
-            nullslop_protocol::ChatEntryKind::User(text) => Line::from(Span::styled(
+            npr::ChatEntryKind::User(text) => Line::from(Span::styled(
                 format!("> {text}"),
                 Style::default().add_modifier(Modifier::BOLD),
             )),
-            nullslop_protocol::ChatEntryKind::System(text) => Line::from(Span::styled(
+            npr::ChatEntryKind::System(text) => Line::from(Span::styled(
                 format!("  {text}"),
                 Style::default().fg(ratatui::style::Color::DarkGray),
             )),

@@ -3,9 +3,10 @@
 //! Handles the `AppQuit` command by setting the `should_quit` flag
 //! and stopping command propagation.
 
+use npr::CommandAction;
+use npr::command::AppQuit;
 use nullslop_plugin::{Out, define_plugin};
-use nullslop_protocol::CommandAction;
-use nullslop_protocol::command::AppQuit;
+use nullslop_protocol as npr;
 
 define_plugin! {
     /// Handles core application commands.
@@ -19,13 +20,7 @@ define_plugin! {
 }
 
 impl CoreDispatcher {
-    #[allow(clippy::unused_self, clippy::trivially_copy_pass_by_ref)]
-    fn on_quit(
-        &self,
-        _cmd: &AppQuit,
-        state: &mut nullslop_protocol::AppData,
-        _out: &mut Out,
-    ) -> CommandAction {
+    fn on_quit(_cmd: &AppQuit, state: &mut npr::AppData, _out: &mut Out) -> CommandAction {
         state.should_quit = true;
         CommandAction::Stop
     }
@@ -33,8 +28,9 @@ impl CoreDispatcher {
 
 #[cfg(test)]
 mod tests {
+    use npr::Command;
     use nullslop_plugin::Bus;
-    use nullslop_protocol::Command;
+    use nullslop_protocol as npr;
 
     use super::*;
 
@@ -46,7 +42,7 @@ mod tests {
 
         // When processing AppQuit.
         bus.submit_command(Command::AppQuit);
-        let mut state = nullslop_protocol::AppData::new();
+        let mut state = npr::AppData::new();
         bus.process_commands(&mut state);
 
         // Then should_quit is true.

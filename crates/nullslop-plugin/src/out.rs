@@ -55,7 +55,8 @@ impl Out {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nullslop_protocol::command::ChatBoxInsertChar;
+    use npr::command::ChatBoxInsertChar;
+    use nullslop_protocol as npr;
 
     #[test]
     fn new_out_is_empty() {

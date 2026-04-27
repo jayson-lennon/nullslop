@@ -2,9 +2,10 @@
 //!
 //! Handles the `AppSetMode` command to change the interaction mode.
 
+use npr::CommandAction;
+use npr::command::AppSetMode;
 use nullslop_plugin::{Out, define_plugin};
-use nullslop_protocol::CommandAction;
-use nullslop_protocol::command::AppSetMode;
+use nullslop_protocol as npr;
 
 define_plugin! {
     /// Handles mode-switching commands.
@@ -18,13 +19,7 @@ define_plugin! {
 }
 
 impl NormalModePlugin {
-    #[allow(clippy::unused_self, clippy::trivially_copy_pass_by_ref)]
-    fn on_set_mode(
-        &self,
-        cmd: &AppSetMode,
-        state: &mut nullslop_protocol::AppData,
-        _out: &mut Out,
-    ) -> CommandAction {
+    fn on_set_mode(cmd: &AppSetMode, state: &mut npr::AppData, _out: &mut Out) -> CommandAction {
         state.mode = cmd.mode;
         CommandAction::Continue
     }
@@ -32,9 +27,10 @@ impl NormalModePlugin {
 
 #[cfg(test)]
 mod tests {
+    use npr::Command;
+    use npr::command::AppSetMode;
     use nullslop_plugin::Bus;
-    use nullslop_protocol::Command;
-    use nullslop_protocol::command::AppSetMode;
+    use nullslop_protocol as npr;
 
     use super::*;
 
@@ -47,13 +43,13 @@ mod tests {
         // When processing AppSetMode(Input).
         bus.submit_command(Command::AppSetMode {
             payload: AppSetMode {
-                mode: nullslop_protocol::Mode::Input,
+                mode: npr::Mode::Input,
             },
         });
-        let mut state = nullslop_protocol::AppData::new();
+        let mut state = npr::AppData::new();
         bus.process_commands(&mut state);
 
         // Then state mode is Input.
-        assert_eq!(state.mode, nullslop_protocol::Mode::Input);
+        assert_eq!(state.mode, npr::Mode::Input);
     }
 }

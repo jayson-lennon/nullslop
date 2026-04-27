@@ -3,9 +3,10 @@
 //! Handles `CustomCommand` (e.g., the "echo" command) by adding
 //! system chat entries.
 
+use npr::CommandAction;
+use npr::command::CustomCommand;
 use nullslop_plugin::{Out, define_plugin};
-use nullslop_protocol::CommandAction;
-use nullslop_protocol::command::CustomCommand;
+use nullslop_protocol as npr;
 
 define_plugin! {
     /// Handles commands from extensions.
@@ -19,17 +20,15 @@ define_plugin! {
 }
 
 impl ExtensionCommandPlugin {
-    #[allow(clippy::unused_self, clippy::trivially_copy_pass_by_ref)]
     fn on_custom_command(
-        &self,
         cmd: &CustomCommand,
-        state: &mut nullslop_protocol::AppData,
+        state: &mut npr::AppData,
         _out: &mut Out,
     ) -> CommandAction {
         if cmd.name == "echo"
             && let Some(text) = cmd.args.get("text").and_then(|v| v.as_str())
         {
-            state.push_entry(nullslop_protocol::ChatEntry::system(text));
+            state.push_entry(npr::ChatEntry::system(text));
         } else {
             tracing::warn!(name = %cmd.name, "unhandled extension command");
         }
@@ -39,8 +38,9 @@ impl ExtensionCommandPlugin {
 
 #[cfg(test)]
 mod tests {
+    use npr::Command;
     use nullslop_plugin::Bus;
-    use nullslop_protocol::Command;
+    use nullslop_protocol as npr;
 
     use super::*;
 
@@ -57,14 +57,14 @@ mod tests {
                 args: serde_json::json!({"text": "hello"}),
             },
         });
-        let mut state = nullslop_protocol::AppData::new();
+        let mut state = npr::AppData::new();
         bus.process_commands(&mut state);
 
         // Then chat_history has a System entry.
         assert_eq!(state.chat_history.len(), 1);
         assert_eq!(
             state.chat_history[0].kind,
-            nullslop_protocol::ChatEntryKind::System("hello".to_string())
+            npr::ChatEntryKind::System("hello".to_string())
         );
     }
 
@@ -81,7 +81,7 @@ mod tests {
                 args: serde_json::json!({}),
             },
         });
-        let mut state = nullslop_protocol::AppData::new();
+        let mut state = npr::AppData::new();
         bus.process_commands(&mut state);
 
         // Then no entry is added.

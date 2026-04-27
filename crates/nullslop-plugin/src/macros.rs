@@ -38,10 +38,10 @@
 /// # Handler methods
 ///
 /// Command handler methods must have this signature:
-/// `fn method(&self, cmd: &C, state: &mut AppData, out: &mut Out) -> CommandAction`
+/// `fn method(cmd: &C, state: &mut AppData, out: &mut Out) -> CommandAction`
 ///
 /// Event handler methods must have this signature:
-/// `fn method(&self, evt: &E, state: &mut AppData, out: &mut Out)`
+/// `fn method(evt: &E, state: &mut AppData, out: &mut Out)`
 ///
 /// Command methods return `CommandAction` directly — the macro forwards the return value.
 /// Event methods return `()`.
@@ -73,7 +73,7 @@ macro_rules! define_plugin {
                     state: &mut ::nullslop_protocol::AppData,
                     out: &mut $crate::Out,
                 ) -> ::nullslop_protocol::CommandAction {
-                    self.$cmd_method(cmd, state, out)
+                    Self::$cmd_method(cmd, state, out)
                 }
             }
         )*
@@ -88,7 +88,7 @@ macro_rules! define_plugin {
                     state: &mut ::nullslop_protocol::AppData,
                     out: &mut $crate::Out,
                 ) {
-                    self.$evt_method(evt, state, out);
+                    Self::$evt_method(evt, state, out);
                 }
             }
         )*
@@ -112,9 +112,10 @@ macro_rules! define_plugin {
 mod tests {
     use crate::fake::FakeCommandHandler;
     use crate::{Bus, Out};
-    use nullslop_protocol::command::{AppQuit, ChatBoxInsertChar};
-    use nullslop_protocol::event::EventApplicationReady;
-    use nullslop_protocol::{AppData, Command, CommandAction, Event};
+    use npr::command::{AppQuit, ChatBoxInsertChar};
+    use npr::event::EventApplicationReady;
+    use npr::{AppData, Command, CommandAction, Event};
+    use nullslop_protocol as npr;
 
     // --- Test plugin: command handler returning Continue ---
 
@@ -129,9 +130,7 @@ mod tests {
     }
 
     impl ContinuePlugin {
-        #[allow(clippy::unused_self, clippy::trivially_copy_pass_by_ref)]
         fn on_insert_char(
-            &self,
             cmd: &ChatBoxInsertChar,
             state: &mut AppData,
             _out: &mut Out,
@@ -171,8 +170,7 @@ mod tests {
     }
 
     impl StopPlugin {
-        #[allow(clippy::unused_self, clippy::trivially_copy_pass_by_ref)]
-        fn on_quit(&self, _cmd: &AppQuit, state: &mut AppData, _out: &mut Out) -> CommandAction {
+        fn on_quit(_cmd: &AppQuit, state: &mut AppData, _out: &mut Out) -> CommandAction {
             state.should_quit = true;
             CommandAction::Stop
         }
@@ -209,8 +207,7 @@ mod tests {
     }
 
     impl EventPlugin {
-        #[allow(clippy::unused_self, clippy::trivially_copy_pass_by_ref)]
-        fn on_ready(&self, _evt: &EventApplicationReady, state: &mut AppData, _out: &mut Out) {
+        fn on_ready(_evt: &EventApplicationReady, state: &mut AppData, _out: &mut Out) {
             state.should_quit = true;
         }
     }
@@ -247,9 +244,7 @@ mod tests {
     }
 
     impl MultiPlugin {
-        #[allow(clippy::unused_self, clippy::trivially_copy_pass_by_ref)]
         fn on_insert_char(
-            &self,
             cmd: &ChatBoxInsertChar,
             state: &mut AppData,
             _out: &mut Out,
@@ -258,14 +253,12 @@ mod tests {
             CommandAction::Continue
         }
 
-        #[allow(clippy::unused_self, clippy::trivially_copy_pass_by_ref)]
-        fn on_quit(&self, _cmd: &AppQuit, state: &mut AppData, _out: &mut Out) -> CommandAction {
+        fn on_quit(_cmd: &AppQuit, state: &mut AppData, _out: &mut Out) -> CommandAction {
             state.should_quit = true;
             CommandAction::Continue
         }
 
-        #[allow(clippy::unused_self, clippy::trivially_copy_pass_by_ref)]
-        fn on_ready(&self, _evt: &EventApplicationReady, state: &mut AppData, _out: &mut Out) {
+        fn on_ready(_evt: &EventApplicationReady, state: &mut AppData, _out: &mut Out) {
             state.input_buffer.push('!');
         }
     }

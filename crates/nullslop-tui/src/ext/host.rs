@@ -233,8 +233,9 @@ async fn send_shutdown(ext: &mut ManagedExtension) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use npr::event::EventChatMessageSubmitted;
     use nullslop_core::{ChatEntry, Key, KeyEvent, Modifiers};
-    use nullslop_protocol::event::EventChatMessageSubmitted;
+    use nullslop_protocol as npr;
 
     #[test]
     fn new_chat_entry_maps_to_name() {
@@ -261,7 +262,7 @@ mod tests {
     fn custom_event_maps_to_its_name() {
         // Given a Custom event.
         let event = Event::EventCustom {
-            payload: nullslop_protocol::event::EventCustom {
+            payload: npr::event::EventCustom {
                 name: "my-event".to_string(),
                 data: serde_json::json!(null),
             },
@@ -282,7 +283,7 @@ mod tests {
         // Then they return None (not routable to extensions).
         assert_eq!(
             event_type_name(&Event::EventKeyDown {
-                payload: nullslop_protocol::event::EventKeyDown {
+                payload: npr::event::EventKeyDown {
                     key: key_event.clone(),
                 },
             }),
@@ -290,7 +291,7 @@ mod tests {
         );
         assert_eq!(
             event_type_name(&Event::EventKeyUp {
-                payload: nullslop_protocol::event::EventKeyUp {
+                payload: npr::event::EventKeyUp {
                     key: key_event.clone(),
                 },
             }),

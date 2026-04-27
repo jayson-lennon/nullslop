@@ -65,6 +65,7 @@ impl ExtensionHost for FakeExtensionHost {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use nullslop_protocol as npr;
 
     #[test]
     fn fake_host_tracks_events() {
@@ -74,7 +75,7 @@ mod tests {
         // When sending events.
         host.send_event(&Event::EventApplicationReady);
         host.send_event(&Event::EventCustom {
-            payload: nullslop_protocol::event::EventCustom {
+            payload: npr::event::EventCustom {
                 name: "test".to_string(),
                 data: serde_json::json!({}),
             },

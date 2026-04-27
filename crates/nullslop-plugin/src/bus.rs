@@ -355,10 +355,9 @@ impl Default for Bus {
 mod tests {
     use super::*;
     use crate::fake::{FakeCommandHandler, FakeEventHandler};
-    use nullslop_protocol::command::{
-        AppSetMode, ChatBoxDeleteGrapheme, ChatBoxInsertChar, ProviderSendMessage,
-    };
-    use nullslop_protocol::event::{EventApplicationReady, EventKeyDown};
+    use npr::command::{AppSetMode, ChatBoxDeleteGrapheme, ChatBoxInsertChar, ProviderSendMessage};
+    use npr::event::{EventApplicationReady, EventKeyDown};
+    use nullslop_protocol as npr;
 
     // --- Command dispatch tests ---
 
@@ -478,9 +477,9 @@ mod tests {
         bus.register_event_handler::<EventKeyDown, _>(handler);
 
         // When processing an event.
-        let key = nullslop_protocol::KeyEvent {
-            key: nullslop_protocol::Key::Char('a'),
-            modifiers: nullslop_protocol::Modifiers::none(),
+        let key = npr::KeyEvent {
+            key: npr::Key::Char('a'),
+            modifiers: npr::Modifiers::none(),
         };
         bus.submit_event(Event::EventKeyDown {
             payload: EventKeyDown { key },
@@ -647,7 +646,7 @@ mod tests {
         // When submitting multiple commands.
         bus.submit_command(Command::AppSetMode {
             payload: AppSetMode {
-                mode: nullslop_protocol::Mode::Input,
+                mode: npr::Mode::Input,
             },
         });
         bus.submit_command(Command::ProviderSendMessage {
