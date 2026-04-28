@@ -1,7 +1,7 @@
 //! UI element for the chat input box.
 //!
 //! [`ChatInputBoxElement`] implements [`UiElement`] to render the input box.
-//! It reads from `AppData.input_buffer` and renders the input prompt.
+//! It reads from `AppData.chat_input.input_buffer` and renders the input prompt.
 //! In Input mode, the `>` prompt and border are styled green; in Normal mode
 //! they use default styling. A cursor is positioned at the current insertion
 //! point when in Input mode.
@@ -47,7 +47,7 @@ impl UiElement for ChatInputBoxElement {
 
         let line = Line::from(vec![
             Span::styled("> ", prompt_style),
-            Span::styled(&state.input_buffer, Style::default()),
+            Span::styled(&state.chat_input.input_buffer, Style::default()),
         ]);
 
         let block = Block::default()
@@ -61,7 +61,7 @@ impl UiElement for ChatInputBoxElement {
         // Position cursor at the end of the prompt + text when in input mode.
         if input_mode {
             let prompt_width: usize = 2; // "> " = 2 columns
-            let text_width: usize = state.input_buffer.graphemes(true).count();
+            let text_width: usize = state.chat_input.input_buffer.graphemes(true).count();
             let cursor_x = inner.x + (prompt_width + text_width) as u16;
             let cursor_y = inner.y;
             frame.set_cursor_position((cursor_x, cursor_y));
@@ -95,7 +95,7 @@ mod tests {
         let mut element = ChatInputBoxElement;
         let state = {
             let mut s = nullslop_protocol::AppData::new();
-            s.input_buffer = "hello".to_string();
+            s.chat_input.input_buffer = "hello".to_string();
             s
         };
 
@@ -146,7 +146,7 @@ mod tests {
         let state = {
             let mut s = nullslop_protocol::AppData::new();
             s.mode = Mode::Input;
-            s.input_buffer = "hi".to_string();
+            s.chat_input.input_buffer = "hi".to_string();
             s
         };
 
@@ -202,7 +202,7 @@ mod tests {
         let state = {
             let mut s = nullslop_protocol::AppData::new();
             s.mode = Mode::Input;
-            s.input_buffer = "abc".to_string();
+            s.chat_input.input_buffer = "abc".to_string();
             s
         };
 

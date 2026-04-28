@@ -240,7 +240,7 @@ mod tests {
         });
         core.tick();
 
-        // Then the character appears in input_buffer.
-        assert_eq!(core.state.read().input_buffer, "x");
+        // Then the character appears in chat_input.input_buffer.
+        assert_eq!(core.state.read().chat_input.input_buffer, "x");
     }
 }

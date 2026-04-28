@@ -8,6 +8,7 @@
 pub mod action;
 pub mod app_data;
 pub mod chat;
+pub mod chat_input_state;
 pub mod command;
 pub mod event;
 pub mod key;
@@ -17,6 +18,7 @@ pub mod mode;
 pub use action::CommandAction;
 pub use app_data::AppData;
 pub use chat::{ChatEntry, ChatEntryKind};
+pub use chat_input_state::ChatInputBoxState;
 pub use command::Command;
 pub use event::Event;
 pub use key::{Key, KeyEvent, Modifiers};

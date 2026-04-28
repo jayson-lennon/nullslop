@@ -5,7 +5,8 @@
 
 use npr::CommandAction;
 use npr::command::CustomCommand;
-use nullslop_plugin_core::{Out, define_plugin};
+use nullslop_plugin_core::{Bus, Out, define_plugin};
+use nullslop_plugin_ui::UiRegistry;
 use nullslop_protocol as npr;
 
 define_plugin! {
@@ -17,6 +18,11 @@ define_plugin! {
     }
 
     events {}
+}
+
+/// Register the extension command plugin.
+pub(crate) fn register(bus: &mut Bus, _registry: &mut UiRegistry) {
+    ExtensionCommandPlugin.register(bus);
 }
 
 impl ExtensionCommandPlugin {

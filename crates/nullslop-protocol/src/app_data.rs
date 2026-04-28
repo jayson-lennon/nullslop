@@ -2,17 +2,15 @@
 //!
 //! [`AppData`] is the shared state that plugins read and write.
 //! It contains domain-level data: chat history, input mode, and
-//! the input buffer. Host-side concerns like extension tracking
+//! the chat input box state. Host-side concerns like extension tracking
 //! are managed separately in `nullslop-core`.
 
-use unicode_segmentation::UnicodeSegmentation;
-
-use crate::{ChatEntry, Mode};
+use crate::{ChatEntry, ChatInputBoxState, Mode};
 
 /// The domain data of the application.
 ///
 /// This is the data shared across threads via the [`State`](nullslop_core::State) wrapper.
-/// It contains domain-level state: chat history, interaction mode, and input buffer.
+/// It contains domain-level state: chat history, interaction mode, and chat input.
 /// Host-side extension tracking lives separately in `nullslop-core`.
 #[derive(Debug)]
 pub struct AppData {
@@ -20,8 +18,8 @@ pub struct AppData {
     pub chat_history: Vec<ChatEntry>,
     /// Current interaction mode.
     pub mode: Mode,
-    /// The current text in the input box.
-    pub input_buffer: String,
+    /// Chat input box state.
+    pub chat_input: ChatInputBoxState,
     /// Whether the application should exit.
     pub should_quit: bool,
 }
@@ -33,7 +31,7 @@ impl AppData {
         Self {
             chat_history: Vec::new(),
             mode: Mode::Normal,
-            input_buffer: String::new(),
+            chat_input: ChatInputBoxState::new(),
             should_quit: false,
         }
     }
@@ -43,15 +41,6 @@ impl AppData {
         let index = self.chat_history.len();
         self.chat_history.push(entry);
         index
-    }
-
-    /// Removes the last grapheme cluster from the input buffer.
-    ///
-    /// Uses `unicode_segmentation` to handle multi-byte characters correctly.
-    pub fn pop_grapheme(&mut self) {
-        if let Some((idx, _)) = self.input_buffer.grapheme_indices(true).next_back() {
-            self.input_buffer.truncate(idx);
-        }
     }
 }
 
@@ -100,12 +89,12 @@ mod tests {
     }
 
     #[test]
-    fn default_input_buffer_is_empty() {
+    fn default_chat_input_is_empty() {
         // Given a new AppData.
         let data = AppData::new();
 
-        // Then input buffer is empty.
-        assert!(data.input_buffer.is_empty());
+        // Then chat input buffer is empty.
+        assert!(data.chat_input.input_buffer.is_empty());
     }
 
     #[test]
@@ -115,43 +104,5 @@ mod tests {
 
         // Then should_quit is false.
         assert!(!data.should_quit);
-    }
-
-    #[test]
-    fn pop_grapheme_removes_last() {
-        // Given an AppData with "abc" in the buffer.
-        let mut data = AppData::new();
-        data.input_buffer = "abc".to_string();
-
-        // When popping a grapheme.
-        data.pop_grapheme();
-
-        // Then buffer is "ab".
-        assert_eq!(data.input_buffer, "ab");
-    }
-
-    #[test]
-    fn pop_grapheme_handles_unicode() {
-        // Given an AppData with "é" in the buffer.
-        let mut data = AppData::new();
-        data.input_buffer = "é".to_string();
-
-        // When popping a grapheme.
-        data.pop_grapheme();
-
-        // Then buffer is empty.
-        assert_eq!(data.input_buffer, "");
-    }
-
-    #[test]
-    fn pop_grapheme_empty_is_noop() {
-        // Given an AppData with empty buffer.
-        let mut data = AppData::new();
-
-        // When popping a grapheme.
-        data.pop_grapheme();
-
-        // Then buffer is still empty.
-        assert!(data.input_buffer.is_empty());
     }
 }

@@ -169,7 +169,7 @@ fn run_main_loop(
 /// 5. Invokes the `on_result` closure to produce the new input buffer content
 /// 6. Restarts the event stream task
 /// 7. Redraws the terminal
-/// 8. Writes the result directly to `AppData.input_buffer`
+/// 8. Writes the result directly to `AppData.chat_input.input_buffer`
 fn handle_suspend_action(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     app: &mut TuiApp,
@@ -211,7 +211,7 @@ fn handle_suspend_action(
 
     // Handle the suspend result directly — set input_buffer on AppData.
     if let Some(content) = result_content {
-        app.core.state.write().input_buffer = content;
+        app.core.state.write().chat_input.input_buffer = content;
     }
 
     Ok(())

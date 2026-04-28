@@ -3,7 +3,7 @@
 //! This state is main-thread only and not shared across threads.
 //! It contains rendering concerns like scroll offset.
 //!
-//! Note: `input_buffer` lives in [`AppData`](nullslop_protocol::AppData),
+//! Note: chat input state lives in [`AppData.chat_input`](nullslop_protocol::ChatInputBoxState),
 //! not here. The plugin system operates on `AppData` via the bus.
 
 /// Mutable state for the TUI layer.

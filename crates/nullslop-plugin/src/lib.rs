@@ -6,8 +6,8 @@
 
 pub mod chat_input_box;
 pub mod chat_log;
-pub mod core_dispatcher;
 pub mod extension_command;
+pub mod quit_handler;
 
 use nullslop_plugin_core::Bus;
 use nullslop_plugin_ui::UiRegistry;
@@ -16,9 +16,8 @@ use nullslop_plugin_ui::UiRegistry;
 ///
 /// Called once during application startup.
 pub fn register_all(bus: &mut Bus, registry: &mut UiRegistry) {
-    core_dispatcher::CoreDispatcher.register(bus);
-    extension_command::ExtensionCommandPlugin.register(bus);
-    chat_input_box::ChatInputBoxHandler.register(bus);
-    registry.register(Box::new(chat_input_box::ChatInputBoxElement));
-    registry.register(Box::new(chat_log::ChatLogElement));
+    quit_handler::register(bus, registry);
+    extension_command::register(bus, registry);
+    chat_input_box::register(bus, registry);
+    chat_log::register(bus, registry);
 }

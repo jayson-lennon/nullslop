@@ -19,7 +19,7 @@ use std::rc::Rc;
 
 use crate::element::UiElement;
 
-/// Recorded render call data: the allocated area and a snapshot of `input_buffer`.
+/// Recorded render call data: the allocated area and a snapshot of the input buffer.
 pub type RenderCall = (ratatui::layout::Rect, String);
 
 /// Fake UI element that records render calls.
@@ -64,7 +64,7 @@ impl UiElement for FakeUiElement {
     ) {
         self.render_calls
             .borrow_mut()
-            .push((area, state.input_buffer.clone()));
+            .push((area, state.chat_input.input_buffer.clone()));
     }
 }
 
@@ -110,13 +110,13 @@ mod tests {
         // Given a fake element.
         let (mut element, calls) = FakeUiElement::new("test");
         let mut state = AppData::new();
-        state.input_buffer = "hello".to_string();
+        state.chat_input.input_buffer = "hello".to_string();
 
         // When rendering with a specific area.
         let area = Rect::new(0, 0, 80, 3);
         render_element(&mut element, area, &state);
 
-        // Then the call was recorded with the correct area and input_buffer.
+        // Then the call was recorded with the correct area and input buffer.
         assert_eq!(calls.borrow().len(), 1);
         let (recorded_area, recorded_buffer) = calls.borrow()[0].clone();
         assert_eq!(recorded_area, area);

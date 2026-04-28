@@ -31,7 +31,7 @@ impl ChatInputBoxHandler {
         state: &mut npr::AppData,
         _out: &mut Out,
     ) -> CommandAction {
-        state.input_buffer.push(cmd.ch);
+        state.chat_input.input_buffer.push(cmd.ch);
         CommandAction::Continue
     }
 
@@ -40,7 +40,7 @@ impl ChatInputBoxHandler {
         state: &mut npr::AppData,
         _out: &mut Out,
     ) -> CommandAction {
-        state.pop_grapheme();
+        state.chat_input.pop_grapheme();
         CommandAction::Continue
     }
 
@@ -49,11 +49,11 @@ impl ChatInputBoxHandler {
         state: &mut npr::AppData,
         out: &mut Out,
     ) -> CommandAction {
-        let text = state.input_buffer.clone();
+        let text = state.chat_input.input_buffer.clone();
         if !text.is_empty() {
             let entry = npr::ChatEntry::user(&text);
             state.push_entry(entry.clone());
-            state.input_buffer.clear();
+            state.chat_input.input_buffer.clear();
 
             out.submit_event(npr::Event::EventChatMessageSubmitted {
                 payload: npr::event::EventChatMessageSubmitted { entry },
@@ -63,7 +63,7 @@ impl ChatInputBoxHandler {
     }
 
     fn on_clear(_cmd: &ChatBoxClear, state: &mut npr::AppData, _out: &mut Out) -> CommandAction {
-        state.input_buffer.clear();
+        state.chat_input.input_buffer.clear();
         CommandAction::Continue
     }
 
@@ -95,8 +95,8 @@ mod tests {
         let mut state = npr::AppData::new();
         bus.process_commands(&mut state);
 
-        // Then input_buffer contains "x".
-        assert_eq!(state.input_buffer, "x");
+        // Then chat_input.input_buffer contains "x".
+        assert_eq!(state.chat_input.input_buffer, "x");
     }
 
     #[test]
@@ -116,8 +116,8 @@ mod tests {
         let mut state = npr::AppData::new();
         bus.process_commands(&mut state);
 
-        // Then input_buffer is "a".
-        assert_eq!(state.input_buffer, "a");
+        // Then chat_input.input_buffer is "a".
+        assert_eq!(state.chat_input.input_buffer, "a");
     }
 
     #[test]
@@ -127,7 +127,7 @@ mod tests {
         ChatInputBoxHandler.register(&mut bus);
 
         let mut state = npr::AppData::new();
-        state.input_buffer = "hello".to_string();
+        state.chat_input.input_buffer = "hello".to_string();
 
         // When processing ChatBoxSubmitMessage.
         bus.submit_command(Command::ChatBoxSubmitMessage {
@@ -143,7 +143,7 @@ mod tests {
             state.chat_history[0].kind,
             npr::ChatEntryKind::User("hello".to_string())
         );
-        assert!(state.input_buffer.is_empty());
+        assert!(state.chat_input.input_buffer.is_empty());
     }
 
     #[test]
@@ -173,7 +173,7 @@ mod tests {
         ChatInputBoxHandler.register(&mut bus);
 
         let mut state = npr::AppData::new();
-        state.input_buffer = "hello".to_string();
+        state.chat_input.input_buffer = "hello".to_string();
 
         // When processing ChatBoxSubmitMessage.
         bus.submit_command(Command::ChatBoxSubmitMessage {
@@ -205,14 +205,14 @@ mod tests {
         ChatInputBoxHandler.register(&mut bus);
 
         let mut state = npr::AppData::new();
-        state.input_buffer = "some text".to_string();
+        state.chat_input.input_buffer = "some text".to_string();
 
         // When processing ChatBoxClear.
         bus.submit_command(Command::ChatBoxClear);
         bus.process_commands(&mut state);
 
         // Then the input buffer is empty.
-        assert!(state.input_buffer.is_empty());
+        assert!(state.chat_input.input_buffer.is_empty());
     }
 
     #[test]

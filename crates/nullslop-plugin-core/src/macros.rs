@@ -135,7 +135,7 @@ mod tests {
             state: &mut AppData,
             _out: &mut Out,
         ) -> CommandAction {
-            state.input_buffer.push(cmd.ch);
+            state.chat_input.input_buffer.push(cmd.ch);
             CommandAction::Continue
         }
     }
@@ -154,7 +154,7 @@ mod tests {
         bus.process_commands(&mut state);
 
         // Then the handler ran and mutated state.
-        assert_eq!(state.input_buffer, "x");
+        assert_eq!(state.chat_input.input_buffer, "x");
     }
 
     // --- Test plugin: command handler returning Stop ---
@@ -249,7 +249,7 @@ mod tests {
             state: &mut AppData,
             _out: &mut Out,
         ) -> CommandAction {
-            state.input_buffer.push(cmd.ch);
+            state.chat_input.input_buffer.push(cmd.ch);
             CommandAction::Continue
         }
 
@@ -259,7 +259,7 @@ mod tests {
         }
 
         fn on_ready(_evt: &EventApplicationReady, state: &mut AppData, _out: &mut Out) {
-            state.input_buffer.push('!');
+            state.chat_input.input_buffer.push('!');
         }
     }
 
@@ -277,7 +277,7 @@ mod tests {
         bus.process_commands(&mut state);
 
         // Then the command handler ran.
-        assert_eq!(state.input_buffer, "h");
+        assert_eq!(state.chat_input.input_buffer, "h");
         assert!(!state.should_quit);
 
         // When also processing AppQuit.
@@ -291,7 +291,7 @@ mod tests {
         bus.submit_event(Event::EventApplicationReady);
         bus.process_events(&mut state);
 
-        // Then the event handler ran (input_buffer has "h!").
-        assert_eq!(state.input_buffer, "h!");
+        // Then the event handler ran (chat_input.input_buffer has "h!").
+        assert_eq!(state.chat_input.input_buffer, "h!");
     }
 }
