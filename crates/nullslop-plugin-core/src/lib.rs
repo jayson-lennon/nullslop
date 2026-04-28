@@ -4,7 +4,7 @@
 //! - [`CommandHandler`] and [`EventHandler`] traits for typed handling
 //! - [`Out`] for buffered command/event submission
 //! - [`Bus`] for [`TypeId`]-keyed dispatch with processing loops
-//! - [`define_plugin!`](crate::define_plugin) macro for declarative plugin definitions
+//! - [`define_handler!`](crate::define_handler) macro for declarative handler definitions
 //!
 //! It depends only on `nullslop-protocol` — no dependency on `nullslop-core`.
 

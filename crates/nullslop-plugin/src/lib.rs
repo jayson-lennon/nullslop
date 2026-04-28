@@ -1,7 +1,7 @@
 //! nullslop-plugin: built-in plugin implementations.
 //!
 //! Contains all plugins that handle commands and events for the nullslop
-//! application. Each plugin is defined using the [`define_plugin!`](nullslop_plugin_core::define_plugin)
+//! application. Each plugin that handles messages is defined using the [`define_handler!`](nullslop_plugin_core::define_handler)
 //! macro from `nullslop-plugin-core`.
 
 pub mod chat_input_box;

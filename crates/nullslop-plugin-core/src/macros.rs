@@ -1,7 +1,7 @@
-//! Declarative macro for defining plugins with typed command and event handlers.
+//! Declarative macro for defining plugins that handle messages (commands and events).
 //!
-//! The [`define_plugin!`] macro reduces boilerplate by generating:
-//! - The plugin struct definition (unit struct)
+//! The [`define_handler!`] macro reduces boilerplate by generating:
+//! - The handler struct definition (unit struct)
 //! - `impl CommandHandler<C>` for each command entry
 //! - `impl EventHandler<E>` for each event entry
 //! - A `register(&self, bus: &mut Bus)` method
@@ -9,10 +9,14 @@
 //! Users provide method implementations in a separate `impl` block for full
 //! IDE support (autocomplete, type checking, inline errors).
 
-/// Define a plugin struct with typed command and event handlers.
+/// Define a plugin that handles messages (commands and events).
+///
+/// A plugin can be a command/event handler (defined via this macro),
+/// a UI element (implementing `UiElement`), or both. This macro
+/// generates the handler struct and typed dispatch wiring.
 ///
 /// Generates:
-/// - The plugin struct definition (unit struct)
+/// - The handler struct definition (unit struct)
 /// - `impl CommandHandler<C>` for each command entry (forwards `CommandAction` return value)
 /// - `impl EventHandler<E>` for each event entry
 /// - A `register(&self, bus: &mut Bus)` method
@@ -20,9 +24,9 @@
 /// # Syntax
 ///
 /// ```ignore
-/// define_plugin! {
+/// define_handler! {
 ///     /// Optional doc comments.
-///     pub struct MyPlugin;
+///     pub struct MyHandler;
 ///
 ///     commands {
 ///         CmdTypeA: method_a,
@@ -46,7 +50,7 @@
 /// Command methods return `CommandAction` directly — the macro forwards the return value.
 /// Event methods return `()`.
 #[macro_export]
-macro_rules! define_plugin {
+macro_rules! define_handler {
     (
         $(#[$meta:meta])*
         $vis:vis struct $name:ident;
@@ -117,10 +121,10 @@ mod tests {
     use npr::{AppData, Command, CommandAction, Event};
     use nullslop_protocol as npr;
 
-    // --- Test plugin: command handler returning Continue ---
+    // --- Test handler: command handler returning Continue ---
 
-    define_plugin! {
-        struct ContinuePlugin;
+    define_handler! {
+        struct ContinueHandler;
 
         commands {
             ChatBoxInsertChar: on_insert_char,
@@ -129,7 +133,7 @@ mod tests {
         events {}
     }
 
-    impl ContinuePlugin {
+    impl ContinueHandler {
         fn on_insert_char(
             cmd: &ChatBoxInsertChar,
             state: &mut AppData,
@@ -142,9 +146,9 @@ mod tests {
 
     #[test]
     fn command_handler_returning_continue() {
-        // Given a plugin registered with the bus.
+        // Given a handler registered with the bus.
         let mut bus = Bus::new();
-        ContinuePlugin.register(&mut bus);
+        ContinueHandler.register(&mut bus);
 
         // When submitting a ChatBoxInsertChar command.
         bus.submit_command(Command::ChatBoxInsertChar {
@@ -157,10 +161,10 @@ mod tests {
         assert_eq!(state.chat_input.input_buffer, "x");
     }
 
-    // --- Test plugin: command handler returning Stop ---
+    // --- Test handler: command handler returning Stop ---
 
-    define_plugin! {
-        struct StopPlugin;
+    define_handler! {
+        struct StopHandler;
 
         commands {
             AppQuit: on_quit,
@@ -169,7 +173,7 @@ mod tests {
         events {}
     }
 
-    impl StopPlugin {
+    impl StopHandler {
         fn on_quit(_cmd: &AppQuit, state: &mut AppData, _out: &mut Out) -> CommandAction {
             state.should_quit = true;
             CommandAction::Stop
@@ -178,9 +182,9 @@ mod tests {
 
     #[test]
     fn command_handler_returning_stop_prevents_later_handlers() {
-        // Given a StopPlugin and a fake handler both registered for AppQuit.
+        // Given a StopHandler and a fake handler both registered for AppQuit.
         let mut bus = Bus::new();
-        StopPlugin.register(&mut bus);
+        StopHandler.register(&mut bus);
         let (fake, fake_calls) = FakeCommandHandler::<AppQuit>::continuing();
         bus.register_command_handler::<AppQuit, _>(fake);
 
@@ -194,10 +198,10 @@ mod tests {
         assert!(fake_calls.borrow().is_empty());
     }
 
-    // --- Test plugin: event handler ---
+    // --- Test handler: event handler ---
 
-    define_plugin! {
-        struct EventPlugin;
+    define_handler! {
+        struct EventHandlerTest;
 
         commands {}
 
@@ -206,7 +210,7 @@ mod tests {
         }
     }
 
-    impl EventPlugin {
+    impl EventHandlerTest {
         fn on_ready(_evt: &EventApplicationReady, state: &mut AppData, _out: &mut Out) {
             state.should_quit = true;
         }
@@ -214,9 +218,9 @@ mod tests {
 
     #[test]
     fn event_handler_mutates_state() {
-        // Given an EventPlugin registered with the bus.
+        // Given an EventHandlerTest registered with the bus.
         let mut bus = Bus::new();
-        EventPlugin.register(&mut bus);
+        EventHandlerTest.register(&mut bus);
 
         // When processing an EventApplicationReady event.
         bus.submit_event(Event::EventApplicationReady);
@@ -227,11 +231,11 @@ mod tests {
         assert!(state.should_quit);
     }
 
-    // --- Test plugin: multiple command + event handlers ---
+    // --- Test handler: multiple command + event handlers ---
 
-    define_plugin! {
-        /// A plugin with multiple handlers.
-        struct MultiPlugin;
+    define_handler! {
+        /// A handler with multiple message handlers.
+        struct MultiHandler;
 
         commands {
             ChatBoxInsertChar: on_insert_char,
@@ -243,7 +247,7 @@ mod tests {
         }
     }
 
-    impl MultiPlugin {
+    impl MultiHandler {
         fn on_insert_char(
             cmd: &ChatBoxInsertChar,
             state: &mut AppData,
@@ -265,9 +269,9 @@ mod tests {
 
     #[test]
     fn multiple_handlers_dispatch_correctly() {
-        // Given a MultiPlugin with 2 command handlers and 1 event handler.
+        // Given a MultiHandler with 2 command handlers and 1 event handler.
         let mut bus = Bus::new();
-        MultiPlugin.register(&mut bus);
+        MultiHandler.register(&mut bus);
 
         // When processing a ChatBoxInsertChar command.
         bus.submit_command(Command::ChatBoxInsertChar {

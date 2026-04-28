@@ -5,11 +5,11 @@
 
 use npr::CommandAction;
 use npr::command::AppQuit;
-use nullslop_plugin_core::{Bus, Out, define_plugin};
+use nullslop_plugin_core::{Bus, Out, define_handler};
 use nullslop_plugin_ui::UiRegistry;
 use nullslop_protocol as npr;
 
-define_plugin! {
+define_handler! {
     /// Handles the quit command.
     pub(crate) struct QuitHandler;
 

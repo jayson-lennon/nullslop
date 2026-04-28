@@ -7,10 +7,10 @@ use npr::CommandAction;
 use npr::command::{
     AppSetMode, ChatBoxClear, ChatBoxDeleteGrapheme, ChatBoxInsertChar, ChatBoxSubmitMessage,
 };
-use nullslop_plugin_core::{Out, define_plugin};
+use nullslop_plugin_core::{Out, define_handler};
 use nullslop_protocol as npr;
 
-define_plugin! {
+define_handler! {
     /// Handles chat input and mode-switching commands.
     pub(crate) struct ChatInputBoxHandler;
 
