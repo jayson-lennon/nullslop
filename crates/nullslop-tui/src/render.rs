@@ -17,6 +17,8 @@ pub const MIN_HEIGHT: u16 = 12;
 pub struct AppLayout {
     /// The chat log area (fills remaining space).
     pub chat: Rect,
+    /// The character counter area (1 row above input).
+    pub counter: Rect,
     /// The input box area (3 rows at bottom).
     pub input: Rect,
 }
@@ -31,10 +33,18 @@ impl AppLayout {
     /// Computes the layout for the given terminal area.
     #[must_use]
     pub fn new(area: Rect) -> Self {
-        let [chat, input] =
-            Layout::vertical([Constraint::Min(1), Constraint::Length(3)]).areas(area);
+        let [chat, counter, input] = Layout::vertical([
+            Constraint::Min(1),
+            Constraint::Length(1),
+            Constraint::Length(3),
+        ])
+        .areas(area);
 
-        Self { chat, input }
+        Self {
+            chat,
+            counter,
+            input,
+        }
     }
 }
 
@@ -52,6 +62,11 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
     // Chat log — delegate to registry element
     if let Some(element) = app.ui_registry.get_mut("chat-log") {
         element.render(frame, layout.chat, &state);
+    }
+
+    // Character counter — delegate to registry element
+    if let Some(element) = app.ui_registry.get_mut("char-counter") {
+        element.render(frame, layout.counter, &state);
     }
 
     // Input box — delegate to registry element
@@ -116,8 +131,9 @@ mod tests {
         // When computing layout.
         let layout = AppLayout::new(area);
 
-        // Then chat height is 21 and input height is 3.
-        assert_eq!(layout.chat.height, 21);
+        // Then chat height is 20, counter height is 1, and input height is 3.
+        assert_eq!(layout.chat.height, 20);
+        assert_eq!(layout.counter.height, 1);
         assert_eq!(layout.input.height, 3);
     }
 }

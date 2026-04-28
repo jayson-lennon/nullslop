@@ -4,6 +4,7 @@
 //! application. Each plugin that handles messages is defined using the [`define_handler!`](nullslop_plugin_core::define_handler)
 //! macro from `nullslop-plugin-core`.
 
+pub mod char_counter;
 pub mod chat_input_box;
 pub mod chat_log;
 pub mod extension_command;
@@ -20,4 +21,5 @@ pub fn register_all(bus: &mut Bus, registry: &mut UiRegistry) {
     extension_command::register(bus, registry);
     chat_input_box::register(bus, registry);
     chat_log::register(bus, registry);
+    char_counter::register(bus, registry);
 }
