@@ -100,6 +100,24 @@ pub enum Event {
     },
 }
 
+impl Event {
+    /// Returns the subscription-relevant type name for event routing.
+    ///
+    /// Returns `None` for events that should not be routed to extensions
+    /// (e.g., key events).
+    #[must_use]
+    pub fn type_name(&self) -> Option<&str> {
+        match self {
+            Self::EventChatMessageSubmitted { .. } => Some("EventChatMessageSubmitted"),
+            Self::EventApplicationReady => Some("EventApplicationReady"),
+            Self::EventCustom { payload, .. } => Some(payload.name.as_str()),
+            Self::EventKeyDown { .. } | Self::EventKeyUp { .. } | Self::EventModeChanged { .. } => {
+                None
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -158,5 +176,52 @@ mod tests {
         // Then it matches the original when re-serialized.
         let back_json = serde_json::to_string(&back).expect("re-serialize");
         assert_eq!(json, back_json);
+    }
+
+    #[test]
+    fn event_type_name_returns_correct_names() {
+        // Given various event variants.
+        let chat = Event::EventChatMessageSubmitted {
+            payload: EventChatMessageSubmitted {
+                entry: ChatEntry::user("test"),
+            },
+        };
+        let ready = Event::EventApplicationReady;
+        let custom = Event::EventCustom {
+            payload: EventCustom {
+                name: "my-event".to_string(),
+                data: serde_json::json!(null),
+            },
+        };
+        let key_down = Event::EventKeyDown {
+            payload: EventKeyDown {
+                key: KeyEvent {
+                    key: Key::Enter,
+                    modifiers: Modifiers::none(),
+                },
+            },
+        };
+        let key_up = Event::EventKeyUp {
+            payload: EventKeyUp {
+                key: KeyEvent {
+                    key: Key::Char('a'),
+                    modifiers: Modifiers::none(),
+                },
+            },
+        };
+        let mode_changed = Event::EventModeChanged {
+            payload: EventModeChanged {
+                from: Mode::Normal,
+                to: Mode::Input,
+            },
+        };
+
+        // Then type_name returns expected values.
+        assert_eq!(chat.type_name(), Some("EventChatMessageSubmitted"));
+        assert_eq!(ready.type_name(), Some("EventApplicationReady"));
+        assert_eq!(custom.type_name(), Some("my-event"));
+        assert_eq!(key_down.type_name(), None);
+        assert_eq!(key_up.type_name(), None);
+        assert_eq!(mode_changed.type_name(), None);
     }
 }

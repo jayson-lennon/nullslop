@@ -1,7 +1,7 @@
 //! Plugin for commands received from extensions.
 //!
 //! Handles `CustomCommand` (e.g., the "echo" command) by adding
-//! system chat entries.
+//! extension-branded chat entries with source identification.
 
 use npr::CommandAction;
 use npr::command::CustomCommand;
@@ -32,9 +32,10 @@ impl ExtensionCommandPlugin {
         _out: &mut Out,
     ) -> CommandAction {
         if cmd.name == "echo"
+            && let Some(source) = cmd.args.get("source").and_then(|v| v.as_str())
             && let Some(text) = cmd.args.get("text").and_then(|v| v.as_str())
         {
-            state.push_entry(npr::ChatEntry::system(text));
+            state.push_entry(npr::ChatEntry::extension(source, text));
         } else {
             tracing::warn!(name = %cmd.name, "unhandled extension command");
         }
@@ -51,12 +52,39 @@ mod tests {
     use super::*;
 
     #[test]
-    fn echo_command_adds_system_entry() {
+    fn echo_command_adds_extension_entry() {
         // Given a bus with ExtensionCommandPlugin registered.
         let mut bus = Bus::new();
         ExtensionCommandPlugin.register(&mut bus);
 
-        // When processing a CustomCommand "echo" with text "hello".
+        // When processing a CustomCommand "echo" with source and text.
+        bus.submit_command(Command::CustomCommand {
+            payload: CustomCommand {
+                name: "echo".to_string(),
+                args: serde_json::json!({"source": "nullslop-echo", "text": "HELLO"}),
+            },
+        });
+        let mut state = npr::AppState::new();
+        bus.process_commands(&mut state);
+
+        // Then chat_history has an Extension entry.
+        assert_eq!(state.chat_history.len(), 1);
+        assert_eq!(
+            state.chat_history[0].kind,
+            npr::ChatEntryKind::Extension {
+                source: "nullslop-echo".to_string(),
+                text: "HELLO".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn echo_command_requires_source() {
+        // Given a bus with ExtensionCommandPlugin registered.
+        let mut bus = Bus::new();
+        ExtensionCommandPlugin.register(&mut bus);
+
+        // When processing a CustomCommand "echo" missing source field.
         bus.submit_command(Command::CustomCommand {
             payload: CustomCommand {
                 name: "echo".to_string(),
@@ -66,12 +94,8 @@ mod tests {
         let mut state = npr::AppState::new();
         bus.process_commands(&mut state);
 
-        // Then chat_history has a System entry.
-        assert_eq!(state.chat_history.len(), 1);
-        assert_eq!(
-            state.chat_history[0].kind,
-            npr::ChatEntryKind::System("hello".to_string())
-        );
+        // Then no entry is added (falls through to warning).
+        assert!(state.chat_history.is_empty());
     }
 
     #[test]

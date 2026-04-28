@@ -29,6 +29,7 @@ nullslop-plugin = { path = "crates/nullslop-plugin" }
 nullslop-ext-host = { path = "crates/nullslop-ext-host" }
 nullslop-cli = { path = "crates/nullslop-cli" }
 nullslop-services = { path = "crates/nullslop-services" }
+nullslop-echo = { path = "extensions/nullslop-echo" }
 
 # Error handling
 wherror = "2.3.1"

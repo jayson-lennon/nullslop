@@ -50,6 +50,13 @@ impl ExtensionHost for ProcessExtensionHost {
         let _ = self.event_sender.send(event.clone());
     }
 
+    fn send_command(&self, _command: &nullslop_core::Command) {
+        // Process-mode command routing is not yet implemented.
+        // The process host receives commands from extensions via stdout
+        // and routes events to extensions via stdin. Bidirectional command
+        // routing to process extensions will be added in a future phase.
+    }
+
     fn shutdown(&self) {
         if let Some(task) = self.host_task.lock().unwrap().take() {
             task.abort();

@@ -1,4 +1,6 @@
 //! Chat log entry types.
+//!
+//! Entries can be from the user, the system, or an extension.
 
 use serde::{Deserialize, Serialize};
 
@@ -16,8 +18,15 @@ pub struct ChatEntry {
 pub enum ChatEntryKind {
     /// A message typed by the user.
     User(String),
-    /// A system-generated message (from extensions, status updates, etc.).
+    /// A system-generated message (status updates, etc.).
     System(String),
+    /// A message from an extension, identified by source name.
+    Extension {
+        /// The name of the extension that produced this entry.
+        source: String,
+        /// The message text.
+        text: String,
+    },
 }
 
 impl ChatEntry {
@@ -36,6 +45,18 @@ impl ChatEntry {
         Self {
             timestamp: jiff::Timestamp::now(),
             kind: ChatEntryKind::System(text.into()),
+        }
+    }
+
+    /// Create a new extension chat entry with the current timestamp.
+    #[must_use]
+    pub fn extension(source: impl Into<String>, text: impl Into<String>) -> Self {
+        Self {
+            timestamp: jiff::Timestamp::now(),
+            kind: ChatEntryKind::Extension {
+                source: source.into(),
+                text: text.into(),
+            },
         }
     }
 }
@@ -86,6 +107,39 @@ mod tests {
     fn chat_entry_serialization_roundtrip() {
         // Given a ChatEntry.
         let entry = ChatEntry::user("hello");
+
+        // When serialized and deserialized.
+        let json = serde_json::to_string(&entry).expect("serialize");
+        let back: ChatEntry = serde_json::from_str(&json).expect("deserialize");
+
+        // Then it matches the original.
+        assert_eq!(back.kind, entry.kind);
+        assert_eq!(back.timestamp, entry.timestamp);
+    }
+
+    #[test]
+    fn extension_entry_has_extension_kind() {
+        // Given source "nullslop-echo" and text "HELLO".
+        let source = "nullslop-echo";
+        let text = "HELLO";
+
+        // When creating an extension entry.
+        let entry = ChatEntry::extension(source, text);
+
+        // Then kind is Extension with correct source and text.
+        assert_eq!(
+            entry.kind,
+            ChatEntryKind::Extension {
+                source: "nullslop-echo".to_string(),
+                text: "HELLO".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn extension_entry_serialization_roundtrip() {
+        // Given an extension ChatEntry.
+        let entry = ChatEntry::extension("nullslop-echo", "hello");
 
         // When serialized and deserialized.
         let json = serde_json::to_string(&entry).expect("serialize");

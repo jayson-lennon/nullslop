@@ -12,6 +12,7 @@ nullslop-plugin-core = { workspace = true }
 nullslop-plugin-ui = { workspace = true }
 nullslop-services = { workspace = true }
 nullslop-ext-host = { workspace = true }
+nullslop-echo = { workspace = true }
 wherror = { workspace = true }
 error-stack = { workspace = true }
 ratatui = { workspace = true }
@@ -24,7 +25,6 @@ kanal = { workspace = true }
 futures = { workspace = true }
 parking_lot = { workspace = true }
 derive_more = { workspace = true }
-dirs = { workspace = true }
 unicode-segmentation = { workspace = true }
 dialoguer = { workspace = true }
 tracing = { workspace = true }

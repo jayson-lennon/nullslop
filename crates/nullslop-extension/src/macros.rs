@@ -34,7 +34,10 @@
 macro_rules! run {
     ($extension_type:ty) => {
         fn main() {
-            let mut ctx = $crate::Context::new();
+            let mut ctx = $crate::Context::new(
+            std::sync::Arc::new($crate::context::StdoutCommandSink),
+            $crate::context::ContextKind::Process,
+        );
             let mut extension = <$extension_type as $crate::Extension>::activate(&mut ctx);
 
             // Flush registrations.

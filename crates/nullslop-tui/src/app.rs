@@ -260,7 +260,7 @@ mod tests {
         app.route_command(Command::CustomCommand {
             payload: npr::command::CustomCommand {
                 name: "echo".to_string(),
-                args: serde_json::json!({"text": "hello"}),
+                args: serde_json::json!({"source": "nullslop-echo", "text": "HELLO"}),
             },
         });
 
@@ -270,7 +270,10 @@ mod tests {
         assert_eq!(guard.chat_history.len(), 1);
         assert_eq!(
             guard.chat_history[0].kind,
-            npr::ChatEntryKind::System("hello".to_string())
+            npr::ChatEntryKind::Extension {
+                source: "nullslop-echo".to_string(),
+                text: "HELLO".to_string(),
+            }
         );
     }
 

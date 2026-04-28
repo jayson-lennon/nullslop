@@ -29,6 +29,9 @@ pub trait ExtensionHost: Send + Sync + 'static {
     /// Broadcasts an event to all subscribed extensions.
     fn send_event(&self, event: &crate::Event);
 
+    /// Routes a command to extensions that registered for it.
+    fn send_command(&self, command: &crate::Command);
+
     /// Shuts down all extension processes gracefully.
     fn shutdown(&self);
 }
@@ -59,6 +62,11 @@ impl ExtensionHostService {
     /// Delegates to [`ExtensionHost::send_event`].
     pub fn send_event(&self, event: &crate::Event) {
         self.svc.send_event(event);
+    }
+
+    /// Delegates to [`ExtensionHost::send_command`].
+    pub fn send_command(&self, command: &crate::Command) {
+        self.svc.send_command(command);
     }
 
     /// Delegates to [`ExtensionHost::shutdown`].

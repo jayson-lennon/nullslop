@@ -69,15 +69,13 @@ fn run_headless(
     let mut registry = nullslop_plugin_ui::UiRegistry::new();
     nullslop_plugin::register_all(&mut core.bus, &mut registry);
 
-    // Start extension host.
-    let base_dir = dirs::config_dir()
-        .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join("nullslop")
-        .join("extensions");
+    // Start extension host (in-memory with nullslop-echo).
     let sender = HeadlessExtSender::new(core.sender());
-    let ext_host = nullslop_ext_host::ProcessExtensionHost::start(
+    let echo_ext: Box<dyn nullslop_extension::InMemoryExtension> =
+        Box::new(nullslop_echo::EchoExtension);
+    let ext_host = nullslop_ext_host::InMemoryExtensionHost::start(
         Arc::new(sender),
-        base_dir,
+        vec![echo_ext],
         &handle,
     );
     let ext_arc: Arc<dyn nullslop_core::ExtensionHost> = Arc::new(ext_host);

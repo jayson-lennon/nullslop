@@ -179,21 +179,9 @@ async fn read_extension_stdout(
     }
 }
 
-/// Returns the subscription-relevant type name for an event, if any.
-///
-/// Returns `None` for key events and other non-routable events.
-fn event_type_name(event: &Event) -> Option<&str> {
-    match event {
-        Event::EventChatMessageSubmitted { .. } => Some("EventChatMessageSubmitted"),
-        Event::EventApplicationReady => Some("EventApplicationReady"),
-        Event::EventCustom { payload, .. } => Some(payload.name.as_str()),
-        _ => None,
-    }
-}
-
 /// Routes an event to all extensions subscribed to its type.
 async fn route_event(extensions: &mut [ManagedExtension], event: &Event) {
-    let Some(event_type) = event_type_name(event) else {
+    let Some(event_type) = event.type_name() else {
         return; // Skip key events etc.
     };
 
@@ -246,14 +234,14 @@ mod tests {
             },
         };
 
-        // Then event_type_name returns "EventChatMessageSubmitted".
-        assert_eq!(event_type_name(&event), Some("EventChatMessageSubmitted"));
+        // Then type_name returns "EventChatMessageSubmitted".
+        assert_eq!(event.type_name(), Some("EventChatMessageSubmitted"));
     }
 
     #[test]
     fn application_ready_maps_to_name() {
         assert_eq!(
-            event_type_name(&Event::EventApplicationReady),
+            Event::EventApplicationReady.type_name(),
             Some("EventApplicationReady")
         );
     }
@@ -268,8 +256,8 @@ mod tests {
             },
         };
 
-        // Then event_type_name returns the custom name.
-        assert_eq!(event_type_name(&event), Some("my-event"));
+        // Then type_name returns the custom name.
+        assert_eq!(event.type_name(), Some("my-event"));
     }
 
     #[test]
@@ -282,19 +270,21 @@ mod tests {
 
         // Then they return None (not routable to extensions).
         assert_eq!(
-            event_type_name(&Event::EventKeyDown {
+            Event::EventKeyDown {
                 payload: npr::event::EventKeyDown {
                     key: key_event.clone(),
                 },
-            }),
+            }
+            .type_name(),
             None
         );
         assert_eq!(
-            event_type_name(&Event::EventKeyUp {
+            Event::EventKeyUp {
                 payload: npr::event::EventKeyUp {
                     key: key_event.clone(),
                 },
-            }),
+            }
+            .type_name(),
             None
         );
     }

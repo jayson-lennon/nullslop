@@ -2,6 +2,10 @@
 //!
 //! Extension authors implement [`Extension`] and use the [`run!`](crate::run!)
 //! macro to generate their binary's `main()` function.
+//!
+//! For in-memory hosting, [`InMemoryExtension`] is automatically provided via
+//! a blanket impl for all types that implement [`Extension`] + [`Send`].
+//! Extension authors never need to implement [`InMemoryExtension`] directly.
 
 use nullslop_core::{Command, Event};
 
@@ -31,4 +35,43 @@ pub trait Extension {
 
     /// Deactivates the extension. Called before the process exits.
     fn deactivate(&mut self);
+}
+
+/// Object-safe extension trait for in-memory hosting.
+///
+/// Automatically implemented for all types that implement [`Extension`]
+/// and are [`Send`]. Extension authors only implement [`Extension`];
+/// this trait is provided by the blanket impl.
+///
+/// The host creates `Box<dyn InMemoryExtension>` and calls [`activate`](Self::activate)
+/// with `&mut self`, which replaces the dummy instance with the properly-activated one
+/// via `*self = E::activate(ctx)`.
+pub trait InMemoryExtension: Send + 'static {
+    /// Activates the extension.
+    fn activate(&mut self, ctx: &mut Context);
+    /// Handles a command dispatched to this extension.
+    fn on_command(&mut self, command: &Command, ctx: &Context);
+    /// Handles an event this extension subscribed to.
+    fn on_event(&mut self, event: &Event, ctx: &Context);
+    /// Deactivates the extension.
+    fn deactivate(&mut self);
+}
+
+impl<E: Extension + Send + 'static> InMemoryExtension for E {
+    fn activate(&mut self, ctx: &mut Context) {
+        // Replace dummy self with properly-activated instance.
+        *self = E::activate(ctx);
+    }
+
+    fn on_command(&mut self, command: &Command, ctx: &Context) {
+        Extension::on_command(self, command, ctx);
+    }
+
+    fn on_event(&mut self, event: &Event, ctx: &Context) {
+        Extension::on_event(self, event, ctx);
+    }
+
+    fn deactivate(&mut self) {
+        Extension::deactivate(self);
+    }
 }

@@ -69,15 +69,13 @@ pub fn run(mut app: TuiApp, handle: &Handle) -> Result<(), Report<TuiRunError>> 
     // Start the event stream task.
     app.event_task = Some(app.events.event_task(handle));
 
-    // Start extension host.
-    let base_dir = dirs::config_dir()
-        .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join("nullslop")
-        .join("extensions");
+    // Start extension host (in-memory with nullslop-echo).
     let sender = TuiExtSender(app.core.sender());
-    let ext_host = nullslop_ext_host::ProcessExtensionHost::start(
+    let echo_ext: Box<dyn nullslop_extension::InMemoryExtension> =
+        Box::new(nullslop_echo::EchoExtension);
+    let ext_host = nullslop_ext_host::InMemoryExtensionHost::start(
         Arc::new(sender),
-        base_dir,
+        vec![echo_ext],
         handle,
     );
     let ext_arc: Arc<dyn nullslop_core::ExtensionHost> = Arc::new(ext_host);

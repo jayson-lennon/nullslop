@@ -95,6 +95,10 @@ pub struct Bus {
     /// Populated by `dispatch_event` so consumers can forward them
     /// after bus processing completes.
     processed_events: Vec<Event>,
+    /// Commands that were dispatched during the last processing cycle.
+    /// Populated by `dispatch_command` so consumers can forward them
+    /// to the extension host after bus processing completes.
+    processed_commands: Vec<Command>,
     max_iterations: usize,
 }
 
@@ -111,6 +115,7 @@ impl Bus {
             command_queue: Vec::new(),
             event_queue: Vec::new(),
             processed_events: Vec::new(),
+            processed_commands: Vec::new(),
             max_iterations: 100,
         }
     }
@@ -228,8 +233,29 @@ impl Bus {
         std::mem::take(&mut self.processed_events)
     }
 
+    /// Drain all commands that were dispatched during processing.
+    ///
+    /// Returns a snapshot of the command queue after processing.
+    /// This captures commands that were submitted by handlers and already
+    /// processed by the bus. Useful for forwarding processed commands
+    /// to external systems (e.g., extension host) after bus processing.
+    pub fn drain_processed_commands(&mut self) -> Vec<Command> {
+        // Commands that were dispatched during processing are not tracked
+        // individually like events. Instead, we drain any remaining commands
+        // in the queue after processing completes. These are commands that
+        // were submitted by handlers during the last process_commands call
+        // but not yet drained by process_commands (already processed).
+        //
+        // For the extension host use case, we need commands that were
+        // submitted to the bus and fully processed. Since process_commands
+        // empties the queue, we need a separate tracking mechanism.
+        std::mem::take(&mut self.processed_commands)
+    }
+
     /// Dispatch a single command to its registered handlers.
     fn dispatch_command(&mut self, cmd: Command, state: &mut AppState) {
+        // Record the command before dispatching so consumers can drain it later.
+        self.processed_commands.push(cmd.clone());
         let mut out = Out::new();
         match cmd {
             Command::ChatBoxInsertChar { payload } => {
@@ -731,6 +757,45 @@ mod tests {
         let second = bus.drain_processed_events();
 
         // Then first has the event and second is empty.
+        assert_eq!(first.len(), 1);
+        assert!(second.is_empty());
+    }
+
+    // --- drain_processed_commands tests ---
+
+    #[test]
+    fn drain_processed_commands_returns_dispatched_commands() {
+        // Given a bus with a command handler.
+        let (handler, _calls) = FakeCommandHandler::<AppQuit>::continuing();
+        let mut bus = Bus::new();
+        bus.register_command_handler::<AppQuit, _>(handler);
+
+        // When processing a command.
+        bus.submit_command(Command::AppQuit);
+        let mut state = AppState::new();
+        bus.process_commands(&mut state);
+
+        // Then drain_processed_commands returns the dispatched command.
+        let processed = bus.drain_processed_commands();
+        assert_eq!(processed.len(), 1);
+        assert!(matches!(processed[0], Command::AppQuit));
+    }
+
+    #[test]
+    fn drain_processed_commands_clears_buffer() {
+        // Given a bus with a processed command.
+        let (handler, _calls) = FakeCommandHandler::<AppQuit>::continuing();
+        let mut bus = Bus::new();
+        bus.register_command_handler::<AppQuit, _>(handler);
+        bus.submit_command(Command::AppQuit);
+        let mut state = AppState::new();
+        bus.process_commands(&mut state);
+
+        // When draining twice.
+        let first = bus.drain_processed_commands();
+        let second = bus.drain_processed_commands();
+
+        // Then first has the command and second is empty.
         assert_eq!(first.len(), 1);
         assert!(second.is_empty());
     }

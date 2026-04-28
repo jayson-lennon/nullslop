@@ -143,6 +143,16 @@ impl AppCore {
             }
         }
 
+        // Forward processed commands to extension host for routing to extensions.
+        let processed_commands = self.bus.drain_processed_commands();
+        if !processed_commands.is_empty()
+            && let Some(ext) = &self.ext_host
+        {
+            for cmd in &processed_commands {
+                ext.send_command(cmd);
+            }
+        }
+
         TickResult {
             should_quit: self.state.read().should_quit,
             did_work: received_messages || had_pending,

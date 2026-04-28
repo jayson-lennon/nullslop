@@ -1,8 +1,10 @@
 //! UI element for the chat log.
 //!
 //! [`ChatLogElement`] implements [`UiElement`] to render chat history.
-//! It reads from `AppState.chat_history` and displays user entries in bold
-//! with a `> ` prefix and system entries in dark gray with a `  ` prefix.
+//! It reads from `AppState.chat_history` and displays:
+//! - User entries in bold with a `> ` prefix
+//! - System entries in dark gray with a `  ` prefix
+//! - Extension entries in yellow with a `[ext] {source}: {text}` format
 
 use nullslop_plugin_ui::UiElement;
 use nullslop_protocol::{AppState, ChatEntryKind};
@@ -37,6 +39,10 @@ impl UiElement for ChatLogElement {
                 ChatEntryKind::System(text) => Line::from(Span::styled(
                     format!("  {text}"),
                     Style::default().fg(Color::DarkGray),
+                )),
+                ChatEntryKind::Extension { source, text } => Line::from(Span::styled(
+                    format!("[ext] {source}: {text}"),
+                    Style::default().fg(Color::Yellow),
                 )),
             })
             .collect();
@@ -149,14 +155,42 @@ mod tests {
     }
 
     #[test]
+    fn render_extension_entry() {
+        // Given a ChatLogElement with an extension entry.
+        let mut element = ChatLogElement;
+        let state = {
+            let mut s = AppState::new();
+            s.chat_history.push(ChatEntry::extension("nullslop-echo", "HELLO"));
+            s
+        };
+
+        let backend = TestBackend::new(40, 10);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 40, 10);
+
+        // When rendering.
+        terminal
+            .draw(|frame| {
+                element.render(frame, area, &state);
+            })
+            .unwrap();
+
+        // Then the text starts with "[" (from "[ext]") and is yellow.
+        let buffer = terminal.backend().buffer().clone();
+        let cell = buffer.cell((0, 0)).expect("cell should exist");
+        assert_eq!(cell.symbol(), "[");
+        assert_eq!(cell.style().fg, Some(Color::Yellow));
+    }
+
+    #[test]
     fn render_mixed_entries() {
-        // Given a ChatLogElement with both user and system entries.
+        // Given a ChatLogElement with user, system, and extension entries.
         let mut element = ChatLogElement;
         let state = {
             let mut s = AppState::new();
             s.chat_history.push(ChatEntry::system("welcome"));
             s.chat_history.push(ChatEntry::user("hello"));
-            s.chat_history.push(ChatEntry::system("received"));
+            s.chat_history.push(ChatEntry::extension("nullslop-echo", "HELLO"));
             s
         };
 
@@ -182,9 +216,9 @@ mod tests {
         assert_eq!(line1_cell.symbol(), ">");
         assert!(line1_cell.style().add_modifier.contains(Modifier::BOLD));
 
-        // And line 2 is system again (dark gray). (Leading spaces trimmed by Wrap.)
+        // And line 2 is extension (yellow, "[" from "[ext]").
         let line2_cell = buffer.cell((0, 2)).expect("cell should exist");
-        assert_eq!(line2_cell.symbol(), "r");
-        assert_eq!(line2_cell.style().fg, Some(Color::DarkGray));
+        assert_eq!(line2_cell.symbol(), "[");
+        assert_eq!(line2_cell.style().fg, Some(Color::Yellow));
     }
 }

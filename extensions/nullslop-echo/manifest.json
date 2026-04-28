@@ -4,5 +4,5 @@
     "binary": "nullslop-echo",
     "activation_events": ["onStartup"],
     "commands": ["echo"],
-    "events": ["NewChatEntry"]
+    "events": ["EventChatMessageSubmitted"]
 }

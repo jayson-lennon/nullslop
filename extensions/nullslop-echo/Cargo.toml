@@ -3,6 +3,9 @@ name = "nullslop-echo"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+path = "src/lib.rs"
+
 [dependencies]
 nullslop-extension = { workspace = true }
 nullslop-core = { workspace = true }

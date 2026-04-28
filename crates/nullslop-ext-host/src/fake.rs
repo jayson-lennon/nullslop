@@ -10,6 +10,7 @@ use nullslop_core::{Event, ExtensionHost};
 /// Fake extension host for testing.
 pub struct FakeExtensionHost {
     events_sent: Mutex<Vec<Event>>,
+    commands_sent: Mutex<Vec<nullslop_core::Command>>,
     shutdown_called: AtomicBool,
 }
 
@@ -19,6 +20,7 @@ impl FakeExtensionHost {
     pub fn new() -> Self {
         Self {
             events_sent: Mutex::new(Vec::new()),
+            commands_sent: Mutex::new(Vec::new()),
             shutdown_called: AtomicBool::new(false),
         }
     }
@@ -31,6 +33,16 @@ impl FakeExtensionHost {
     #[must_use]
     pub fn events_sent(&self) -> Vec<Event> {
         self.events_sent.lock().unwrap().clone()
+    }
+
+    /// Returns all commands that were sent via `send_command`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned.
+    #[must_use]
+    pub fn commands_sent(&self) -> Vec<nullslop_core::Command> {
+        self.commands_sent.lock().unwrap().clone()
     }
 
     /// Returns whether `shutdown` was called.
@@ -53,6 +65,10 @@ impl ExtensionHost for FakeExtensionHost {
 
     fn send_event(&self, event: &Event) {
         self.events_sent.lock().unwrap().push(event.clone());
+    }
+
+    fn send_command(&self, command: &nullslop_core::Command) {
+        self.commands_sent.lock().unwrap().push(command.clone());
     }
 
     fn shutdown(&self) {
