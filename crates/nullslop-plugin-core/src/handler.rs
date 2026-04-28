@@ -4,7 +4,7 @@
 //! implement for specific command or event types. The [`Bus`](crate::Bus) dispatches
 //! to handlers via [`TypeId`], so each handler receives the concrete type.
 
-use nullslop_protocol::{AppData, CommandAction};
+use nullslop_protocol::{AppState, CommandAction};
 
 use crate::Out;
 
@@ -33,7 +33,7 @@ pub trait CommandHandler<C: 'static> {
     ///
     /// [`CommandAction::Continue`] to allow further handlers,
     /// or [`CommandAction::Stop`] to halt propagation.
-    fn handle(&self, cmd: &C, state: &mut AppData, out: &mut Out) -> CommandAction;
+    fn handle(&self, cmd: &C, state: &mut AppState, out: &mut Out) -> CommandAction;
 }
 
 /// Handler for a specific event type `E`.
@@ -54,5 +54,5 @@ pub trait EventHandler<E: 'static> {
     /// * `evt` - The concrete event to handle.
     /// * `state` - Mutable application state.
     /// * `out` - Buffered output for submitting new commands/events.
-    fn handle(&self, evt: &E, state: &mut AppData, out: &mut Out);
+    fn handle(&self, evt: &E, state: &mut AppState, out: &mut Out);
 }

@@ -19,13 +19,13 @@
 //!
 //! Each command/event gets a fresh [`Out`](crate::Out). After all handlers for an
 //! item run, the buffer is flushed into the bus queues. This ensures one consistent
-//! `&mut AppData` snapshot per item and no re-entrancy.
+//! `&mut AppState` snapshot per item and no re-entrancy.
 
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
 use nullslop_protocol::{
-    AppData, Command, CommandAction, Event,
+    AppState, Command, CommandAction, Event,
     command::{
         AppEditInput, AppQuit, AppToggleWhichKey, ChatBoxClear, ChatBoxDeleteGrapheme,
         ProviderCancelStream,
@@ -44,20 +44,20 @@ use crate::out::Out;
 /// type id is stored here.
 struct AnyCommandHandler {
     handler: Box<dyn Any>,
-    invoke: fn(&dyn Any, &dyn Any, &mut AppData, &mut Out) -> CommandAction,
+    invoke: fn(&dyn Any, &dyn Any, &mut AppState, &mut Out) -> CommandAction,
 }
 
 /// Type-erased event handler wrapper.
 struct AnyEventHandler {
     handler: Box<dyn Any>,
-    invoke: fn(&dyn Any, &dyn Any, &mut AppData, &mut Out),
+    invoke: fn(&dyn Any, &dyn Any, &mut AppState, &mut Out),
 }
 
 /// Monomorphized invoke function for command handlers.
 fn invoke_command<C, H>(
     handler: &dyn Any,
     cmd: &dyn Any,
-    state: &mut AppData,
+    state: &mut AppState,
     out: &mut Out,
 ) -> CommandAction
 where
@@ -70,7 +70,7 @@ where
 }
 
 /// Monomorphized invoke function for event handlers.
-fn invoke_event<E, H>(handler: &dyn Any, evt: &dyn Any, state: &mut AppData, out: &mut Out)
+fn invoke_event<E, H>(handler: &dyn Any, evt: &dyn Any, state: &mut AppState, out: &mut Out)
 where
     H: EventHandler<E> + 'static,
     E: 'static,
@@ -184,7 +184,7 @@ impl Bus {
     /// Drains the command queue, dispatches each command to its registered
     /// handlers, and repeats if handlers submitted new commands. Stops when
     /// the queue is empty or `max_iterations` is reached.
-    pub fn process_commands(&mut self, state: &mut AppData) {
+    pub fn process_commands(&mut self, state: &mut AppState) {
         let mut iterations = 0;
         loop {
             let commands = std::mem::take(&mut self.command_queue);
@@ -206,7 +206,7 @@ impl Bus {
     /// Drains the event queue and dispatches each event to its registered
     /// handlers. All handlers always run. Events submitted by handlers during
     /// processing are queued for a future call.
-    pub fn process_events(&mut self, state: &mut AppData) {
+    pub fn process_events(&mut self, state: &mut AppState) {
         let events = std::mem::take(&mut self.event_queue);
         for evt in events {
             self.dispatch_event(evt, state);
@@ -229,7 +229,7 @@ impl Bus {
     }
 
     /// Dispatch a single command to its registered handlers.
-    fn dispatch_command(&mut self, cmd: Command, state: &mut AppData) {
+    fn dispatch_command(&mut self, cmd: Command, state: &mut AppState) {
         let mut out = Out::new();
         match cmd {
             Command::ChatBoxInsertChar { payload } => {
@@ -282,7 +282,7 @@ impl Bus {
     fn dispatch_command_to_handlers<C: 'static>(
         &self,
         cmd: &C,
-        state: &mut AppData,
+        state: &mut AppState,
         out: &mut Out,
     ) {
         let type_id = TypeId::of::<C>();
@@ -297,7 +297,7 @@ impl Bus {
     }
 
     /// Dispatch a single event to its registered handlers.
-    fn dispatch_event(&mut self, evt: Event, state: &mut AppData) {
+    fn dispatch_event(&mut self, evt: Event, state: &mut AppState) {
         // Record the event before dispatching so consumers can drain it later.
         self.processed_events.push(evt.clone());
         let mut out = Out::new();
@@ -329,7 +329,7 @@ impl Bus {
     }
 
     /// Look up and invoke handlers for a concrete event type `E`.
-    fn dispatch_event_to_handlers<E: 'static>(&self, evt: &E, state: &mut AppData, out: &mut Out) {
+    fn dispatch_event_to_handlers<E: 'static>(&self, evt: &E, state: &mut AppState, out: &mut Out) {
         let type_id = TypeId::of::<E>();
         if let Some(handlers) = self.event_handlers.get(&type_id) {
             for h in handlers {
@@ -372,7 +372,7 @@ mod tests {
         bus.submit_command(Command::ChatBoxInsertChar {
             payload: ChatBoxInsertChar { ch: 'x' },
         });
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         bus.process_commands(&mut state);
 
         // Then the handler was called with the correct payload.
@@ -391,7 +391,7 @@ mod tests {
 
         // When processing a command.
         bus.submit_command(Command::AppQuit);
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         bus.process_commands(&mut state);
 
         // Then both handlers were called.
@@ -410,7 +410,7 @@ mod tests {
 
         // When processing a command.
         bus.submit_command(Command::AppQuit);
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         bus.process_commands(&mut state);
 
         // Then only the first handler was called.
@@ -429,7 +429,7 @@ mod tests {
 
         // When processing a command.
         bus.submit_command(Command::AppQuit);
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         bus.process_commands(&mut state);
 
         // Then both handlers were called.
@@ -444,7 +444,7 @@ mod tests {
 
         // When submitting a command.
         bus.submit_command(Command::AppQuit);
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         bus.process_commands(&mut state);
 
         // Then no panic occurs and the queue is empty.
@@ -460,7 +460,7 @@ mod tests {
 
         // When processing a unit command.
         bus.submit_command(Command::ChatBoxDeleteGrapheme);
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         bus.process_commands(&mut state);
 
         // Then the handler was called.
@@ -484,7 +484,7 @@ mod tests {
         bus.submit_event(Event::EventKeyDown {
             payload: EventKeyDown { key },
         });
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         bus.process_events(&mut state);
 
         // Then the handler was called.
@@ -500,7 +500,7 @@ mod tests {
 
         // When processing a unit event.
         bus.submit_event(Event::EventApplicationReady);
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         bus.process_events(&mut state);
 
         // Then the handler was called.
@@ -518,7 +518,7 @@ mod tests {
 
         // When processing an event.
         bus.submit_event(Event::EventApplicationReady);
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         bus.process_events(&mut state);
 
         // Then both handlers were called.
@@ -535,7 +535,7 @@ mod tests {
         fn handle(
             &self,
             _cmd: &ChatBoxInsertChar,
-            _state: &mut AppData,
+            _state: &mut AppState,
             out: &mut Out,
         ) -> CommandAction {
             out.submit_command(Command::AppQuit);
@@ -555,7 +555,7 @@ mod tests {
         bus.submit_command(Command::ChatBoxInsertChar {
             payload: ChatBoxInsertChar { ch: 'x' },
         });
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         bus.process_commands(&mut state);
 
         // Then the cascaded AppQuit was also processed.
@@ -569,7 +569,7 @@ mod tests {
         fn handle(
             &self,
             _cmd: &ChatBoxInsertChar,
-            _state: &mut AppData,
+            _state: &mut AppState,
             out: &mut Out,
         ) -> CommandAction {
             out.submit_command(Command::ChatBoxInsertChar {
@@ -589,7 +589,7 @@ mod tests {
         bus.submit_command(Command::ChatBoxInsertChar {
             payload: ChatBoxInsertChar { ch: 'x' },
         });
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         bus.process_commands(&mut state);
 
         // Then it terminates without hanging.
@@ -611,7 +611,7 @@ mod tests {
         assert!(bus.has_pending());
 
         // When processing commands.
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         bus.process_commands(&mut state);
         assert!(!bus.has_pending());
     }
@@ -627,7 +627,7 @@ mod tests {
         assert!(bus.has_pending());
 
         // When processing events.
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         bus.process_events(&mut state);
         assert!(!bus.has_pending());
     }
@@ -654,7 +654,7 @@ mod tests {
                 text: "hello".into(),
             },
         });
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         bus.process_commands(&mut state);
 
         // Then both handlers were called with correct payloads.
@@ -667,7 +667,7 @@ mod tests {
     struct CommandToEventHandler;
 
     impl CommandHandler<AppQuit> for CommandToEventHandler {
-        fn handle(&self, _cmd: &AppQuit, _state: &mut AppData, out: &mut Out) -> CommandAction {
+        fn handle(&self, _cmd: &AppQuit, _state: &mut AppState, out: &mut Out) -> CommandAction {
             out.submit_event(Event::EventApplicationReady);
             CommandAction::Continue
         }
@@ -683,7 +683,7 @@ mod tests {
 
         // When processing a command that submits an event.
         bus.submit_command(Command::AppQuit);
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         bus.process_commands(&mut state);
 
         // Then the event is in the event queue (not yet processed).
@@ -707,7 +707,7 @@ mod tests {
 
         // When processing an event.
         bus.submit_event(Event::EventApplicationReady);
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         bus.process_events(&mut state);
 
         // Then drain_processed_events returns the dispatched event.
@@ -723,7 +723,7 @@ mod tests {
         let mut bus = Bus::new();
         bus.register_event_handler::<EventApplicationReady, _>(handler);
         bus.submit_event(Event::EventApplicationReady);
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         bus.process_events(&mut state);
 
         // When draining twice.

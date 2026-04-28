@@ -28,7 +28,7 @@ define_handler! {
 impl ChatInputBoxHandler {
     fn on_insert_char(
         cmd: &ChatBoxInsertChar,
-        state: &mut npr::AppData,
+        state: &mut npr::AppState,
         _out: &mut Out,
     ) -> CommandAction {
         state.chat_input.input_buffer.push(cmd.ch);
@@ -37,7 +37,7 @@ impl ChatInputBoxHandler {
 
     fn on_delete_grapheme(
         _cmd: &ChatBoxDeleteGrapheme,
-        state: &mut npr::AppData,
+        state: &mut npr::AppState,
         _out: &mut Out,
     ) -> CommandAction {
         state.chat_input.pop_grapheme();
@@ -46,7 +46,7 @@ impl ChatInputBoxHandler {
 
     fn on_submit_message(
         _cmd: &ChatBoxSubmitMessage,
-        state: &mut npr::AppData,
+        state: &mut npr::AppState,
         out: &mut Out,
     ) -> CommandAction {
         let text = state.chat_input.input_buffer.clone();
@@ -62,12 +62,12 @@ impl ChatInputBoxHandler {
         CommandAction::Continue
     }
 
-    fn on_clear(_cmd: &ChatBoxClear, state: &mut npr::AppData, _out: &mut Out) -> CommandAction {
+    fn on_clear(_cmd: &ChatBoxClear, state: &mut npr::AppState, _out: &mut Out) -> CommandAction {
         state.chat_input.input_buffer.clear();
         CommandAction::Continue
     }
 
-    fn on_set_mode(cmd: &AppSetMode, state: &mut npr::AppData, _out: &mut Out) -> CommandAction {
+    fn on_set_mode(cmd: &AppSetMode, state: &mut npr::AppState, _out: &mut Out) -> CommandAction {
         state.mode = cmd.mode;
         CommandAction::Continue
     }
@@ -92,7 +92,7 @@ mod tests {
         bus.submit_command(Command::ChatBoxInsertChar {
             payload: ChatBoxInsertChar { ch: 'x' },
         });
-        let mut state = npr::AppData::new();
+        let mut state = npr::AppState::new();
         bus.process_commands(&mut state);
 
         // Then chat_input.input_buffer contains "x".
@@ -113,7 +113,7 @@ mod tests {
             payload: ChatBoxInsertChar { ch: 'b' },
         });
         bus.submit_command(Command::ChatBoxDeleteGrapheme);
-        let mut state = npr::AppData::new();
+        let mut state = npr::AppState::new();
         bus.process_commands(&mut state);
 
         // Then chat_input.input_buffer is "a".
@@ -126,7 +126,7 @@ mod tests {
         let mut bus = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
-        let mut state = npr::AppData::new();
+        let mut state = npr::AppState::new();
         state.chat_input.input_buffer = "hello".to_string();
 
         // When processing ChatBoxSubmitMessage.
@@ -158,7 +158,7 @@ mod tests {
                 text: String::new(),
             },
         });
-        let mut state = npr::AppData::new();
+        let mut state = npr::AppState::new();
         bus.process_commands(&mut state);
 
         // Then no entry is added and no event is emitted.
@@ -172,7 +172,7 @@ mod tests {
         let mut bus = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
-        let mut state = npr::AppData::new();
+        let mut state = npr::AppState::new();
         state.chat_input.input_buffer = "hello".to_string();
 
         // When processing ChatBoxSubmitMessage.
@@ -204,7 +204,7 @@ mod tests {
         let mut bus = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
-        let mut state = npr::AppData::new();
+        let mut state = npr::AppState::new();
         state.chat_input.input_buffer = "some text".to_string();
 
         // When processing ChatBoxClear.
@@ -227,7 +227,7 @@ mod tests {
                 mode: npr::Mode::Input,
             },
         });
-        let mut state = npr::AppData::new();
+        let mut state = npr::AppState::new();
         bus.process_commands(&mut state);
 
         // Then state mode is Input.

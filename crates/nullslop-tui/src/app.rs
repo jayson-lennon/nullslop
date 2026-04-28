@@ -12,7 +12,7 @@ use crate::msg::Msg;
 use crate::render;
 use crate::scope::Scope;
 use crate::suspend::{Suspend, SuspendAction};
-use crate::{AppStatus, MsgHandler, TuiState};
+use crate::{AppStatus, MsgHandler};
 
 /// Type alias for the which-key state parameterized for nullslop.
 pub type WhichKeyInstance =
@@ -25,8 +25,6 @@ pub struct TuiApp {
     pub core: AppCore,
     /// UI element registry.
     pub ui_registry: UiRegistry,
-    /// Ephemeral TUI state (scroll offset).
-    pub tui_state: TuiState,
     /// Message channel for the event loop.
     pub events: MsgHandler,
     /// Which-key keybinding system state.
@@ -56,7 +54,6 @@ impl TuiApp {
         Self {
             core,
             ui_registry,
-            tui_state: TuiState::new(),
             events: MsgHandler::new(),
             which_key,
             suspend: Suspend::new(),

@@ -2,7 +2,7 @@
 //!
 //! Elements draw within an allocated area on the ratatui frame. They are
 //! separate from command/event handlers and communicate through
-//! [`AppData`] — handlers mutate state during processing, elements
+//! [`AppState`] — handlers mutate state during processing, elements
 //! read state during rendering.
 
 /// A renderable UI element that draws within an allocated area.
@@ -12,7 +12,7 @@
 /// anywhere on the frame if needed.
 ///
 /// UI elements are separate from command/event handlers. They communicate
-/// through [`AppData`] — handlers mutate state during processing, elements
+/// through [`AppState`] — handlers mutate state during processing, elements
 /// read state during rendering.
 ///
 /// # Type parameter
@@ -37,6 +37,6 @@ pub trait UiElement: 'static + std::fmt::Debug {
         &mut self,
         frame: &mut ratatui::Frame<'_>,
         area: ratatui::layout::Rect,
-        state: &nullslop_protocol::AppData,
+        state: &nullslop_protocol::AppState,
     );
 }

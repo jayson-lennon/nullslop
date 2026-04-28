@@ -7,7 +7,7 @@ use npr::CommandAction;
 use npr::command::CustomCommand;
 use nullslop_plugin_core::{Bus, Out, define_handler};
 use nullslop_plugin_ui::UiRegistry;
-use nullslop_protocol::{self as npr, AppData};
+use nullslop_protocol::{self as npr, AppState};
 
 define_handler! {
     /// Handles commands from extensions.
@@ -28,7 +28,7 @@ pub(crate) fn register(bus: &mut Bus, _registry: &mut UiRegistry) {
 impl ExtensionCommandPlugin {
     fn on_custom_command(
         cmd: &CustomCommand,
-        state: &mut AppData,
+        state: &mut AppState,
         _out: &mut Out,
     ) -> CommandAction {
         if cmd.name == "echo"
@@ -63,7 +63,7 @@ mod tests {
                 args: serde_json::json!({"text": "hello"}),
             },
         });
-        let mut state = npr::AppData::new();
+        let mut state = npr::AppState::new();
         bus.process_commands(&mut state);
 
         // Then chat_history has a System entry.
@@ -87,7 +87,7 @@ mod tests {
                 args: serde_json::json!({}),
             },
         });
-        let mut state = npr::AppData::new();
+        let mut state = npr::AppState::new();
         bus.process_commands(&mut state);
 
         // Then no entry is added.

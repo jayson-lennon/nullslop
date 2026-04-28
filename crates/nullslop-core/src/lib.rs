@@ -1,11 +1,11 @@
 //! nullslop-core: shared types for the nullslop TUI agent harness.
 //!
 //! This crate re-exports types from `nullslop-protocol` (command/event system,
-//! domain data, key types) and adds host-side concerns: thread-safe state
+//! application state, key types) and adds host-side concerns: thread-safe state
 //! wrapper and extension registry.
 
 pub mod app_core;
-pub mod app_data;
+pub mod app_state;
 pub mod app_msg;
 pub mod chat;
 pub mod command;
@@ -17,7 +17,7 @@ pub mod state;
 
 // Re-export primary types from nullslop-protocol
 pub use app_core::{AppCore, TickResult};
-pub use app_data::AppData;
+pub use app_state::AppState;
 pub use app_msg::AppMsg;
 pub use chat::{ChatEntry, ChatEntryKind};
 pub use command::Command;

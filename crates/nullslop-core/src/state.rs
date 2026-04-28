@@ -1,6 +1,6 @@
 //! Thread-safe application state wrapper.
 //!
-//! Provides [`State`] as a shared reference to [`AppData`] and
+//! Provides [`State`] as a shared reference to [`AppState`] and
 //! [`ExtensionRegistry`] with read/write guards that don't expose
 //! the underlying lock implementation.
 
@@ -9,20 +9,20 @@ use std::sync::Arc;
 use parking_lot::RwLock;
 
 use crate::extension::ExtensionRegistry;
-use nullslop_protocol::AppData;
+use nullslop_protocol::AppState;
 
-/// Internal state combining domain data and extension registry.
+/// Internal state combining application data and extension registry.
 #[derive(Debug)]
 struct CoreState {
     /// Domain data (from protocol).
-    data: AppData,
+    data: AppState,
     /// Extension registry (host-side concern).
     extensions: ExtensionRegistry,
 }
 
 /// Thread-safe shared state wrapper.
 ///
-/// Wraps [`AppData`] from `nullslop-protocol` and the host-side
+/// Wraps [`AppState`] from `nullslop-protocol` and the host-side
 /// [`ExtensionRegistry`] in a single [`RwLock`] for consistent snapshots.
 #[derive(Debug, Clone)]
 pub struct State {
@@ -40,9 +40,9 @@ pub struct StateWriteGuard<'a> {
 }
 
 impl State {
-    /// Create a new State wrapping the given `AppData`.
+    /// Create a new State wrapping the given `AppState`.
     #[must_use]
-    pub fn new(data: AppData) -> Self {
+    pub fn new(data: AppState) -> Self {
         Self {
             inner: Arc::new(RwLock::new(CoreState {
                 data,
@@ -89,23 +89,23 @@ impl StateWriteGuard<'_> {
 }
 
 impl std::ops::Deref for StateReadGuard<'_> {
-    type Target = AppData;
+    type Target = AppState;
 
-    fn deref(&self) -> &AppData {
+    fn deref(&self) -> &AppState {
         &self.inner.data
     }
 }
 
 impl std::ops::Deref for StateWriteGuard<'_> {
-    type Target = AppData;
+    type Target = AppState;
 
-    fn deref(&self) -> &AppData {
+    fn deref(&self) -> &AppState {
         &self.inner.data
     }
 }
 
 impl std::ops::DerefMut for StateWriteGuard<'_> {
-    fn deref_mut(&mut self) -> &mut AppData {
+    fn deref_mut(&mut self) -> &mut AppState {
         &mut self.inner.data
     }
 }
@@ -116,9 +116,9 @@ mod tests {
     use nullslop_protocol::ChatEntry;
 
     #[test]
-    fn state_read_returns_app_data() {
+    fn state_read_returns_app_state() {
         // Given a State with a chat entry.
-        let mut data = AppData::new();
+        let mut data = AppState::new();
         data.push_entry(ChatEntry::user("hello"));
         let state = State::new(data);
 
@@ -132,7 +132,7 @@ mod tests {
     #[test]
     fn state_write_allows_mutation() {
         // Given a State.
-        let state = State::new(AppData::new());
+        let state = State::new(AppState::new());
 
         // When writing and pushing an entry.
         {
@@ -148,7 +148,7 @@ mod tests {
     #[test]
     fn state_is_cloneable() {
         // Given a State.
-        let state = State::new(AppData::new());
+        let state = State::new(AppState::new());
 
         // When cloning.
         let clone = state.clone();
@@ -165,24 +165,24 @@ mod tests {
     /// Compile-time check that [`StateReadGuard`] does not expose
     /// `parking_lot::RwLockReadGuard` in its public API.
     ///
-    /// The guard type only implements `Deref<Target = AppData>`,
+    /// The guard type only implements `Deref<Target = AppState>`,
     /// so consumers cannot access the underlying lock.
     #[test]
     fn state_read_guard_hides_lock() {
         // Given a State.
-        let state = State::new(AppData::new());
+        let state = State::new(AppState::new());
 
         // When acquiring a read guard.
         let guard = state.read();
 
-        // Then we can only access AppData through Deref.
+        // Then we can only access AppState through Deref.
         let _history = &guard.chat_history;
     }
 
     #[test]
     fn state_extensions_are_accessible() {
         // Given a State.
-        let state = State::new(AppData::new());
+        let state = State::new(AppState::new());
 
         // When reading extensions.
         let guard = state.read();
@@ -194,7 +194,7 @@ mod tests {
     #[test]
     fn state_extensions_are_mutable() {
         // Given a State.
-        let state = State::new(AppData::new());
+        let state = State::new(AppState::new());
 
         // When registering an extension.
         {

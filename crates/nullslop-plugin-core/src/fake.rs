@@ -17,7 +17,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use nullslop_protocol::{AppData, CommandAction};
+use nullslop_protocol::{AppState, CommandAction};
 
 use crate::handler::{CommandHandler, EventHandler};
 use crate::out::Out;
@@ -58,7 +58,7 @@ impl<C: Clone + 'static> FakeCommandHandler<C> {
 }
 
 impl<C: Clone + 'static> CommandHandler<C> for FakeCommandHandler<C> {
-    fn handle(&self, cmd: &C, _state: &mut AppData, _out: &mut Out) -> CommandAction {
+    fn handle(&self, cmd: &C, _state: &mut AppState, _out: &mut Out) -> CommandAction {
         self.calls.borrow_mut().push(cmd.clone());
         self.action
     }
@@ -93,7 +93,7 @@ impl<E: Clone + 'static> Default for FakeEventHandler<E> {
 }
 
 impl<E: Clone + 'static> EventHandler<E> for FakeEventHandler<E> {
-    fn handle(&self, evt: &E, _state: &mut AppData, _out: &mut Out) {
+    fn handle(&self, evt: &E, _state: &mut AppState, _out: &mut Out) {
         self.calls.borrow_mut().push(evt.clone());
     }
 }
@@ -108,7 +108,7 @@ mod tests {
     fn fake_command_handler_records_call() {
         // Given a continuing fake handler.
         let (handler, calls) = FakeCommandHandler::<AppQuit>::continuing();
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         let mut out = Out::new();
 
         // When handling a command.
@@ -123,7 +123,7 @@ mod tests {
     fn fake_command_handler_stopping() {
         // Given a stopping fake handler.
         let (handler, calls) = FakeCommandHandler::<AppQuit>::stopping();
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         let mut out = Out::new();
 
         // When handling a command.
@@ -152,7 +152,7 @@ mod tests {
         // Given a fake event handler.
         use npr::event::EventApplicationReady;
         let (handler, calls) = FakeEventHandler::<EventApplicationReady>::new();
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         let mut out = Out::new();
 
         // When handling an event.

@@ -1,12 +1,12 @@
-//! Application core: bus, state, and domain processing loop.
+//! Application core: bus, state, and processing loop.
 //!
-//! [`AppCore`] owns the domain processing pipeline — the bus, shared state,
+//! [`AppCore`] owns the processing pipeline — the bus, shared state,
 //! an internal message channel for [`AppMsg`], and an optional extension host.
 //! The caller (TUI or headless runner) feeds messages into [`AppCore`] and
 //! drives the processing loop.
 
 use nullslop_plugin_core::Bus;
-use nullslop_protocol::AppData;
+use nullslop_protocol::AppState;
 
 use crate::{AppMsg, ExtensionHostService, State};
 
@@ -19,14 +19,14 @@ pub struct TickResult {
     pub did_work: bool,
 }
 
-/// Application core: bus, state, and domain processing.
+/// Application core: bus, state, and processing.
 ///
-/// Owns the domain processing pipeline. The caller feeds [`AppMsg`] values
+/// Owns the processing pipeline. The caller feeds [`AppMsg`] values
 /// via [`Self::sender`] and drives processing with [`Self::tick`].
 pub struct AppCore {
     /// Plugin command/event bus.
     pub bus: Bus,
-    /// Shared domain state.
+    /// Shared application state.
     pub state: State,
     /// Internal message channel sender.
     sender: kanal::Sender<AppMsg>,
@@ -56,7 +56,7 @@ impl AppCore {
         let (sender, receiver) = kanal::unbounded();
         Self {
             bus: Bus::new(),
-            state: State::new(AppData::new()),
+            state: State::new(AppState::new()),
             sender,
             receiver,
             ext_host: None,

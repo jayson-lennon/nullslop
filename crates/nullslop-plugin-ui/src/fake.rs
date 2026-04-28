@@ -60,7 +60,7 @@ impl UiElement for FakeUiElement {
         &mut self,
         _frame: &mut ratatui::Frame<'_>,
         area: ratatui::layout::Rect,
-        state: &nullslop_protocol::AppData,
+        state: &nullslop_protocol::AppState,
     ) {
         self.render_calls
             .borrow_mut()
@@ -70,7 +70,7 @@ impl UiElement for FakeUiElement {
 
 #[cfg(test)]
 mod tests {
-    use nullslop_protocol::AppData;
+    use nullslop_protocol::AppState;
     use ratatui::layout::Rect;
 
     use super::*;
@@ -82,7 +82,7 @@ mod tests {
     fn render_element(
         element: &mut dyn crate::UiElement,
         area: Rect,
-        state: &AppData,
+        state: &AppState,
     ) {
         let backend = ratatui::backend::TestBackend::new(80, 24);
         let mut terminal = ratatui::Terminal::new(backend).expect("test backend should init");
@@ -109,7 +109,7 @@ mod tests {
     fn records_render_calls() {
         // Given a fake element.
         let (mut element, calls) = FakeUiElement::new("test");
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         state.chat_input.input_buffer = "hello".to_string();
 
         // When rendering with a specific area.
@@ -140,7 +140,7 @@ mod tests {
     fn multiple_render_calls_accumulate() {
         // Given a fake element.
         let (mut element, calls) = FakeUiElement::new("test");
-        let state = AppData::new();
+        let state = AppState::new();
         let area1 = Rect::new(0, 0, 40, 10);
         let area2 = Rect::new(0, 10, 40, 10);
 

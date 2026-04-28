@@ -1,11 +1,11 @@
 //! UI element for the chat log.
 //!
 //! [`ChatLogElement`] implements [`UiElement`] to render chat history.
-//! It reads from `AppData.chat_history` and displays user entries in bold
+//! It reads from `AppState.chat_history` and displays user entries in bold
 //! with a `> ` prefix and system entries in dark gray with a `  ` prefix.
 
 use nullslop_plugin_ui::UiElement;
-use nullslop_protocol::{AppData, ChatEntryKind};
+use nullslop_protocol::{AppState, ChatEntryKind};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -14,7 +14,7 @@ use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 
 /// Renders the chat history log.
 ///
-/// Displays all chat entries from `AppData.chat_history`, styling user
+/// Displays all chat entries from `AppState.chat_history`, styling user
 /// entries in bold with a `> ` prefix and system entries in dark gray
 /// with a `  ` prefix. Text wraps within the allocated area.
 #[derive(Debug)]
@@ -25,7 +25,7 @@ impl UiElement for ChatLogElement {
         "chat-log".to_string()
     }
 
-    fn render(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppData) {
+    fn render(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppState) {
         let lines: Vec<Line> = state
             .chat_history
             .iter()
@@ -55,7 +55,7 @@ mod tests {
     use ratatui::layout::Rect;
 
     use super::*;
-    use nullslop_protocol::{AppData, ChatEntry};
+    use nullslop_protocol::{AppState, ChatEntry};
 
     #[test]
     fn name_returns_chat_log() {
@@ -73,7 +73,7 @@ mod tests {
     fn render_empty_history() {
         // Given a ChatLogElement with empty chat history.
         let mut element = ChatLogElement;
-        let state = AppData::new();
+        let state = AppState::new();
 
         let backend = TestBackend::new(40, 10);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -97,7 +97,7 @@ mod tests {
         // Given a ChatLogElement with a user entry "hello".
         let mut element = ChatLogElement;
         let state = {
-            let mut s = AppData::new();
+            let mut s = AppState::new();
             s.chat_history.push(ChatEntry::user("hello"));
             s
         };
@@ -125,7 +125,7 @@ mod tests {
         // Given a ChatLogElement with a system entry "ready".
         let mut element = ChatLogElement;
         let state = {
-            let mut s = AppData::new();
+            let mut s = AppState::new();
             s.chat_history.push(ChatEntry::system("ready"));
             s
         };
@@ -153,7 +153,7 @@ mod tests {
         // Given a ChatLogElement with both user and system entries.
         let mut element = ChatLogElement;
         let state = {
-            let mut s = AppData::new();
+            let mut s = AppState::new();
             s.chat_history.push(ChatEntry::system("welcome"));
             s.chat_history.push(ChatEntry::user("hello"));
             s.chat_history.push(ChatEntry::system("received"));

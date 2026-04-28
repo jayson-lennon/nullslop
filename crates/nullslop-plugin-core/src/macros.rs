@@ -42,10 +42,10 @@
 /// # Handler methods
 ///
 /// Command handler methods must have this signature:
-/// `fn method(cmd: &C, state: &mut AppData, out: &mut Out) -> CommandAction`
+/// `fn method(cmd: &C, state: &mut AppState, out: &mut Out) -> CommandAction`
 ///
 /// Event handler methods must have this signature:
-/// `fn method(evt: &E, state: &mut AppData, out: &mut Out)`
+/// `fn method(evt: &E, state: &mut AppState, out: &mut Out)`
 ///
 /// Command methods return `CommandAction` directly — the macro forwards the return value.
 /// Event methods return `()`.
@@ -74,7 +74,7 @@ macro_rules! define_handler {
                 fn handle(
                     &self,
                     cmd: &$cmd_type,
-                    state: &mut ::nullslop_protocol::AppData,
+                    state: &mut ::nullslop_protocol::AppState,
                     out: &mut $crate::Out,
                 ) -> ::nullslop_protocol::CommandAction {
                     Self::$cmd_method(cmd, state, out)
@@ -89,7 +89,7 @@ macro_rules! define_handler {
                 fn handle(
                     &self,
                     evt: &$evt_type,
-                    state: &mut ::nullslop_protocol::AppData,
+                    state: &mut ::nullslop_protocol::AppState,
                     out: &mut $crate::Out,
                 ) {
                     Self::$evt_method(evt, state, out);
@@ -118,7 +118,7 @@ mod tests {
     use crate::{Bus, Out};
     use npr::command::{AppQuit, ChatBoxInsertChar};
     use npr::event::EventApplicationReady;
-    use npr::{AppData, Command, CommandAction, Event};
+    use npr::{AppState, Command, CommandAction, Event};
     use nullslop_protocol as npr;
 
     // --- Test handler: command handler returning Continue ---
@@ -136,7 +136,7 @@ mod tests {
     impl ContinueHandler {
         fn on_insert_char(
             cmd: &ChatBoxInsertChar,
-            state: &mut AppData,
+            state: &mut AppState,
             _out: &mut Out,
         ) -> CommandAction {
             state.chat_input.input_buffer.push(cmd.ch);
@@ -154,7 +154,7 @@ mod tests {
         bus.submit_command(Command::ChatBoxInsertChar {
             payload: ChatBoxInsertChar { ch: 'x' },
         });
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         bus.process_commands(&mut state);
 
         // Then the handler ran and mutated state.
@@ -174,7 +174,7 @@ mod tests {
     }
 
     impl StopHandler {
-        fn on_quit(_cmd: &AppQuit, state: &mut AppData, _out: &mut Out) -> CommandAction {
+        fn on_quit(_cmd: &AppQuit, state: &mut AppState, _out: &mut Out) -> CommandAction {
             state.should_quit = true;
             CommandAction::Stop
         }
@@ -190,7 +190,7 @@ mod tests {
 
         // When processing an AppQuit command.
         bus.submit_command(Command::AppQuit);
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         bus.process_commands(&mut state);
 
         // Then the stop handler ran and prevented the fake from running.
@@ -211,7 +211,7 @@ mod tests {
     }
 
     impl EventHandlerTest {
-        fn on_ready(_evt: &EventApplicationReady, state: &mut AppData, _out: &mut Out) {
+        fn on_ready(_evt: &EventApplicationReady, state: &mut AppState, _out: &mut Out) {
             state.should_quit = true;
         }
     }
@@ -224,7 +224,7 @@ mod tests {
 
         // When processing an EventApplicationReady event.
         bus.submit_event(Event::EventApplicationReady);
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         bus.process_events(&mut state);
 
         // Then the handler ran and mutated state.
@@ -250,19 +250,19 @@ mod tests {
     impl MultiHandler {
         fn on_insert_char(
             cmd: &ChatBoxInsertChar,
-            state: &mut AppData,
+            state: &mut AppState,
             _out: &mut Out,
         ) -> CommandAction {
             state.chat_input.input_buffer.push(cmd.ch);
             CommandAction::Continue
         }
 
-        fn on_quit(_cmd: &AppQuit, state: &mut AppData, _out: &mut Out) -> CommandAction {
+        fn on_quit(_cmd: &AppQuit, state: &mut AppState, _out: &mut Out) -> CommandAction {
             state.should_quit = true;
             CommandAction::Continue
         }
 
-        fn on_ready(_evt: &EventApplicationReady, state: &mut AppData, _out: &mut Out) {
+        fn on_ready(_evt: &EventApplicationReady, state: &mut AppState, _out: &mut Out) {
             state.chat_input.input_buffer.push('!');
         }
     }
@@ -277,7 +277,7 @@ mod tests {
         bus.submit_command(Command::ChatBoxInsertChar {
             payload: ChatBoxInsertChar { ch: 'h' },
         });
-        let mut state = AppData::new();
+        let mut state = AppState::new();
         bus.process_commands(&mut state);
 
         // Then the command handler ran.

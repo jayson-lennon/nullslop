@@ -7,7 +7,7 @@
 //! # Two-struct pattern
 //!
 //! Handlers and elements are separate structs that communicate through
-//! [`AppData`]:
+//! [`AppState`]:
 //!
 //! - **Handlers** implement [`CommandHandler`](nullslop_plugin_core::CommandHandler)
 //!   or [`EventHandler`](nullslop_plugin_core::EventHandler) and mutate state

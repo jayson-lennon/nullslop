@@ -1,19 +1,19 @@
-//! Domain data container for the application.
+//! Application state container.
 //!
-//! [`AppData`] is the shared state that plugins read and write.
-//! It contains domain-level data: chat history, input mode, and
+//! [`AppState`] is the shared state that plugins read and write.
+//! It contains chat history, input mode, and
 //! the chat input box state. Host-side concerns like extension tracking
 //! are managed separately in `nullslop-core`.
 
 use crate::{ChatEntry, ChatInputBoxState, Mode};
 
-/// The domain data of the application.
+/// The application state.
 ///
-/// This is the data shared across threads via the [`State`](nullslop_core::State) wrapper.
-/// It contains domain-level state: chat history, interaction mode, and chat input.
+/// This is the state shared across threads via the [`State`](nullslop_core::State) wrapper.
+/// It contains chat history, interaction mode, and chat input.
 /// Host-side extension tracking lives separately in `nullslop-core`.
 #[derive(Debug)]
-pub struct AppData {
+pub struct AppState {
     /// Chat history entries.
     pub chat_history: Vec<ChatEntry>,
     /// Current interaction mode.
@@ -24,8 +24,8 @@ pub struct AppData {
     pub should_quit: bool,
 }
 
-impl AppData {
-    /// Create a new `AppData` with default values.
+impl AppState {
+    /// Create a new `AppState` with default values.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -44,7 +44,7 @@ impl AppData {
     }
 }
 
-impl Default for AppData {
+impl Default for AppState {
     fn default() -> Self {
         Self::new()
     }
@@ -56,8 +56,8 @@ mod tests {
 
     #[test]
     fn new_data_has_empty_history() {
-        // Given a new AppData.
-        let data = AppData::new();
+        // Given a new AppState.
+        let data = AppState::new();
 
         // When inspecting chat history.
 
@@ -67,8 +67,8 @@ mod tests {
 
     #[test]
     fn push_entry_adds_to_history() {
-        // Given an AppData.
-        let mut data = AppData::new();
+        // Given an AppState.
+        let mut data = AppState::new();
 
         // When pushing an entry.
         let entry = ChatEntry::user("hello");
@@ -81,8 +81,8 @@ mod tests {
 
     #[test]
     fn default_mode_is_normal() {
-        // Given a new AppData.
-        let data = AppData::new();
+        // Given a new AppState.
+        let data = AppState::new();
 
         // Then mode is Normal.
         assert_eq!(data.mode, Mode::Normal);
@@ -90,8 +90,8 @@ mod tests {
 
     #[test]
     fn default_chat_input_is_empty() {
-        // Given a new AppData.
-        let data = AppData::new();
+        // Given a new AppState.
+        let data = AppState::new();
 
         // Then chat input buffer is empty.
         assert!(data.chat_input.input_buffer.is_empty());
@@ -99,8 +99,8 @@ mod tests {
 
     #[test]
     fn default_should_quit_is_false() {
-        // Given a new AppData.
-        let data = AppData::new();
+        // Given a new AppState.
+        let data = AppState::new();
 
         // Then should_quit is false.
         assert!(!data.should_quit);

@@ -7,7 +7,7 @@ use npr::CommandAction;
 use npr::command::AppQuit;
 use nullslop_plugin_core::{Bus, Out, define_handler};
 use nullslop_plugin_ui::UiRegistry;
-use nullslop_protocol::{self as npr, AppData};
+use nullslop_protocol::{self as npr, AppState};
 
 define_handler! {
     /// Handles the quit command.
@@ -26,7 +26,7 @@ pub(crate) fn register(bus: &mut Bus, _: &mut UiRegistry) {
 }
 
 impl QuitHandler {
-    fn on_quit(_cmd: &AppQuit, state: &mut AppData, _out: &mut Out) -> CommandAction {
+    fn on_quit(_cmd: &AppQuit, state: &mut AppState, _out: &mut Out) -> CommandAction {
         state.should_quit = true;
         CommandAction::Stop
     }
@@ -48,7 +48,7 @@ mod tests {
 
         // When processing AppQuit.
         bus.submit_command(Command::AppQuit);
-        let mut state = npr::AppData::new();
+        let mut state = npr::AppState::new();
         bus.process_commands(&mut state);
 
         // Then should_quit is true.
