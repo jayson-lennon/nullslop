@@ -7,7 +7,7 @@ use npr::CommandAction;
 use npr::command::CustomCommand;
 use nullslop_plugin_core::{Bus, Out, define_handler};
 use nullslop_plugin_ui::UiRegistry;
-use nullslop_protocol as npr;
+use nullslop_protocol::{self as npr, AppData};
 
 define_handler! {
     /// Handles commands from extensions.
@@ -28,7 +28,7 @@ pub(crate) fn register(bus: &mut Bus, _registry: &mut UiRegistry) {
 impl ExtensionCommandPlugin {
     fn on_custom_command(
         cmd: &CustomCommand,
-        state: &mut npr::AppData,
+        state: &mut AppData,
         _out: &mut Out,
     ) -> CommandAction {
         if cmd.name == "echo"

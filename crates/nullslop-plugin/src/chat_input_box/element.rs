@@ -7,7 +7,9 @@
 //! point when in Input mode.
 
 use nullslop_plugin_ui::UiElement;
-use nullslop_protocol::Mode;
+use nullslop_protocol::{AppData, Mode};
+use ratatui::Frame;
+use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
@@ -25,16 +27,13 @@ impl UiElement for ChatInputBoxElement {
         "chat-input-box".to_string()
     }
 
-    fn render(
-        &mut self,
-        frame: &mut ratatui::Frame<'_>,
-        area: ratatui::layout::Rect,
-        state: &nullslop_protocol::AppData,
-    ) {
+    fn render(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppData) {
         let input_mode = state.mode == Mode::Input;
 
         let prompt_style = if input_mode {
-            Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().add_modifier(Modifier::BOLD)
         };
@@ -71,9 +70,9 @@ impl UiElement for ChatInputBoxElement {
 
 #[cfg(test)]
 mod tests {
+    use ratatui::Terminal;
     use ratatui::backend::{Backend, TestBackend};
     use ratatui::layout::{Position, Rect};
-    use ratatui::Terminal;
 
     use super::*;
 
@@ -218,7 +217,9 @@ mod tests {
             .unwrap();
 
         // Then cursor is at position (5, 1): inner.x=0 + "> "=2 + "abc"=3.
-        terminal.backend_mut().assert_cursor_position(Position { x: 5, y: 1 });
+        terminal
+            .backend_mut()
+            .assert_cursor_position(Position { x: 5, y: 1 });
     }
 
     #[test]

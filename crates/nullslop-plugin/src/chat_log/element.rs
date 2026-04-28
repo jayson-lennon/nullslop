@@ -5,7 +5,9 @@
 //! with a `> ` prefix and system entries in dark gray with a `  ` prefix.
 
 use nullslop_plugin_ui::UiElement;
-use nullslop_protocol::ChatEntryKind;
+use nullslop_protocol::{AppData, ChatEntryKind};
+use ratatui::Frame;
+use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
@@ -23,12 +25,7 @@ impl UiElement for ChatLogElement {
         "chat-log".to_string()
     }
 
-    fn render(
-        &mut self,
-        frame: &mut ratatui::Frame<'_>,
-        area: ratatui::layout::Rect,
-        state: &nullslop_protocol::AppData,
-    ) {
+    fn render(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppData) {
         let lines: Vec<Line> = state
             .chat_history
             .iter()
@@ -53,9 +50,9 @@ impl UiElement for ChatLogElement {
 
 #[cfg(test)]
 mod tests {
+    use ratatui::Terminal;
     use ratatui::backend::TestBackend;
     use ratatui::layout::Rect;
-    use ratatui::Terminal;
 
     use super::*;
     use nullslop_protocol::{AppData, ChatEntry};

@@ -7,7 +7,7 @@ use npr::CommandAction;
 use npr::command::AppQuit;
 use nullslop_plugin_core::{Bus, Out, define_handler};
 use nullslop_plugin_ui::UiRegistry;
-use nullslop_protocol as npr;
+use nullslop_protocol::{self as npr, AppData};
 
 define_handler! {
     /// Handles the quit command.
@@ -21,12 +21,12 @@ define_handler! {
 }
 
 /// Register the quit handler plugin.
-pub(crate) fn register(bus: &mut Bus, _registry: &mut UiRegistry) {
+pub(crate) fn register(bus: &mut Bus, _: &mut UiRegistry) {
     QuitHandler.register(bus);
 }
 
 impl QuitHandler {
-    fn on_quit(_cmd: &AppQuit, state: &mut npr::AppData, _out: &mut Out) -> CommandAction {
+    fn on_quit(_cmd: &AppQuit, state: &mut AppData, _out: &mut Out) -> CommandAction {
         state.should_quit = true;
         CommandAction::Stop
     }
