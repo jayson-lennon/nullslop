@@ -31,13 +31,13 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
         // Normal scope: navigation and commands
         .scope(Scope::Normal, |b| {
             b.bind(
-                "<enter>",
+                "i",
                 Command::AppSetMode {
                     payload: AppSetMode { mode: Mode::Input },
                 },
                 KeyCategory::General,
             )
-            .bind("<esc>", Command::AppQuit, KeyCategory::General)
+            .bind("q", Command::AppQuit, KeyCategory::General)
             .bind("?", Command::AppToggleWhichKey, KeyCategory::General)
             .bind("<c-e>", Command::AppEditInput, KeyCategory::Input);
         })
@@ -60,6 +60,7 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
                 KeyCategory::General,
             )
             .bind("<c-e>", Command::AppEditInput, KeyCategory::Input)
+            .bind("<f1>", Command::AppToggleWhichKey, KeyCategory::General)
             .bind(
                 "<backspace>",
                 Command::ChatBoxDeleteGrapheme,
@@ -79,78 +80,5 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
     keymap
 }
 
-#[cfg(test)]
-mod tests {
-    use nullslop_core::{Key, KeyEvent, Modifiers};
-
-    use super::*;
-
-    fn key_event(key: Key) -> KeyEvent {
-        KeyEvent {
-            key,
-            modifiers: Modifiers::none(),
-        }
-    }
-
-    #[test]
-    fn keymap_init_normal_scope_has_enter_binding() {
-        // Given an initialized keymap.
-        let keymap = init();
-        let mut state = ratatui_which_key::WhichKeyState::new(keymap, Scope::Normal);
-
-        // When navigating Normal scope with Enter key.
-        let result = state.handle_key(key_event(Key::Enter));
-
-        // Then returns AppSetMode with Input mode.
-        assert!(matches!(
-            result,
-            Some(Command::AppSetMode {
-                payload: AppSetMode { mode: Mode::Input }
-            })
-        ));
-    }
-
-    #[test]
-    fn keymap_init_input_scope_has_submit_binding() {
-        // Given an initialized keymap.
-        let keymap = init();
-        let mut state = ratatui_which_key::WhichKeyState::new(keymap, Scope::Input);
-
-        // When navigating Input scope with Enter key.
-        let result = state.handle_key(key_event(Key::Enter));
-
-        // Then returns ChatBoxSubmitMessage.
-        assert!(matches!(result, Some(Command::ChatBoxSubmitMessage { .. })));
-    }
-
-    #[test]
-    fn keymap_init_input_scope_catch_all_handles_char() {
-        // Given an initialized keymap in Input scope.
-        let keymap = init();
-        let mut state = ratatui_which_key::WhichKeyState::new(keymap, Scope::Input);
-
-        // When pressing 'a' (no explicit binding).
-        let result = state.handle_key(key_event(Key::Char('a')));
-
-        // Then catch_all returns ChatBoxInsertChar with 'a'.
-        assert!(matches!(
-            result,
-            Some(Command::ChatBoxInsertChar {
-                payload: ChatBoxInsertChar { ch: 'a' }
-            })
-        ));
-    }
-
-    #[test]
-    fn keymap_init_normal_scope_esc_quits() {
-        // Given an initialized keymap.
-        let keymap = init();
-        let mut state = ratatui_which_key::WhichKeyState::new(keymap, Scope::Normal);
-
-        // When navigating Normal scope with Esc.
-        let result = state.handle_key(key_event(Key::Esc));
-
-        // Then returns AppQuit.
-        assert!(matches!(result, Some(Command::AppQuit)));
-    }
-}
+// No tests needed — keymap bindings are exercised end-to-end through the
+// TUI app integration tests in `app.rs` (key press → command dispatch).

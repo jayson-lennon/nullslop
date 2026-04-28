@@ -156,8 +156,8 @@ mod tests {
         let mut app = TuiApp::new();
         assert_eq!(*app.which_key.scope(), Scope::Normal);
 
-        // When pressing Enter.
-        app.handle_msg(Msg::Input(key_event(KeyCode::Enter)));
+        // When pressing 'i'.
+        app.handle_msg(Msg::Input(key_event(KeyCode::Char('i'))));
 
         // Then process core and verify state.
         app.core.tick();
@@ -169,8 +169,8 @@ mod tests {
         // Given an App in Normal scope.
         let mut app = TuiApp::new();
 
-        // When pressing Esc.
-        app.handle_msg(Msg::Input(key_event(KeyCode::Esc)));
+        // When pressing 'q'.
+        app.handle_msg(Msg::Input(key_event(KeyCode::Char('q'))));
 
         // Then process core and verify.
         let should_quit = app.core.tick().should_quit;

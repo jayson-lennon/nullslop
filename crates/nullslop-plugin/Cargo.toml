@@ -9,6 +9,7 @@ nullslop-plugin-core = { workspace = true }
 nullslop-plugin-ui = { workspace = true }
 ratatui = { workspace = true }
 tracing = { workspace = true }
+unicode-segmentation = { workspace = true }
 
 [dev-dependencies]
 rstest = { workspace = true }

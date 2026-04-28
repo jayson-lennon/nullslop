@@ -2,13 +2,21 @@
 //!
 //! [`ChatInputBoxElement`] implements [`UiElement`] to render the input box.
 //! It reads from `AppData.input_buffer` and renders the input prompt.
+//! In Input mode, the `>` prompt and border are styled green; in Normal mode
+//! they use default styling. A cursor is positioned at the current insertion
+//! point when in Input mode.
 
 use nullslop_plugin_ui::UiElement;
+use nullslop_protocol::Mode;
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
+use unicode_segmentation::UnicodeSegmentation;
 
 /// Renders the chat input box.
 ///
 /// Displays the current input buffer with a `>` prompt and a top border.
+/// When in Input mode, the prompt and border are green and a cursor is shown.
 #[derive(Debug)]
 pub struct ChatInputBoxElement;
 
@@ -23,18 +31,48 @@ impl UiElement for ChatInputBoxElement {
         area: ratatui::layout::Rect,
         state: &nullslop_protocol::AppData,
     ) {
-        let input_text = format!("> {}", state.input_buffer);
-        let input_widget = Paragraph::new(input_text)
-            .block(Block::default().borders(Borders::TOP))
-            .style(ratatui::style::Style::default());
+        let input_mode = state.mode == Mode::Input;
+
+        let prompt_style = if input_mode {
+            Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().add_modifier(Modifier::BOLD)
+        };
+
+        let border_style = if input_mode {
+            Style::default().fg(Color::Green)
+        } else {
+            Style::default()
+        };
+
+        let line = Line::from(vec![
+            Span::styled("> ", prompt_style),
+            Span::styled(&state.input_buffer, Style::default()),
+        ]);
+
+        let block = Block::default()
+            .borders(Borders::TOP)
+            .border_style(border_style);
+        let inner = block.inner(area);
+
+        let input_widget = Paragraph::new(line).block(block);
         frame.render_widget(input_widget, area);
+
+        // Position cursor at the end of the prompt + text when in input mode.
+        if input_mode {
+            let prompt_width: usize = 2; // "> " = 2 columns
+            let text_width: usize = state.input_buffer.graphemes(true).count();
+            let cursor_x = inner.x + (prompt_width + text_width) as u16;
+            let cursor_y = inner.y;
+            frame.set_cursor_position((cursor_x, cursor_y));
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use ratatui::backend::TestBackend;
-    use ratatui::layout::Rect;
+    use ratatui::backend::{Backend, TestBackend};
+    use ratatui::layout::{Position, Rect};
     use ratatui::Terminal;
 
     use super::*;
@@ -53,7 +91,7 @@ mod tests {
 
     #[test]
     fn render_draws_input_buffer() {
-        // Given a ChatInputBoxElement with "hello" in state.
+        // Given a ChatInputBoxElement with "hello" in state (Normal mode).
         let mut element = ChatInputBoxElement;
         let state = {
             let mut s = nullslop_protocol::AppData::new();
@@ -99,5 +137,109 @@ mod tests {
         let buffer = terminal.backend().buffer().clone();
         let cell = buffer.cell((0, 1)).expect("cell should exist");
         assert_eq!(cell.symbol(), ">");
+    }
+
+    #[test]
+    fn render_input_mode_green_prompt() {
+        // Given a ChatInputBoxElement in Input mode with "hi" in buffer.
+        let mut element = ChatInputBoxElement;
+        let state = {
+            let mut s = nullslop_protocol::AppData::new();
+            s.mode = Mode::Input;
+            s.input_buffer = "hi".to_string();
+            s
+        };
+
+        let backend = TestBackend::new(40, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 40, 3);
+
+        // When rendering.
+        terminal
+            .draw(|frame| {
+                element.render(frame, area, &state);
+            })
+            .unwrap();
+
+        // Then the ">" prompt is green.
+        let buffer = terminal.backend().buffer().clone();
+        let cell = buffer.cell((0, 1)).expect("cell should exist");
+        assert_eq!(cell.symbol(), ">");
+        assert_eq!(cell.style().fg, Some(Color::Green));
+    }
+
+    #[test]
+    fn render_input_mode_green_border() {
+        // Given a ChatInputBoxElement in Input mode.
+        let mut element = ChatInputBoxElement;
+        let state = {
+            let mut s = nullslop_protocol::AppData::new();
+            s.mode = Mode::Input;
+            s
+        };
+
+        let backend = TestBackend::new(40, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 40, 3);
+
+        // When rendering.
+        terminal
+            .draw(|frame| {
+                element.render(frame, area, &state);
+            })
+            .unwrap();
+
+        // Then the top border is green.
+        let buffer = terminal.backend().buffer().clone();
+        let cell = buffer.cell((0, 0)).expect("cell should exist");
+        assert_eq!(cell.style().fg, Some(Color::Green));
+    }
+
+    #[test]
+    fn render_input_mode_cursor_at_end_of_text() {
+        // Given a ChatInputBoxElement in Input mode with "abc" in buffer.
+        let mut element = ChatInputBoxElement;
+        let state = {
+            let mut s = nullslop_protocol::AppData::new();
+            s.mode = Mode::Input;
+            s.input_buffer = "abc".to_string();
+            s
+        };
+
+        let backend = TestBackend::new(40, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 40, 3);
+
+        // When rendering.
+        terminal
+            .draw(|frame| {
+                element.render(frame, area, &state);
+            })
+            .unwrap();
+
+        // Then cursor is at position (5, 1): inner.x=0 + "> "=2 + "abc"=3.
+        terminal.backend_mut().assert_cursor_position(Position { x: 5, y: 1 });
+    }
+
+    #[test]
+    fn render_normal_mode_no_cursor() {
+        // Given a ChatInputBoxElement in Normal mode.
+        let mut element = ChatInputBoxElement;
+        let state = nullslop_protocol::AppData::new();
+
+        let backend = TestBackend::new(40, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 40, 3);
+
+        // When rendering.
+        terminal
+            .draw(|frame| {
+                element.render(frame, area, &state);
+            })
+            .unwrap();
+
+        // Then cursor position was not set (remains at default 0,0 with cursor hidden).
+        let pos = terminal.backend_mut().get_cursor_position().unwrap();
+        assert_eq!(pos, Position { x: 0, y: 0 });
     }
 }

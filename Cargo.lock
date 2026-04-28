@@ -1131,6 +1131,7 @@ dependencies = [
  "rstest",
  "serde_json",
  "tracing",
+ "unicode-segmentation",
 ]
 
 [[package]]

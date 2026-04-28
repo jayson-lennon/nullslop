@@ -1,5 +1,6 @@
 //! Layout computation and rendering for the application.
 
+use ratatui::style::{Color, Style};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::widgets::{Paragraph, Wrap};
@@ -66,7 +67,8 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
 fn render_which_key(frame: &mut Frame<'_>, state: &mut crate::app::WhichKeyInstance) {
     let widget = WhichKey::new()
         .max_height(10)
-        .position(PopupPosition::BottomRight);
+        .position(PopupPosition::BottomRight)
+        .border_style(Style::default().fg(Color::Green));
     let buf = frame.buffer_mut();
     widget.render(buf, state);
 }
