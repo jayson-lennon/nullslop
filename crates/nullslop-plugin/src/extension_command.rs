@@ -5,7 +5,7 @@
 
 use npr::CommandAction;
 use npr::command::CustomCommand;
-use nullslop_plugin::{Out, define_plugin};
+use nullslop_plugin_core::{Out, define_plugin};
 use nullslop_protocol as npr;
 
 define_plugin! {
@@ -39,7 +39,7 @@ impl ExtensionCommandPlugin {
 #[cfg(test)]
 mod tests {
     use npr::Command;
-    use nullslop_plugin::Bus;
+    use nullslop_plugin_core::Bus;
     use nullslop_protocol as npr;
 
     use super::*;

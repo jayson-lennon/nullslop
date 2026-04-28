@@ -3,12 +3,17 @@ name = "nullslop-protocol"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = []
+which-key = ["ratatui-which-key"]
+
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
 jiff = { workspace = true }
 derive_more = { workspace = true }
 unicode-segmentation = { workspace = true }
+ratatui-which-key = { workspace = true, optional = true }
 
 [dev-dependencies]
 rstest = { workspace = true }

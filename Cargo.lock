@@ -1041,9 +1041,17 @@ name = "nullslop-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "dirs",
  "error-stack",
+ "kanal",
  "nullslop-core",
+ "nullslop-ext-host",
+ "nullslop-plugin",
+ "nullslop-plugin-ui",
+ "nullslop-protocol",
+ "nullslop-services",
  "nullslop-tui",
+ "ratatui-which-key",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -1057,11 +1065,16 @@ dependencies = [
  "derive_more",
  "error-stack",
  "jiff",
+ "kanal",
+ "nullslop-plugin",
+ "nullslop-plugin-core",
+ "nullslop-plugin-ui",
  "nullslop-protocol",
  "parking_lot",
  "rstest",
  "serde",
  "serde_json",
+ "tracing",
  "wherror",
 ]
 
@@ -1074,6 +1087,23 @@ dependencies = [
  "nullslop-protocol",
  "serde_json",
  "tracing",
+]
+
+[[package]]
+name = "nullslop-ext-host"
+version = "0.1.0"
+dependencies = [
+ "error-stack",
+ "kanal",
+ "nullslop-core",
+ "nullslop-extension",
+ "nullslop-protocol",
+ "rstest",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "wherror",
 ]
 
 [[package]]
@@ -1094,7 +1124,30 @@ dependencies = [
 name = "nullslop-plugin"
 version = "0.1.0"
 dependencies = [
+ "nullslop-plugin-core",
+ "nullslop-plugin-ui",
  "nullslop-protocol",
+ "ratatui",
+ "rstest",
+ "serde_json",
+ "tracing",
+]
+
+[[package]]
+name = "nullslop-plugin-core"
+version = "0.1.0"
+dependencies = [
+ "nullslop-protocol",
+ "rstest",
+]
+
+[[package]]
+name = "nullslop-plugin-ui"
+version = "0.1.0"
+dependencies = [
+ "nullslop-plugin-core",
+ "nullslop-protocol",
+ "ratatui",
  "rstest",
 ]
 
@@ -1104,10 +1157,20 @@ version = "0.1.0"
 dependencies = [
  "derive_more",
  "jiff",
+ "ratatui-which-key",
  "rstest",
  "serde",
  "serde_json",
  "unicode-segmentation",
+]
+
+[[package]]
+name = "nullslop-services"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "nullslop-core",
+ "tokio",
 ]
 
 [[package]]
@@ -1122,9 +1185,13 @@ dependencies = [
  "futures",
  "kanal",
  "nullslop-core",
+ "nullslop-ext-host",
  "nullslop-extension",
  "nullslop-plugin",
+ "nullslop-plugin-core",
+ "nullslop-plugin-ui",
  "nullslop-protocol",
+ "nullslop-services",
  "parking_lot",
  "ratatui",
  "ratatui-spatial-splits",

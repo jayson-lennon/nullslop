@@ -1,11 +1,9 @@
 //! Real extension host that spawns child processes via an async tokio task.
 
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
-use nullslop_core::Event;
-
-use super::ExtensionHost;
+use nullslop_core::{Event, ExtHostSender, ExtensionHost};
 
 /// Real extension host that spawns child processes via an async tokio task.
 ///
@@ -23,21 +21,19 @@ impl ProcessExtensionHost {
     /// Creates and starts the extension host task.
     ///
     /// The task immediately begins discovery and registration.
-    /// It sends `Msg::ExtensionsReady` when done.
+    /// It calls [`ExtHostSender::send_extensions_ready`] when done.
     ///
     /// # Errors
     ///
-    /// Does not return errors directly, but the spawned host task may send
-    /// an `ExtensionsReady` message with an empty list if discovery fails.
+    /// Does not return errors directly, but the spawned host task may call
+    /// `send_extensions_ready` with an empty list if discovery fails.
     pub fn start(
-        msg_sender: crate::msg::MsgSender,
+        sender: Arc<dyn ExtHostSender>,
         base_dir: PathBuf,
         handle: &tokio::runtime::Handle,
     ) -> Self {
         let (event_tx, event_rx) = kanal::unbounded();
-        let task = handle.spawn(crate::ext::host::run_extension_host(
-            msg_sender, event_rx, base_dir,
-        ));
+        let task = handle.spawn(crate::host::run_extension_host(sender, event_rx, base_dir));
         Self {
             event_sender: event_tx,
             host_task: Mutex::new(Some(task)),

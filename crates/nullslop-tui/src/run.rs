@@ -6,18 +6,38 @@
 //! terminal suspension and restarting it afterward.
 
 use std::io::{self, Stdout};
+use std::sync::Arc;
 
 use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use error_stack::{Report, ResultExt};
+use nullslop_core::{AppMsg, Command, ExtHostSender, RegisteredExtension};
 use ratatui::{Terminal, backend::CrosstermBackend};
 use tokio::runtime::Handle;
 use wherror::Error;
 
 use crate::TuiApp;
 use crate::app::scope_for_mode;
+
+/// Wrapper that adapts a `kanal::Sender<AppMsg>` to the
+/// [`ExtHostSender`] trait.
+///
+/// Required because Rust's orphan rules prevent implementing
+/// `ExtHostSender` (from `nullslop_core`) on `kanal::Sender<AppMsg>`
+/// directly.
+struct TuiExtSender(kanal::Sender<AppMsg>);
+
+impl ExtHostSender for TuiExtSender {
+    fn send_extensions_ready(&self, registrations: Vec<RegisteredExtension>) {
+        let _ = self.0.send(AppMsg::ExtensionsReady(registrations));
+    }
+
+    fn send_command(&self, command: Command) {
+        let _ = self.0.send(AppMsg::Command(command));
+    }
+}
 
 /// Error type for TUI run operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
@@ -54,10 +74,20 @@ pub fn run(mut app: TuiApp, handle: &Handle) -> Result<(), Report<TuiRunError>> 
         .unwrap_or_else(|| std::path::PathBuf::from("."))
         .join("nullslop")
         .join("extensions");
-    let mut services = crate::services::Services::new(handle.clone());
-    let ext_host =
-        crate::ext::process::ProcessExtensionHost::start(app.events.sender(), base_dir, handle);
-    services.register_extension_host(std::sync::Arc::new(ext_host));
+    let sender = TuiExtSender(app.core.sender());
+    let ext_host = nullslop_ext_host::ProcessExtensionHost::start(
+        Arc::new(sender),
+        base_dir,
+        handle,
+    );
+    let ext_arc: Arc<dyn nullslop_core::ExtensionHost> = Arc::new(ext_host);
+
+    // Share the extension host between AppCore and Services.
+    app.core
+        .set_ext_host(nullslop_core::ExtensionHostService::new(ext_arc.clone()));
+
+    let mut services = nullslop_services::Services::new(handle.clone());
+    services.register_extension_host(ext_arc);
     app.services = Some(services);
 
     let result = run_main_loop(&mut terminal, &mut app, handle);
@@ -68,9 +98,7 @@ pub fn run(mut app: TuiApp, handle: &Handle) -> Result<(), Report<TuiRunError>> 
     }
 
     // Shut down extension host.
-    if let Some(svc) = app.services.as_ref()
-        && let Some(ext) = svc.ext_host()
-    {
+    if let Some(ext) = app.core.ext_host() {
         ext.shutdown();
     }
 
@@ -105,27 +133,12 @@ fn run_main_loop(
             app.handle_msg(event);
         }
 
-        // Process the bus: commands then events.
-        {
-            let mut guard = app.state.write();
-            app.bus.process_commands(&mut guard);
-            app.bus.process_events(&mut guard);
-        }
+        // Core processing: drain messages, process bus, forward events.
+        let should_quit = app.core.tick().should_quit;
 
         // Sync which_key scope from AppData.mode.
-        let scope = scope_for_mode(app.state.read().mode);
+        let scope = scope_for_mode(app.core.state.read().mode);
         app.which_key.set_scope(scope);
-
-        // Forward processed events to extension host.
-        let processed_events = app.bus.drain_processed_events();
-        if !processed_events.is_empty()
-            && let Some(svc) = app.services.as_ref()
-            && let Some(ext) = svc.ext_host()
-        {
-            for evt in &processed_events {
-                ext.send_event(evt);
-            }
-        }
 
         // Check for pending suspend after event batch processing.
         if let Some(action) = app.suspend.take_action() {
@@ -139,8 +152,7 @@ fn run_main_loop(
             .change_context(TuiRunError)
             .attach("failed to draw frame")?;
 
-        // Check should_quit from AppData (set by CoreDispatcher plugin).
-        if app.state.read().should_quit {
+        if should_quit {
             break;
         }
     }
@@ -199,7 +211,7 @@ fn handle_suspend_action(
 
     // Handle the suspend result directly — set input_buffer on AppData.
     if let Some(content) = result_content {
-        app.state.write().input_buffer = content;
+        app.core.state.write().input_buffer = content;
     }
 
     Ok(())

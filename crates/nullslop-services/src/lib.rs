@@ -1,17 +1,19 @@
-//! Runtime services available to the TUI application.
+//! Application-wide runtime services.
 //!
-//! [`Services`] holds the tokio runtime handle and any other
-//! long-lived infrastructure that subsystems need access to.
-//! It is stored on [`TuiApp`](crate::TuiApp) once during startup
-//! and borrowed by anything that needs to spawn tasks.
+//! This crate defines the [`Services`] container, which holds the tokio
+//! runtime handle and other long-lived infrastructure that subsystems
+//! need access to. It is created once during startup and shared via
+//! [`Arc`](std::sync::Arc) or cloning throughout the application.
 
 use std::sync::Arc;
 
+use nullslop_core::ExtensionHostService;
 use tokio::runtime::Handle;
 
-use crate::ext::ExtensionHostService;
-
-/// Runtime services shared across the TUI application.
+/// Runtime services shared across the application.
+///
+/// Holds references to all services, enabling dependency injection
+/// and making it easy to swap implementations for testing.
 #[derive(Debug, Clone)]
 pub struct Services {
     /// Handle to the tokio runtime for spawning async tasks.
@@ -43,7 +45,7 @@ impl Services {
     }
 
     /// Registers the extension host service.
-    pub fn register_extension_host(&mut self, svc: Arc<dyn crate::ext::ExtensionHost>) {
+    pub fn register_extension_host(&mut self, svc: Arc<dyn nullslop_core::ExtensionHost>) {
         self.ext_host = Some(ExtensionHostService::new(svc));
     }
 }

@@ -5,9 +5,7 @@
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use nullslop_core::Event;
-
-use super::ExtensionHost;
+use nullslop_core::{Event, ExtensionHost};
 
 /// Fake extension host for testing.
 pub struct FakeExtensionHost {

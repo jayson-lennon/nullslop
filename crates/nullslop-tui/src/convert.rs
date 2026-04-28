@@ -1,10 +1,7 @@
 //! Conversions from crossterm key types to nullslop-core key types.
 //!
-//! These conversions are retained for use by extensions that need
-//! `nullslop_core::KeyEvent` conversion. The main key handling path
-//! now routes through `ratatui-which-key` directly.
-
-#![allow(dead_code)]
+//! These conversions are used by the main key handling path to translate
+//! crossterm events into protocol keys before passing them to the keymap.
 
 use nullslop_core::{Key, KeyEvent, Modifiers};
 

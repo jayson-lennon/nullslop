@@ -1,27 +1,31 @@
-//! Plugin for chat input commands.
+//! Handler for chat input and mode-switching commands.
 //!
-//! Handles inserting characters, deleting graphemes, and submitting messages
-//! in the chat input buffer.
+//! Consolidates all chat input command handling from the old `InputModePlugin`
+//! and `NormalModePlugin` into a single [`ChatInputBoxHandler`].
 
 use npr::CommandAction;
-use npr::command::{ChatBoxDeleteGrapheme, ChatBoxInsertChar, ChatBoxSubmitMessage};
-use nullslop_plugin::{Out, define_plugin};
+use npr::command::{
+    AppSetMode, ChatBoxClear, ChatBoxDeleteGrapheme, ChatBoxInsertChar, ChatBoxSubmitMessage,
+};
+use nullslop_plugin_core::{Out, define_plugin};
 use nullslop_protocol as npr;
 
 define_plugin! {
-    /// Handles chat input commands.
-    pub(crate) struct InputModePlugin;
+    /// Handles chat input and mode-switching commands.
+    pub(crate) struct ChatInputBoxHandler;
 
     commands {
         ChatBoxInsertChar: on_insert_char,
         ChatBoxDeleteGrapheme: on_delete_grapheme,
         ChatBoxSubmitMessage: on_submit_message,
+        ChatBoxClear: on_clear,
+        AppSetMode: on_set_mode,
     }
 
     events {}
 }
 
-impl InputModePlugin {
+impl ChatInputBoxHandler {
     fn on_insert_char(
         cmd: &ChatBoxInsertChar,
         state: &mut npr::AppData,
@@ -57,22 +61,32 @@ impl InputModePlugin {
         }
         CommandAction::Continue
     }
+
+    fn on_clear(_cmd: &ChatBoxClear, state: &mut npr::AppData, _out: &mut Out) -> CommandAction {
+        state.input_buffer.clear();
+        CommandAction::Continue
+    }
+
+    fn on_set_mode(cmd: &AppSetMode, state: &mut npr::AppData, _out: &mut Out) -> CommandAction {
+        state.mode = cmd.mode;
+        CommandAction::Continue
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use npr::Command;
-    use npr::command::{ChatBoxInsertChar, ChatBoxSubmitMessage};
-    use nullslop_plugin::Bus;
+    use npr::command::{AppSetMode, ChatBoxInsertChar, ChatBoxSubmitMessage};
+    use nullslop_plugin_core::Bus;
     use nullslop_protocol as npr;
 
     use super::*;
 
     #[test]
     fn insert_char_appends_to_buffer() {
-        // Given a bus with InputModePlugin registered.
+        // Given a bus with ChatInputBoxHandler registered.
         let mut bus = Bus::new();
-        InputModePlugin.register(&mut bus);
+        ChatInputBoxHandler.register(&mut bus);
 
         // When processing ChatBoxInsertChar('x').
         bus.submit_command(Command::ChatBoxInsertChar {
@@ -87,9 +101,9 @@ mod tests {
 
     #[test]
     fn delete_grapheme_removes_last() {
-        // Given a bus with InputModePlugin registered.
+        // Given a bus with ChatInputBoxHandler registered.
         let mut bus = Bus::new();
-        InputModePlugin.register(&mut bus);
+        ChatInputBoxHandler.register(&mut bus);
 
         // When processing ChatBoxInsertChar('a') then ChatBoxInsertChar('b') then ChatBoxDeleteGrapheme.
         bus.submit_command(Command::ChatBoxInsertChar {
@@ -108,9 +122,9 @@ mod tests {
 
     #[test]
     fn submit_message_adds_entry_and_clears_buffer() {
-        // Given a bus with InputModePlugin registered and "hello" in buffer.
+        // Given a bus with ChatInputBoxHandler registered and "hello" in buffer.
         let mut bus = Bus::new();
-        InputModePlugin.register(&mut bus);
+        ChatInputBoxHandler.register(&mut bus);
 
         let mut state = npr::AppData::new();
         state.input_buffer = "hello".to_string();
@@ -134,9 +148,9 @@ mod tests {
 
     #[test]
     fn submit_message_ignores_empty_buffer() {
-        // Given a bus with InputModePlugin registered and empty buffer.
+        // Given a bus with ChatInputBoxHandler registered and empty buffer.
         let mut bus = Bus::new();
-        InputModePlugin.register(&mut bus);
+        ChatInputBoxHandler.register(&mut bus);
 
         // When processing ChatBoxSubmitMessage with empty buffer.
         bus.submit_command(Command::ChatBoxSubmitMessage {
@@ -154,9 +168,9 @@ mod tests {
 
     #[test]
     fn submit_message_emits_event() {
-        // Given a bus with InputModePlugin registered and "hello" in buffer.
+        // Given a bus with ChatInputBoxHandler registered and "hello" in buffer.
         let mut bus = Bus::new();
-        InputModePlugin.register(&mut bus);
+        ChatInputBoxHandler.register(&mut bus);
 
         let mut state = npr::AppData::new();
         state.input_buffer = "hello".to_string();
@@ -182,5 +196,41 @@ mod tests {
             &processed[0],
             npr::Event::EventChatMessageSubmitted { .. }
         ));
+    }
+
+    #[test]
+    fn clear_empties_buffer() {
+        // Given a bus with ChatInputBoxHandler registered.
+        let mut bus = Bus::new();
+        ChatInputBoxHandler.register(&mut bus);
+
+        let mut state = npr::AppData::new();
+        state.input_buffer = "some text".to_string();
+
+        // When processing ChatBoxClear.
+        bus.submit_command(Command::ChatBoxClear);
+        bus.process_commands(&mut state);
+
+        // Then the input buffer is empty.
+        assert!(state.input_buffer.is_empty());
+    }
+
+    #[test]
+    fn set_mode_changes_app_mode() {
+        // Given a bus with ChatInputBoxHandler registered.
+        let mut bus = Bus::new();
+        ChatInputBoxHandler.register(&mut bus);
+
+        // When processing AppSetMode(Input).
+        bus.submit_command(Command::AppSetMode {
+            payload: AppSetMode {
+                mode: npr::Mode::Input,
+            },
+        });
+        let mut state = npr::AppData::new();
+        bus.process_commands(&mut state);
+
+        // Then state mode is Input.
+        assert_eq!(state.mode, npr::Mode::Input);
     }
 }

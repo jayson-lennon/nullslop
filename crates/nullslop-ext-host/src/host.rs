@@ -5,13 +5,13 @@
 //! the main loop and extension processes.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
-use nullslop_core::{Event, ExtensionManifest, RegisteredExtension};
+use nullslop_core::{Event, ExtHostSender, ExtensionManifest, RegisteredExtension};
 use nullslop_extension::codec::OutboundMessage;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 
-use crate::ext::discovery;
-use crate::msg::MsgSender;
+use crate::discovery;
 
 /// A running extension child process managed by the host task.
 ///
@@ -35,11 +35,11 @@ struct ManagedExtension {
 /// 1. Discovers extension manifests
 /// 2. Spawns child processes
 /// 3. Waits for registration messages
-/// 4. Sends `Msg::ExtensionsReady` with registrations
+/// 4. Sends `ExtensionsReady` with registrations
 /// 5. Enters event loop: route events to extensions
 /// 6. On channel close: sends shutdown to each extension
 pub async fn run_extension_host(
-    msg_sender: MsgSender,
+    sender: Arc<dyn ExtHostSender>,
     event_receiver: kanal::Receiver<Event>,
     base_dir: PathBuf,
 ) {
@@ -48,7 +48,7 @@ pub async fn run_extension_host(
         Ok(m) => m,
         Err(e) => {
             tracing::error!(err = ?e, "extension discovery failed");
-            msg_sender.send(crate::msg::Msg::ExtensionsReady(vec![]));
+            sender.send_extensions_ready(vec![]);
             return;
         }
     };
@@ -60,7 +60,7 @@ pub async fn run_extension_host(
     let handle = tokio::runtime::Handle::current();
 
     for (dir, manifest) in &manifests {
-        match spawn_and_register(&msg_sender, dir, manifest, &handle).await {
+        match spawn_and_register(&sender, dir, manifest, &handle).await {
             Some((ext, reg)) => {
                 registrations.push(reg);
                 extensions.push(ext);
@@ -72,7 +72,7 @@ pub async fn run_extension_host(
     }
 
     // Phase 3: Signal ready.
-    msg_sender.send(crate::msg::Msg::ExtensionsReady(registrations));
+    sender.send_extensions_ready(registrations);
 
     // Phase 4: Event routing loop (async receive via kanal).
     let async_rx = event_receiver.as_async();
@@ -88,7 +88,7 @@ pub async fn run_extension_host(
 
 /// Spawns an extension process, sends initialize, waits for registration.
 async fn spawn_and_register(
-    msg_sender: &MsgSender,
+    sender: &Arc<dyn ExtHostSender>,
     dir: &Path,
     manifest: &ExtensionManifest,
     handle: &tokio::runtime::Handle,
@@ -131,9 +131,9 @@ async fn spawn_and_register(
     let name = manifest.name.clone();
 
     // Spawn the long-lived reader task on the remaining stdout stream.
-    let sender = msg_sender.clone();
+    let reader_sender = Arc::clone(sender);
     let reader_name = name.clone();
-    let reader_task = handle.spawn(read_extension_stdout(sender, reader_name, reader));
+    let reader_task = handle.spawn(read_extension_stdout(reader_sender, reader_name, reader));
 
     let reg = RegisteredExtension {
         name: name.clone(),
@@ -153,7 +153,7 @@ async fn spawn_and_register(
 
 /// Reads lines from an extension's stdout and forwards commands to the main loop.
 async fn read_extension_stdout(
-    sender: MsgSender,
+    sender: Arc<dyn ExtHostSender>,
     name: String,
     reader: tokio::io::BufReader<tokio::process::ChildStdout>,
 ) {
@@ -162,7 +162,7 @@ async fn read_extension_stdout(
         if let Ok(Some(line)) = lines.next_line().await {
             match serde_json::from_str::<OutboundMessage>(&line) {
                 Ok(OutboundMessage::Command { command }) => {
-                    sender.send(crate::msg::Msg::Command(command));
+                    sender.send_command(command);
                 }
                 Ok(OutboundMessage::Register { .. }) => {
                     // Unexpected after init — ignore.

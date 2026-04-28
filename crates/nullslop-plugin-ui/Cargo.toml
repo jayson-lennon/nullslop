@@ -1,18 +1,15 @@
 [package]
-name = "nullslop-plugin"
+name = "nullslop-plugin-ui"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 nullslop-protocol = { workspace = true }
 nullslop-plugin-core = { workspace = true }
-nullslop-plugin-ui = { workspace = true }
 ratatui = { workspace = true }
-tracing = { workspace = true }
 
 [dev-dependencies]
 rstest = { workspace = true }
-serde_json = { workspace = true }
 
 [lints]
 workspace = true

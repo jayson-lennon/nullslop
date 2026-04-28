@@ -18,5 +18,24 @@ pub enum Commands {
     Tui,
 
     /// Run without a terminal interface.
-    Headless,
+    Headless {
+        /// Headless subcommand.
+        #[command(subcommand)]
+        command: Option<HeadlessCommands>,
+    },
+}
+
+/// Headless subcommands.
+#[derive(Debug, Subcommand)]
+pub enum HeadlessCommands {
+    /// Send a chat message.
+    SendChat {
+        /// The message text to send.
+        message: String,
+    },
+    /// Run a keystroke script.
+    Script {
+        /// Path to a script file with one key sequence per line.
+        path: String,
+    },
 }

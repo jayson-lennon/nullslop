@@ -7,9 +7,7 @@ use std::path::Path;
 
 use error_stack::{Report, ResultExt};
 
-use nullslop_core::ExtensionManifest;
-
-use super::ExtensionError;
+use nullslop_core::{ExtensionError, ExtensionManifest};
 
 /// Discovers extension manifests in the given directory.
 ///

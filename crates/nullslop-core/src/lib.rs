@@ -4,19 +4,25 @@
 //! domain data, key types) and adds host-side concerns: thread-safe state
 //! wrapper and extension registry.
 
+pub mod app_core;
 pub mod app_data;
+pub mod app_msg;
 pub mod chat;
 pub mod command;
 pub mod event;
+pub mod ext_host;
 pub mod extension;
 pub mod key;
 pub mod state;
 
 // Re-export primary types from nullslop-protocol
+pub use app_core::{AppCore, TickResult};
 pub use app_data::AppData;
+pub use app_msg::AppMsg;
 pub use chat::{ChatEntry, ChatEntryKind};
 pub use command::Command;
 pub use event::Event;
+pub use ext_host::{ExtHostSender, ExtensionError, ExtensionHost, ExtensionHostService};
 pub use extension::{ExtensionManifest, ExtensionRegistry, RegisteredExtension};
 pub use key::{Key, KeyEvent, Modifiers};
 pub use state::{State, StateReadGuard, StateWriteGuard};

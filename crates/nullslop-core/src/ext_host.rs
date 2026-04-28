@@ -1,14 +1,16 @@
-//! Extension host trait and service wrapper.
+//! Extension host trait, service wrapper, and sender abstraction.
 //!
 //! Defines the [`ExtensionHost`] trait for managing extension processes,
-//! the [`ExtensionHostService`] service wrapper, and [`ExtensionError`].
+//! the [`ExtensionHostService`] service wrapper, [`ExtensionError`],
+//! and the [`ExtHostSender`] trait that decouples the extension host
+//! from TUI-specific message types.
 
 use std::sync::Arc;
 
 use derive_more::Debug;
 use wherror::Error;
 
-use nullslop_core::Event;
+use crate::{Command, RegisteredExtension};
 
 /// Error type for extension operations.
 #[derive(Debug, Error)]
@@ -25,7 +27,7 @@ pub trait ExtensionHost: Send + Sync + 'static {
     fn name(&self) -> &'static str;
 
     /// Broadcasts an event to all subscribed extensions.
-    fn send_event(&self, event: &Event);
+    fn send_event(&self, event: &crate::Event);
 
     /// Shuts down all extension processes gracefully.
     fn shutdown(&self);
@@ -48,8 +50,14 @@ impl ExtensionHostService {
         Self { svc }
     }
 
+    /// Returns a reference to the inner `Arc<dyn ExtensionHost>`.
+    #[must_use]
+    pub fn backend(&self) -> &Arc<dyn ExtensionHost> {
+        &self.svc
+    }
+
     /// Delegates to [`ExtensionHost::send_event`].
-    pub fn send_event(&self, event: &Event) {
+    pub fn send_event(&self, event: &crate::Event) {
         self.svc.send_event(event);
     }
 
@@ -59,13 +67,21 @@ impl ExtensionHostService {
     }
 }
 
-pub mod discovery;
-pub mod fake;
-pub mod host;
-pub mod process;
+/// Abstraction for sending messages from the extension host to the application.
+///
+/// Implementations map extension host events into the application's message type.
+/// This trait decouples the extension host from TUI-specific message types,
+/// enabling headless mode (Phase 4) to receive extension events without
+/// depending on crossterm or the TUI message enum.
+pub trait ExtHostSender: Send + Sync + 'static {
+    /// Called when extensions have completed discovery and registration.
+    fn send_extensions_ready(&self, registrations: Vec<RegisteredExtension>);
+    /// Called when an extension sends a command.
+    fn send_command(&self, command: Command);
+}
 
 #[cfg(test)]
-mod tests_ext {
+mod tests {
     use super::*;
 
     #[test]

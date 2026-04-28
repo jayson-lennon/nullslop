@@ -2,9 +2,11 @@
 //!
 //! Defines the key categories and builds the keymap with all scope bindings
 //! using the `ratatui-which-key` crate. Binds keys to [`Command`](nullslop_protocol::Command)
-//! variants instead of the old `TuiCommand`.
+//! variants. Parameterized on [`nullslop_core::KeyEvent`] so the keymap works
+//! in both TUI and headless modes.
 
 use derive_more::Display;
+use nullslop_core::{KeyEvent, Key};
 use nullslop_protocol::command::{AppSetMode, ChatBoxInsertChar, ChatBoxSubmitMessage};
 use nullslop_protocol::{Command, Mode};
 use ratatui_which_key::Keymap;
@@ -22,7 +24,7 @@ pub enum KeyCategory {
 
 /// Builds and returns the full keymap with all scope bindings.
 #[must_use]
-pub fn init() -> Keymap<crossterm::event::KeyEvent, Scope, Command, KeyCategory> {
+pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
     let mut keymap = Keymap::new();
 
     keymap
@@ -63,13 +65,8 @@ pub fn init() -> Keymap<crossterm::event::KeyEvent, Scope, Command, KeyCategory>
                 Command::ChatBoxDeleteGrapheme,
                 KeyCategory::Input,
             )
-            .catch_all(|key: crossterm::event::KeyEvent| {
-                use crossterm::event::{KeyCode, KeyEventKind};
-                // Only handle Press events (crossterm fires Release/Repeat too)
-                if key.kind != KeyEventKind::Press {
-                    return None;
-                }
-                if let KeyCode::Char(c) = key.code {
+            .catch_all(|key: KeyEvent| {
+                if let Key::Char(c) = key.key {
                     Some(Command::ChatBoxInsertChar {
                         payload: ChatBoxInsertChar { ch: c },
                     })
@@ -84,9 +81,16 @@ pub fn init() -> Keymap<crossterm::event::KeyEvent, Scope, Command, KeyCategory>
 
 #[cfg(test)]
 mod tests {
-    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use nullslop_core::{Key, KeyEvent, Modifiers};
 
     use super::*;
+
+    fn key_event(key: Key) -> KeyEvent {
+        KeyEvent {
+            key,
+            modifiers: Modifiers::none(),
+        }
+    }
 
     #[test]
     fn keymap_init_normal_scope_has_enter_binding() {
@@ -95,7 +99,7 @@ mod tests {
         let mut state = ratatui_which_key::WhichKeyState::new(keymap, Scope::Normal);
 
         // When navigating Normal scope with Enter key.
-        let result = state.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+        let result = state.handle_key(key_event(Key::Enter));
 
         // Then returns AppSetMode with Input mode.
         assert!(matches!(
@@ -113,7 +117,7 @@ mod tests {
         let mut state = ratatui_which_key::WhichKeyState::new(keymap, Scope::Input);
 
         // When navigating Input scope with Enter key.
-        let result = state.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+        let result = state.handle_key(key_event(Key::Enter));
 
         // Then returns ChatBoxSubmitMessage.
         assert!(matches!(result, Some(Command::ChatBoxSubmitMessage { .. })));
@@ -126,7 +130,7 @@ mod tests {
         let mut state = ratatui_which_key::WhichKeyState::new(keymap, Scope::Input);
 
         // When pressing 'a' (no explicit binding).
-        let result = state.handle_key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE));
+        let result = state.handle_key(key_event(Key::Char('a')));
 
         // Then catch_all returns ChatBoxInsertChar with 'a'.
         assert!(matches!(
@@ -144,7 +148,7 @@ mod tests {
         let mut state = ratatui_which_key::WhichKeyState::new(keymap, Scope::Normal);
 
         // When navigating Normal scope with Esc.
-        let result = state.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+        let result = state.handle_key(key_event(Key::Esc));
 
         // Then returns AppQuit.
         assert!(matches!(result, Some(Command::AppQuit)));

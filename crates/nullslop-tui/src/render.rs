@@ -1,12 +1,8 @@
 //! Layout computation and rendering for the application.
 
-use nullslop_protocol as npr;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::Modifier;
-use ratatui::style::Style;
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
+use ratatui::widgets::{Paragraph, Wrap};
 use ratatui_which_key::{PopupPosition, WhichKey};
 
 use crate::TuiApp;
@@ -50,38 +46,19 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
     }
 
     let layout = AppLayout::new(area);
+    let state = app.core.state.read();
 
-    // Chat log
-    let state = app.state.read();
-    let lines: Vec<Line> = state
-        .chat_history
-        .iter()
-        .map(|entry| match &entry.kind {
-            npr::ChatEntryKind::User(text) => Line::from(Span::styled(
-                format!("> {text}"),
-                Style::default().add_modifier(Modifier::BOLD),
-            )),
-            npr::ChatEntryKind::System(text) => Line::from(Span::styled(
-                format!("  {text}"),
-                Style::default().fg(ratatui::style::Color::DarkGray),
-            )),
-        })
-        .collect();
+    // Chat log — delegate to registry element
+    if let Some(element) = app.ui_registry.get_mut("chat-log") {
+        element.render(frame, layout.chat, &state);
+    }
 
-    let chat_widget = Paragraph::new(lines)
-        .block(Block::default().borders(Borders::NONE))
-        .wrap(Wrap { trim: true })
-        .scroll((app.tui_state.scroll_offset, 0));
-    frame.render_widget(chat_widget, layout.chat);
+    // Input box — delegate to registry element
+    if let Some(element) = app.ui_registry.get_mut("chat-input-box") {
+        element.render(frame, layout.input, &state);
+    }
 
-    // Input box
-    let input_text = format!("> {}", state.input_buffer);
-    let input_widget = Paragraph::new(input_text)
-        .block(Block::default().borders(Borders::TOP))
-        .style(Style::default());
-    frame.render_widget(input_widget, layout.input);
-
-    // Which-key popup overlay
+    // Which-key popup overlay (app-level, not a plugin element)
     render_which_key(frame, &mut app.which_key);
 }
 

@@ -7,6 +7,7 @@ use clap::Parser;
 
 mod app;
 mod cli;
+mod headless_ext_sender;
 mod run;
 
 pub use app::{App, AppError};
