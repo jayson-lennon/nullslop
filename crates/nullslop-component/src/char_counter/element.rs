@@ -1,7 +1,7 @@
-//! UI element for the character counter.
+//! Renders the character count next to the input box.
 //!
-//! [`CharCounterElement`] implements [`UiElement`] to render the total
-//! number of grapheme clusters in the chat input buffer.
+//! Displays the total number of grapheme clusters in the user's in-progress message,
+//! formatted as `chars: N`. The count updates in real time as the user types.
 
 use crate::AppState;
 use nullslop_component_ui::UiElement;
@@ -10,10 +10,7 @@ use ratatui::layout::Rect;
 use ratatui::widgets::Paragraph;
 use unicode_segmentation::UnicodeSegmentation;
 
-/// Renders the character count of the chat input buffer.
-///
-/// Displays the number of grapheme clusters in the input buffer as
-/// `chars: N`, left-aligned with default styling.
+/// A display element that shows how many characters are in the input buffer.
 #[derive(Debug)]
 pub struct CharCounterElement;
 

@@ -1,27 +1,31 @@
-//! nullslop-component: built-in component implementations.
+//! Built-in components for the nullslop application.
 //!
-//! Contains all components that handle commands and events for the nullslop
-//! application, along with [`AppState`], [`ShutdownTracker`], and [`ChatInputBoxState`].
+//! A *component* is a self-contained piece of application behavior — it may handle
+//! user actions, react to lifecycle events, render part of the interface, or any
+//! combination of these. Each component owns a clear domain responsibility and is
+//! wired into the application through [`register_all`], which is called once at
+//! startup.
 //!
-//! All components use the [`define_handler!`](nullslop_component_core::define_handler)
-//! macro from `nullslop-component-core`.
+//! The components in this crate together provide the core chat experience:
+//! accepting user input, displaying conversation history, counting characters,
+//! processing extension commands, and coordinating a clean shutdown.
 //!
 //! # Type aliases
 //!
-//! - [`AppBus`] = `Bus<AppState>` — the standard bus for the nullslop application.
-//! - [`AppUiRegistry`] = `UiRegistry<AppState>` — the standard UI registry.
+//! - [`AppBus`] — the standard message bus for the application.
+//! - [`AppUiRegistry`] — the standard UI element registry.
 
+pub mod app_quit;
 pub mod app_state;
 pub mod char_counter;
 pub mod chat_input_box;
-pub mod chat_input_state;
 pub mod chat_log;
 pub mod custom_command;
-pub mod quit_handler;
-pub mod shutdown;
+pub mod shutdown_tracker;
 
-pub use app_state::{AppState, ShutdownTracker};
-pub use chat_input_state::ChatInputBoxState;
+pub use app_state::AppState;
+pub use chat_input_box::ChatInputBoxState;
+pub use shutdown_tracker::ShutdownTracker;
 
 use nullslop_component_core::Bus;
 use nullslop_component_ui::UiRegistry;
@@ -36,12 +40,12 @@ pub type AppUiRegistry = UiRegistry<AppState>;
 ///
 /// Called once during application startup.
 pub fn register_all(bus: &mut AppBus, registry: &mut AppUiRegistry) {
-    quit_handler::register(bus, registry);
+    app_quit::register(bus, registry);
+    shutdown_tracker::register(bus, registry);
     custom_command::register(bus, registry);
     chat_input_box::register(bus, registry);
     chat_log::register(bus, registry);
     char_counter::register(bus, registry);
-    shutdown::register(bus, registry);
 }
 
 #[cfg(test)]

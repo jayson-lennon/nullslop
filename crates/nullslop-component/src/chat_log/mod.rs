@@ -1,7 +1,8 @@
-//! Chat log UI element.
+//! Conversation history display.
 //!
-//! [`ChatLogElement`] renders the chat history in the TUI. It is a purely
-//! visual element with no command or event handlers.
+//! Renders the full scrollable chat log — all messages exchanged in the current
+//! session. This is a display-only component — it does not handle any user actions
+//! or events.
 
 pub mod element;
 

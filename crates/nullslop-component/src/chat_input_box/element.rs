@@ -1,10 +1,9 @@
-//! UI element for the chat input box.
+//! Renders the chat input prompt line.
 //!
-//! [`ChatInputBoxElement`] implements [`UiElement`] to render the input box.
-//! It reads from `AppState.chat_input.input_buffer` and renders the input prompt.
-//! In Input mode, the `>` prompt and border are styled green; in Normal mode
-//! they use default styling. A cursor is positioned at the current insertion
-//! point when in Input mode.
+//! Shows the user's in-progress message below a `>` prompt. When the user is
+//! actively typing (input mode), the prompt and border are highlighted in green and
+//! the cursor appears at the end of the text. When browsing (normal mode), the
+//! prompt is shown without highlighting and no cursor is displayed.
 
 use crate::AppState;
 use nullslop_component_ui::UiElement;
@@ -16,10 +15,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
 use unicode_segmentation::UnicodeSegmentation;
 
-/// Renders the chat input box.
-///
-/// Displays the current input buffer with a `>` prompt and a top border.
-/// When in Input mode, the prompt and border are green and a cursor is shown.
+/// Display element for the user's message composition area.
 #[derive(Debug)]
 pub struct ChatInputBoxElement;
 

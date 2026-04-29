@@ -1,7 +1,8 @@
-//! Component for custom commands received from extensions.
+//! Processes commands sent by extensions.
 //!
-//! Handles [`CustomCommand`]s using a match arm on command name.
-//! Unknown commands are logged as warnings.
+//! Extensions can send named commands into the application — for example, posting a
+//! message into the conversation. Commands that aren't recognized are logged and
+//! ignored.
 
 use crate::AppUiRegistry;
 use crate::{AppBus, AppState};
@@ -11,7 +12,6 @@ use nullslop_component_core::{Out, define_handler};
 use nullslop_protocol::{self as npr};
 
 define_handler! {
-    /// Handles custom commands from extensions.
     pub(crate) struct CustomCommandHandler;
 
     commands {
@@ -21,7 +21,7 @@ define_handler! {
     events {}
 }
 
-/// Register the custom command handler.
+/// Wire the extension command handler into the application.
 pub(crate) fn register(bus: &mut AppBus, _registry: &mut AppUiRegistry) {
     CustomCommandHandler.register(bus);
 }

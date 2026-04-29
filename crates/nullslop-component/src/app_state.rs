@@ -1,77 +1,31 @@
-//! Application state container.
+//! Shared application state.
 //!
-//! [`AppState`] is the shared state that components read and write.
-//! It contains chat history, input mode, and
-//! the chat input box state. Host-side concerns like extension tracking
-//! are managed separately in `nullslop-core`.
-
-use std::collections::HashSet;
+//! [`AppState`] is the single source of truth for what the user sees and how the
+//! application is currently behaving. Every component reads from and writes to this
+//! shared state.
 
 use nullslop_protocol::{ChatEntry, Mode};
 
-use crate::ChatInputBoxState;
+use crate::chat_input_box::ChatInputBoxState;
+use crate::shutdown_tracker::ShutdownTracker;
 
-/// Tracks which extensions have started and completed shutdown.
-#[derive(Debug, Clone, Default)]
-pub struct ShutdownTracker {
-    /// Extensions currently tracked as starting/running.
-    pending: HashSet<String>,
-    /// Whether shutdown has been initiated.
-    pub shutdown_active: bool,
-}
-
-impl ShutdownTracker {
-    /// Creates a new empty tracker.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Marks an extension as starting (tracked for shutdown coordination).
-    pub fn track(&mut self, name: &str) {
-        self.pending.insert(name.to_string());
-    }
-
-    /// Marks an extension as having completed shutdown.
-    /// Returns true if the extension was in the pending set.
-    pub fn complete(&mut self, name: &str) -> bool {
-        self.pending.remove(name)
-    }
-
-    /// Returns true when shutdown is active and all tracked extensions have completed.
-    #[must_use]
-    pub fn is_complete(&self) -> bool {
-        self.shutdown_active && self.pending.is_empty()
-    }
-
-    /// Returns the names of extensions still pending.
-    #[must_use]
-    pub fn pending_names(&self) -> Vec<String> {
-        self.pending.iter().cloned().collect()
-    }
-}
-
-/// The application state.
-///
-/// This is the state shared across threads via the [`State`](nullslop_core::State) wrapper.
-/// It contains chat history, interaction mode, and chat input.
-/// Host-side extension tracking lives separately in `nullslop-core`.
+/// A snapshot of everything the application is doing right now.
 #[derive(Debug)]
 pub struct AppState {
-    /// Chat history entries.
+    /// All messages in the current conversation.
     pub chat_history: Vec<ChatEntry>,
-    /// Current interaction mode.
+    /// Whether the user is browsing or actively typing.
     pub mode: Mode,
-    /// Chat input box state.
+    /// The user's in-progress message and input buffer.
     pub chat_input: ChatInputBoxState,
-    /// Whether the application should exit.
+    /// Set to `true` when the user has requested to quit.
     pub should_quit: bool,
-    /// Shutdown coordination tracker.
+    /// Bookkeeping for which extensions are still running during shutdown.
     pub shutdown_tracker: ShutdownTracker,
 }
 
 impl AppState {
-    /// Create a new `AppState` with default values.
+    /// Create a new `AppState` with no history, normal mode, and empty input.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -83,7 +37,7 @@ impl AppState {
         }
     }
 
-    /// Add a chat entry and return its index.
+    /// Append a message to the conversation and return its position.
     pub fn push_entry(&mut self, entry: ChatEntry) -> usize {
         let index = self.chat_history.len();
         self.chat_history.push(entry);
@@ -132,58 +86,5 @@ mod tests {
     fn default_should_quit_is_false() {
         let data = AppState::new();
         assert!(!data.should_quit);
-    }
-}
-
-#[cfg(test)]
-mod shutdown_tracker_tests {
-    use super::ShutdownTracker;
-
-    #[test]
-    fn track_adds_to_pending() {
-        let mut tracker = ShutdownTracker::new();
-        tracker.track("ext-a");
-        assert_eq!(tracker.pending_names(), vec!["ext-a".to_string()]);
-    }
-
-    #[test]
-    fn complete_removes_from_pending() {
-        let mut tracker = ShutdownTracker::new();
-        tracker.track("ext-a");
-        let was_tracked = tracker.complete("ext-a");
-        assert!(was_tracked);
-        assert!(tracker.pending_names().is_empty());
-    }
-
-    #[test]
-    fn is_complete_false_when_not_active() {
-        let tracker = ShutdownTracker::new();
-        assert!(!tracker.is_complete());
-    }
-
-    #[test]
-    fn is_complete_false_when_pending() {
-        let mut tracker = ShutdownTracker::new();
-        tracker.track("ext-a");
-        tracker.shutdown_active = true;
-        assert!(!tracker.is_complete());
-    }
-
-    #[test]
-    fn is_complete_true_when_active_and_empty() {
-        let mut tracker = ShutdownTracker::new();
-        tracker.shutdown_active = true;
-        assert!(tracker.is_complete());
-    }
-
-    #[test]
-    fn pending_names_returns_pending() {
-        let mut tracker = ShutdownTracker::new();
-        tracker.track("ext-a");
-        tracker.track("ext-b");
-        tracker.track("ext-c");
-        let mut names = tracker.pending_names();
-        names.sort();
-        assert_eq!(names, vec!["ext-a", "ext-b", "ext-c"]);
     }
 }

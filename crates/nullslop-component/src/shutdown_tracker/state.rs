@@ -1,0 +1,100 @@
+//! Bookkeeping for extensions still running during shutdown.
+//!
+//! Tracks which extensions have started and whether shutdown has been triggered,
+//! so the application can wait for all of them to finish before exiting.
+
+use std::collections::HashSet;
+
+/// Tracks which extensions are still active during a shutdown.
+#[derive(Debug, Clone, Default)]
+pub struct ShutdownTracker {
+    /// Extensions that are currently running.
+    pending: HashSet<String>,
+    /// Whether the application has begun shutting down.
+    pub shutdown_active: bool,
+}
+
+impl ShutdownTracker {
+    /// Create a tracker with no extensions and shutdown inactive.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record that an extension has started.
+    pub fn track(&mut self, name: &str) {
+        self.pending.insert(name.to_string());
+    }
+
+    /// Record that an extension has finished shutting down.
+    ///
+    /// Returns `true` if this extension was known to be running.
+    pub fn complete(&mut self, name: &str) -> bool {
+        self.pending.remove(name)
+    }
+
+    /// Returns `true` when shutdown is in progress and every extension has finished.
+    #[must_use]
+    pub fn is_complete(&self) -> bool {
+        self.shutdown_active && self.pending.is_empty()
+    }
+
+    /// Returns the names of extensions that are still running.
+    #[must_use]
+    pub fn pending_names(&self) -> Vec<String> {
+        self.pending.iter().cloned().collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ShutdownTracker;
+
+    #[test]
+    fn track_adds_to_pending() {
+        let mut tracker = ShutdownTracker::new();
+        tracker.track("ext-a");
+        assert_eq!(tracker.pending_names(), vec!["ext-a".to_string()]);
+    }
+
+    #[test]
+    fn complete_removes_from_pending() {
+        let mut tracker = ShutdownTracker::new();
+        tracker.track("ext-a");
+        let was_tracked = tracker.complete("ext-a");
+        assert!(was_tracked);
+        assert!(tracker.pending_names().is_empty());
+    }
+
+    #[test]
+    fn is_complete_false_when_not_active() {
+        let tracker = ShutdownTracker::new();
+        assert!(!tracker.is_complete());
+    }
+
+    #[test]
+    fn is_complete_false_when_pending() {
+        let mut tracker = ShutdownTracker::new();
+        tracker.track("ext-a");
+        tracker.shutdown_active = true;
+        assert!(!tracker.is_complete());
+    }
+
+    #[test]
+    fn is_complete_true_when_active_and_empty() {
+        let mut tracker = ShutdownTracker::new();
+        tracker.shutdown_active = true;
+        assert!(tracker.is_complete());
+    }
+
+    #[test]
+    fn pending_names_returns_pending() {
+        let mut tracker = ShutdownTracker::new();
+        tracker.track("ext-a");
+        tracker.track("ext-b");
+        tracker.track("ext-c");
+        let mut names = tracker.pending_names();
+        names.sort();
+        assert_eq!(names, vec!["ext-a", "ext-b", "ext-c"]);
+    }
+}

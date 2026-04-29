@@ -1,23 +1,18 @@
-//! State for the chat input box.
+//! Input buffer for the chat input box.
 //!
-//! [`ChatInputBoxState`] encapsulates the input buffer and related operations,
-//! keeping input-box concerns together in one place.
+//! Holds the user's in-progress message — the text they have typed but not yet sent.
 
 use unicode_segmentation::UnicodeSegmentation;
 
-/// Encapsulated state for the chat input box.
-///
-/// Holds the input buffer and provides methods for manipulating it.
-/// Colocated with the chat input box component via re-export from
-/// `nullslop_component::chat_input_box`.
+/// The user's in-progress message being composed in the input box.
 #[derive(Debug)]
 pub struct ChatInputBoxState {
-    /// The current text in the input box.
+    /// The text the user has typed so far.
     pub input_buffer: String,
 }
 
 impl ChatInputBoxState {
-    /// Create a new `ChatInputBoxState` with an empty buffer.
+    /// Create a new state with no text entered.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -25,9 +20,7 @@ impl ChatInputBoxState {
         }
     }
 
-    /// Removes the last grapheme cluster from the input buffer.
-    ///
-    /// Uses `unicode_segmentation` to handle multi-byte characters correctly.
+    /// Delete the last character the user typed, handling multi-byte Unicode correctly.
     pub fn pop_grapheme(&mut self) {
         if let Some((idx, _)) = self.input_buffer.grapheme_indices(true).next_back() {
             self.input_buffer.truncate(idx);

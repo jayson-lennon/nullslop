@@ -1,10 +1,13 @@
-//! UI element for the chat log.
+//! Renders the conversation history.
 //!
-//! [`ChatLogElement`] implements [`UiElement`] to render chat history.
-//! It reads from `AppState.chat_history` and displays:
-//! - User entries in bold with a `> ` prefix
-//! - System entries in dark gray with a `  ` prefix
-//! - Extension entries in yellow with a `[ext] {source}: {text}` format
+//! Each entry in the chat log is displayed with a distinct visual style so the user
+//! can tell them apart at a glance:
+//!
+//! - **User messages** appear bold with a `>` prefix.
+//! - **System messages** appear muted with indentation.
+//! - **Extension messages** appear highlighted with the extension's name and content.
+//!
+//! Text wraps within the available space.
 
 use crate::AppState;
 use nullslop_component_ui::UiElement;
@@ -15,11 +18,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 
-/// Renders the chat history log.
-///
-/// Displays all chat entries from `AppState.chat_history`, styling user
-/// entries in bold with a `> ` prefix and system entries in dark gray
-/// with a `  ` prefix. Text wraps within the allocated area.
+/// Display element for the full conversation history.
 #[derive(Debug)]
 pub struct ChatLogElement;
 

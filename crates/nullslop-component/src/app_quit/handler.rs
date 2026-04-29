@@ -1,18 +1,16 @@
-//! Component for the quit command.
+//! Handles the quit request.
 //!
-//! Handles the `AppQuit` command by setting the `should_quit` flag
-//! and stopping command propagation.
+//! When the user asks to quit, the application is flagged for exit and command
+//! processing stops immediately, preventing any remaining handlers from running.
 
-use crate::AppUiRegistry;
-use crate::{AppBus, AppState};
+use crate::AppState;
 use npr::CommandAction;
 use npr::command::AppQuit;
 use nullslop_component_core::{Out, define_handler};
-use nullslop_protocol::{self as npr};
+use nullslop_protocol as npr;
 
 define_handler! {
-    /// Handles the quit command.
-    pub(crate) struct QuitHandler;
+    pub(crate) struct AppQuitHandler;
 
     commands {
         AppQuit: on_quit,
@@ -21,12 +19,7 @@ define_handler! {
     events {}
 }
 
-/// Register the quit handler component.
-pub(crate) fn register(bus: &mut AppBus, _: &mut AppUiRegistry) {
-    QuitHandler.register(bus);
-}
-
-impl QuitHandler {
+impl AppQuitHandler {
     fn on_quit(_cmd: &AppQuit, state: &mut AppState, _out: &mut Out) -> CommandAction {
         state.should_quit = true;
         CommandAction::Stop
@@ -35,17 +28,18 @@ impl QuitHandler {
 
 #[cfg(test)]
 mod tests {
-    use crate::AppBus;
+    use crate::AppState;
     use npr::Command;
+    use nullslop_component_core::Bus;
     use nullslop_protocol as npr;
 
     use super::*;
 
     #[test]
     fn quit_sets_should_quit() {
-        // Given a bus with QuitHandler registered.
-        let mut bus: AppBus = AppBus::new();
-        QuitHandler.register(&mut bus);
+        // Given a bus with AppQuitHandler registered.
+        let mut bus: Bus<AppState> = Bus::new();
+        AppQuitHandler.register(&mut bus);
 
         // When processing AppQuit.
         bus.submit_command(Command::AppQuit);

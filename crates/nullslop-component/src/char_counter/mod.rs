@@ -1,8 +1,7 @@
-//! Character counter UI element.
+//! Character counter display.
 //!
-//! [`CharCounterElement`] renders the grapheme-cluster count of the chat
-//! input buffer in the TUI. It is a purely visual element with no command
-//! or event handlers.
+//! Shows a live count of how many characters the user has typed in the input box.
+//! This is a display-only component — it does not handle any user actions or events.
 
 pub mod element;
 

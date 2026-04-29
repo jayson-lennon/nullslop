@@ -1,7 +1,11 @@
-//! Handler for chat input and mode-switching commands.
+//! Handles user interactions with the chat input box.
 //!
-//! Consolidates all chat input command handling from the old `InputModeComponent`
-//! and `NormalModeComponent` into a single [`ChatInputBoxHandler`].
+//! Responds to typing, deleting, clearing, and submitting messages, as well as
+//! switching between normal (browsing) and input (typing) modes.
+//!
+//! When a message is submitted, it is added to the conversation history, the input
+//! buffer is cleared, and an event is emitted so other components can react to the
+//! new message.
 
 use crate::AppState;
 use npr::CommandAction;
@@ -12,7 +16,6 @@ use nullslop_component_core::{Out, define_handler};
 use nullslop_protocol as npr;
 
 define_handler! {
-    /// Handles chat input and mode-switching commands.
     pub(crate) struct ChatInputBoxHandler;
 
     commands {

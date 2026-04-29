@@ -6,11 +6,11 @@
 //! serialized and transmitted between host and extensions.
 //!
 //! Runtime-mutable state types ([`AppState`], [`ShutdownTracker`], [`ChatInputBoxState`])
-//! live in `nullslop-component-core`.
+//! live in `nullslop-component`.
 //!
-//! [`AppState`]: nullslop_component_core::AppState
-//! [`ShutdownTracker`]: nullslop_component_core::ShutdownTracker
-//! [`ChatInputBoxState`]: nullslop_component_core::ChatInputBoxState
+//! [`AppState`]: nullslop_component::AppState
+//! [`ShutdownTracker`]: nullslop_component::ShutdownTracker
+//! [`ChatInputBoxState`]: nullslop_component::ChatInputBoxState
 
 pub mod action;
 pub mod chat;
