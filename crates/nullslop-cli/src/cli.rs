@@ -1,4 +1,4 @@
-//! CLI argument definitions using clap derive.
+//! Command-line interface argument definitions.
 
 use clap::{Parser, Subcommand};
 

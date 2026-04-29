@@ -1,10 +1,7 @@
-//! Bus for dispatching commands and events to registered handlers.
+//! Central message router for commands and events.
 //!
-//! The [`Bus`] stores type-erased handlers in [`HashMap`]s keyed by [`TypeId`].
-//! On registration, handlers are boxed and a monomorphized invoke function pointer
-//! captures the concrete types. On dispatch, the bus matches on the wrapper enum,
-//! extracts the concrete payload, and calls the invoke function — no `dyn` trait
-//! objects needed.
+//! The [`Bus`] accepts handler registrations for specific message types, then
+//! routes submitted commands and events to the matching handlers.
 //!
 //! # Processing model
 //!
@@ -17,9 +14,9 @@
 //!
 //! # Consistency
 //!
-//! Each command/event gets a fresh [`Out`](crate::Out). After all handlers for an
-//! item run, the buffer is flushed into the bus queues. This ensures one consistent
-//! `&mut AppState` snapshot per item and no re-entrancy.
+//! Each command or event receives a fresh [`Out`](crate::Out) buffer. New messages
+//! submitted by handlers are only queued after all handlers for the current item
+//! have finished, ensuring a consistent state snapshot per dispatch.
 
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
@@ -36,24 +33,19 @@ use nullslop_protocol::{
 use crate::handler::{CommandHandler, EventHandler};
 use crate::out::Out;
 
-/// Type-erased command handler wrapper.
-///
-/// Stores the handler as `Box<dyn Any>` alongside a function pointer that
-/// captures the concrete handler and command types. The [`TypeId`] key in the
-/// parent `HashMap` already identifies the command type, so no redundant
-/// type id is stored here.
+/// Type-erased command handler ready for dispatch.
 struct AnyCommandHandler<S> {
     handler: Box<dyn Any>,
     invoke: fn(&dyn Any, &dyn Any, &mut S, &mut Out) -> CommandAction,
 }
 
-/// Type-erased event handler wrapper.
+/// Type-erased event handler ready for dispatch.
 struct AnyEventHandler<S> {
     handler: Box<dyn Any>,
     invoke: fn(&dyn Any, &dyn Any, &mut S, &mut Out),
 }
 
-/// Monomorphized invoke function for command handlers.
+/// Invokes a command handler with its concrete types.
 fn invoke_command<C, H, S>(
     handler: &dyn Any,
     cmd: &dyn Any,
@@ -69,7 +61,7 @@ where
     h.handle(c, state, out)
 }
 
-/// Monomorphized invoke function for event handlers.
+/// Invokes an event handler with its concrete types.
 fn invoke_event<E, H, S>(handler: &dyn Any, evt: &dyn Any, state: &mut S, out: &mut Out)
 where
     H: EventHandler<E, S> + 'static,
@@ -80,36 +72,33 @@ where
     h.handle(e, state, out);
 }
 
-/// A command in the bus queue, tagged with the extension that submitted it.
+/// A queued command together with its origin.
 struct QueuedCommand {
     command: Command,
     source: Option<String>,
 }
 
-/// An event in the bus queue, tagged with the extension that submitted it.
+/// A queued event together with its origin.
 struct QueuedEvent {
     event: Event,
     source: Option<String>,
 }
 
-/// Bus for dispatching commands and events to registered handlers.
+/// Central message router that dispatches commands and events to registered handlers.
 ///
-/// The bus maintains separate handler maps and queues for commands and events.
-/// Handlers are registered with concrete types and dispatched via [`TypeId`]
-/// lookup. The processing model ensures consistent state snapshots and no
-/// re-entrancy.
+/// Commands and events are submitted to queues and processed in order. Each
+/// message is routed to every handler registered for its type. The processing
+/// model ensures consistent state snapshots across handlers.
 pub struct Bus<S> {
     command_handlers: HashMap<TypeId, Vec<AnyCommandHandler<S>>>,
     event_handlers: HashMap<TypeId, Vec<AnyEventHandler<S>>>,
     command_queue: Vec<QueuedCommand>,
     event_queue: Vec<QueuedEvent>,
-    /// Events that were dispatched during the last processing cycle, with source.
-    /// Populated by `dispatch_event` so consumers can forward them
-    /// after bus processing completes.
+    /// Events dispatched during the last processing cycle, with source.
+    /// Available via [`drain_processed_events`](Self::drain_processed_events).
     processed_events: Vec<(Event, Option<String>)>,
-    /// Commands that were dispatched during the last processing cycle, with source.
-    /// Populated by `dispatch_command` so consumers can forward them
-    /// to the extension host after bus processing completes.
+    /// Commands dispatched during the last processing cycle, with source.
+    /// Available via [`drain_processed_commands`](Self::drain_processed_commands).
     processed_commands: Vec<(Command, Option<String>)>,
     max_iterations: usize,
 }

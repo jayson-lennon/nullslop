@@ -1,8 +1,7 @@
 //! Event types for the component event pipeline.
 //!
-//! Each event is a separate struct with an `Event` prefix.
-//! The [`Event`] wrapper enum provides a single type for
-//! serialization and the wire protocol.
+//! The [`Event`] enum is the unified type the host broadcasts to
+//! inform internal handlers and extensions about state changes and input.
 //!
 //! Individual event structs live in domain modules ([`chat_input`], [`system`],
 //! [`custom`], [`shutdown`]). This module re-exports them for convenience.
@@ -17,10 +16,10 @@ pub use crate::shutdown::{
 };
 pub use crate::system::{EventApplicationReady, EventKeyDown, EventKeyUp, EventModeChanged};
 
-/// Wrapper enum for all events.
+/// Every event the host can broadcast.
 ///
-/// Used for serialization and the wire protocol between host and extensions.
-/// Each variant wraps its corresponding event struct.
+/// Extensions subscribe to relevant variants; the host also
+/// uses them internally to drive UI updates.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
@@ -28,28 +27,28 @@ pub enum Event {
     /// A key was pressed down.
     #[serde(rename = "event_key_down")]
     EventKeyDown {
-        /// The event payload.
+        /// Which key was pressed.
         #[serde(flatten)]
         payload: EventKeyDown,
     },
     /// A key was released.
     #[serde(rename = "event_key_up")]
     EventKeyUp {
-        /// The event payload.
+        /// Which key was released.
         #[serde(flatten)]
         payload: EventKeyUp,
     },
     /// A chat message was submitted.
     #[serde(rename = "event_chat_message_submitted")]
     EventChatMessageSubmitted {
-        /// The event payload.
+        /// The submitted chat entry.
         #[serde(flatten)]
         payload: EventChatMessageSubmitted,
     },
     /// The application mode changed.
     #[serde(rename = "event_mode_changed")]
     EventModeChanged {
-        /// The event payload.
+        /// The previous and new mode.
         #[serde(flatten)]
         payload: EventModeChanged,
     },
@@ -59,28 +58,28 @@ pub enum Event {
     /// A custom event.
     #[serde(rename = "event_custom")]
     EventCustom {
-        /// The event payload.
+        /// The extension-defined event name and data.
         #[serde(flatten)]
         payload: EventCustom,
     },
     /// An extension is starting up.
     #[serde(rename = "event_extension_starting")]
     EventExtensionStarting {
-        /// The event payload.
+        /// Which extension is starting.
         #[serde(flatten)]
         payload: ExtensionStarting,
     },
     /// An extension has finished starting up.
     #[serde(rename = "event_extension_started")]
     EventExtensionStarted {
-        /// The event payload.
+        /// Which extension finished starting.
         #[serde(flatten)]
         payload: ExtensionStarted,
     },
     /// An extension has completed shutdown.
     #[serde(rename = "event_extension_shutdown_completed")]
     EventExtensionShutdownCompleted {
-        /// The event payload.
+        /// Which extension finished shutting down.
         #[serde(flatten)]
         payload: ExtensionShutdownCompleted,
     },

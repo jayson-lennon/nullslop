@@ -1,8 +1,8 @@
 //! [`FakeUiElement`] for testing registry and rendering behavior.
 //!
 //! Records render calls so tests can verify that the registry dispatches
-//! rendering correctly. Uses [`Rc<RefCell>`] so the test retains access
-//! to the call log after the element is moved into a
+//! rendering correctly. The call log remains accessible to the test after
+//! the element is moved into a
 //! [`UiRegistry`](crate::UiRegistry).
 //!
 //! # Usage
@@ -24,9 +24,9 @@ pub type RenderCall = (ratatui::layout::Rect, String);
 
 /// Fake UI element that records render calls.
 ///
-/// Follows the same `Rc<RefCell<>>` pattern as [`FakeCommandHandler`]
-/// in `nullslop-component-core` — the test retains access to the call log
-/// after the element is moved into the registry.
+/// The call log remains accessible to the test even after the element
+/// is moved into the registry, following the same pattern as
+/// [`FakeCommandHandler`] in `nullslop-component-core`.
 ///
 /// [`FakeCommandHandler`]: nullslop_component_core::fake::FakeCommandHandler
 #[derive(Debug)]

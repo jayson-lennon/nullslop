@@ -1,8 +1,7 @@
 //! Command types for the component command pipeline.
 //!
-//! Each command is a separate struct with a component prefix (`ChatBox*`,
-//! `App*`, `Provider*`). The [`Command`] wrapper enum provides a single
-//! type for serialization and the wire protocol.
+//! The [`Command`] enum is the unified type the host uses to receive and
+//! dispatch instructions from both internal handlers and extensions.
 //!
 //! Individual command structs live in domain modules ([`chat_input`], [`system`],
 //! [`custom`], [`shutdown`]). This module re-exports them for convenience.
@@ -19,10 +18,10 @@ pub use crate::system::{
     AppEditInput, AppQuit, AppSetMode, AppToggleWhichKey, ProviderCancelStream, ProviderSendMessage,
 };
 
-/// Wrapper enum for all commands.
+/// Every command the host can receive.
 ///
-/// Used for serialization and the wire protocol between host and extensions.
-/// Each variant wraps its corresponding command struct.
+/// Extensions and internal handlers produce these; the host dispatches
+/// them to the appropriate domain handler.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
@@ -30,7 +29,7 @@ pub enum Command {
     /// Insert a character into the chat input buffer.
     #[serde(rename = "chat_box_insert_char")]
     ChatBoxInsertChar {
-        /// The command payload.
+        /// Details of the character to insert.
         #[serde(flatten)]
         payload: ChatBoxInsertChar,
     },
@@ -40,7 +39,7 @@ pub enum Command {
     /// Submit the chat input buffer as a message.
     #[serde(rename = "chat_box_submit_message")]
     ChatBoxSubmitMessage {
-        /// The command payload.
+        /// The message being submitted.
         #[serde(flatten)]
         payload: ChatBoxSubmitMessage,
     },
@@ -50,7 +49,7 @@ pub enum Command {
     /// Set the application interaction mode.
     #[serde(rename = "app_set_mode")]
     AppSetMode {
-        /// The command payload.
+        /// The target mode.
         #[serde(flatten)]
         payload: AppSetMode,
     },
@@ -66,7 +65,7 @@ pub enum Command {
     /// Send a message to the AI provider.
     #[serde(rename = "provider_send_message")]
     ProviderSendMessage {
-        /// The command payload.
+        /// The message to send.
         #[serde(flatten)]
         payload: ProviderSendMessage,
     },
@@ -76,14 +75,14 @@ pub enum Command {
     /// A custom command from an extension.
     #[serde(rename = "custom_command")]
     CustomCommand {
-        /// The command payload.
+        /// The extension-defined command name and arguments.
         #[serde(flatten)]
         payload: CustomCommand,
     },
     /// Proceed with shutdown after extension coordination.
     #[serde(rename = "proceed_with_shutdown")]
     ProceedWithShutdown {
-        /// The command payload.
+        /// Which extensions finished or timed out.
         #[serde(flatten)]
         payload: ProceedWithShutdown,
     },

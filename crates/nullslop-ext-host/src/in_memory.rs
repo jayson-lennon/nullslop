@@ -1,8 +1,7 @@
 //! In-memory extension host.
 //!
-//! Runs extensions as OS threads. Events and commands are routed via kanal channels
-//! using pre-computed routing tables for lock-free dispatch on the hot path.
-//! No child processes or serialization.
+//! Runs extensions as threads within the application process. Events and commands
+//! are dispatched to subscribed extensions using pre-computed routing tables.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};

@@ -1,4 +1,7 @@
-//! Chat input box commands.
+//! Commands that mutate the chat input buffer.
+//!
+//! Insertion, deletion, submission, and clearing of the text
+//! the user is composing.
 
 use serde::{Deserialize, Serialize};
 

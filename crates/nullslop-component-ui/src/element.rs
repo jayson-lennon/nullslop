@@ -1,6 +1,6 @@
 //! [`UiElement`] trait for renderable UI components.
 //!
-//! Elements draw within an allocated area on the ratatui frame. They are
+//! Elements draw within an allocated area on the frame. They are
 //! separate from command/event handlers and communicate through
 //! [`AppState`] — handlers mutate state during processing, elements
 //! read state during rendering.
@@ -17,7 +17,7 @@
 ///
 /// # Type parameter
 ///
-/// `'static` bound is required for `Box<dyn UiElement>` storage in the
+/// `'static` bound is required so the element can be stored in the
 /// [`UiRegistry`](crate::UiRegistry).
 pub trait UiElement<S>: 'static + std::fmt::Debug {
     /// Returns the unique name identifying this element.

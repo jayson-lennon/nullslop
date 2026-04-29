@@ -1,12 +1,10 @@
-//! nullslop-component-core: handler traits, bus dispatch, and buffered output.
+//! Runtime dispatch infrastructure for the component system.
 //!
-//! This crate provides the runtime dispatch infrastructure for the component system:
-//! - [`CommandHandler`] and [`EventHandler`] traits for typed handling
-//! - [`Out`] for buffered command/event submission
-//! - [`Bus`] for [`TypeId`]-keyed dispatch with processing loops
-//! - [`define_handler!`](crate::define_handler) macro for declarative handler definitions
-//!
-//! It depends only on `nullslop-protocol` — no dependency on `nullslop-core`.
+//! Commands and events flow through a central [`Bus`] to typed handlers.
+//! Handlers react to specific message types via the [`CommandHandler`] and
+//! [`EventHandler`] traits, and can produce new messages through an [`Out`]
+//! buffer. The [`define_handler!`](crate::define_handler) macro reduces
+//! boilerplate when declaring handlers.
 
 pub mod bus;
 pub mod fake;

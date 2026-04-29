@@ -40,8 +40,8 @@ pub trait ExtensionHost: Send + Sync + 'static {
 
 /// Service wrapper for the extension host.
 ///
-/// Wraps `Arc<dyn ExtensionHost>` following the service wrapper pattern.
-/// This is the type that [`TuiApp`](crate::TuiApp) holds.
+/// Provides a clonable handle to the extension host, used throughout the
+/// application to forward events and commands to extension processes.
 #[derive(Clone, Debug)]
 pub struct ExtensionHostService {
     #[debug("backend<{}>", self.svc.name())]
@@ -81,12 +81,11 @@ impl ExtensionHostService {
     }
 }
 
-/// Abstraction for sending messages from the extension host to the application.
+/// Bridge for sending messages from the extension host back to the application.
 ///
-/// Implementations map extension host events into the application's message type.
-/// This trait decouples the extension host from TUI-specific message types,
-/// enabling headless mode to receive extension events without
-/// depending on crossterm or the TUI message enum.
+/// Implementations translate extension-originated events into application messages.
+/// This decouples the extension host from the application's message loop,
+/// enabling both TUI and headless modes to receive extension events.
 pub trait ExtHostSender: Send + Sync + 'static {
     /// Called when extensions have completed discovery and registration.
     fn send_extensions_ready(&self, registrations: Vec<RegisteredExtension>);

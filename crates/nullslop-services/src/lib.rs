@@ -1,9 +1,8 @@
 //! Application-wide runtime services.
 //!
-//! This crate defines the [`Services`] container, which holds the tokio
-//! runtime handle and other long-lived infrastructure that subsystems
-//! need access to. It is created once during startup and shared via
-//! [`Arc`](std::sync::Arc) or cloning throughout the application.
+//! This crate defines the [`Services`] container, which holds long-lived
+//! runtime infrastructure that subsystems need access to. It is created
+//! once during startup and shared throughout the application.
 
 use std::sync::Arc;
 
@@ -16,14 +15,14 @@ use tokio::runtime::Handle;
 /// and making it easy to swap implementations for testing.
 #[derive(Debug, Clone)]
 pub struct Services {
-    /// Handle to the tokio runtime for spawning async tasks.
+    /// Async runtime handle for spawning background tasks.
     handle: Handle,
     /// Extension host service (optional — set during startup).
     ext_host: Option<ExtensionHostService>,
 }
 
 impl Services {
-    /// Creates a new `Services` with the given tokio handle.
+    /// Creates a new `Services` with the given async runtime handle.
     #[must_use]
     pub fn new(handle: Handle) -> Self {
         Self {
@@ -32,7 +31,7 @@ impl Services {
         }
     }
 
-    /// Returns a reference to the tokio runtime handle.
+    /// Returns a reference to the async runtime handle.
     #[must_use]
     pub fn handle(&self) -> &Handle {
         &self.handle

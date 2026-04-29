@@ -1,17 +1,15 @@
-//! Buffered output for handler submissions.
+//! Buffered output for producing new messages during handler execution.
 //!
-//! [`Out`] is created by the [`Bus`](crate::Bus) for each command or event being
-//! dispatched. Handlers submit new commands and events through it. After all
-//! handlers for a given item run, the bus flushes the buffer into its queues,
-//! ensuring no re-entrancy within a single dispatch cycle.
+//! Handlers receive an [`Out`] reference to submit commands and events that
+//! should be processed after the current dispatch cycle completes. This
+//! decouples message production from immediate processing.
 
 use nullslop_protocol::{Command, Event};
 
-/// Buffered output for handlers to submit new commands and events.
+/// Buffer for submitting commands and events during handler execution.
 ///
-/// Items submitted during handler execution are buffered internally
-/// and flushed to the [`Bus`](crate::Bus) queues after the handler returns.
-/// This prevents re-entrancy and ensures consistent state snapshots.
+/// Submitted messages are held until the current dispatch finishes, then
+/// queued for a future processing cycle.
 #[derive(Debug, Default)]
 pub struct Out {
     commands: Vec<Command>,

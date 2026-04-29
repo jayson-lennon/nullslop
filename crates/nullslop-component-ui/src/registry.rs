@@ -1,18 +1,16 @@
 //! [`UiRegistry`] for storing and retrieving UI elements.
 //!
-//! The registry owns elements via [`Box`] and provides mutable iteration
-//! for rendering. Elements are registered during startup and queried by
-//! name during the TUI render loop.
+//! The registry holds all registered display elements and provides lookup
+//! by name and ordered iteration for rendering. Elements are added during
+//! startup and drawn each frame by the TUI layer.
 
 use crate::element::UiElement;
 
 /// Registry of UI elements available for rendering.
 ///
 /// Elements are registered during startup and queried by name during
-/// the TUI render loop. The registry owns its elements via [`Box`].
-///
-/// Registration order is preserved — iteration yields elements in the
-/// order they were registered.
+/// the TUI render loop. Registration order is preserved — iteration
+/// yields elements in the order they were added.
 #[derive(Debug)]
 pub struct UiRegistry<S> {
     elements: Vec<Box<dyn UiElement<S>>>,

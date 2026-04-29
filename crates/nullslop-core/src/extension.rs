@@ -1,4 +1,8 @@
-//! Extension tracking for the host application.
+//! Registry of active extensions and their capabilities.
+//!
+//! Tracks which extensions are running, the commands they handle, and the events
+//! they subscribe to. Used for command dispatch and event routing throughout the
+//! application.
 
 pub mod manifest;
 

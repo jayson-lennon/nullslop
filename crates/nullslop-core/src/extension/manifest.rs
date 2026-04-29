@@ -16,7 +16,7 @@ pub struct ExtensionManifest {
     pub name: String,
     /// Semantic version.
     pub version: String,
-    /// Path to the extension binary (relative to manifest directory, no traversal).
+    /// Path to the extension binary, relative to the manifest directory.
     pub binary: String,
     /// When to activate this extension.
     pub activation_events: Vec<String>,

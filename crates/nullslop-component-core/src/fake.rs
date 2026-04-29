@@ -1,14 +1,14 @@
-//! Test fakes for command and event handlers.
+//! Test fakes that record handled messages for assertions.
 //!
-//! [`FakeCommandHandler`] and [`FakeEventHandler`] record calls for test assertions.
-//! Since handler traits take `&self`, these fakes use [`RefCell`] for interior
-//! mutability and [`Rc`] for shared access after the handler is moved into a
-//! [`Bus`](crate::Bus).
+//! [`FakeCommandHandler`] and [`FakeEventHandler`] capture every message they
+//! receive so tests can verify dispatch behavior. Each constructor returns the
+//! handler together with a shared call log that remains accessible after the
+//! handler is registered with the bus.
 //!
 //! # Usage
 //!
 //! ```ignore
-//! let (handler, calls) = FakeCommandHandler::<AppQuit>::continuing();
+//! let (handler, calls) = FakeCommandHandler::<AppQuit, TestState>::continuing();
 //! bus.register_command_handler::<AppQuit, _>(handler);
 //! bus.process_commands(&mut state);
 //! assert_eq!(calls.borrow().len(), 1);
@@ -22,11 +22,10 @@ use nullslop_protocol::CommandAction;
 use crate::handler::{CommandHandler, EventHandler};
 use crate::out::Out;
 
-/// Fake command handler that records calls.
+/// Fake command handler that records every command it receives.
 ///
-/// Returns a configurable [`CommandAction`] and records every command it receives.
-/// Uses [`Rc<RefCell>`] so the test retains access to the call log after
-/// the handler is moved into the bus.
+/// Returns a configurable [`CommandAction`] on each call, allowing tests to
+/// exercise both continuation and stop-propagation paths.
 pub struct FakeCommandHandler<C, S> {
     calls: Rc<RefCell<Vec<C>>>,
     action: CommandAction,
@@ -66,10 +65,7 @@ impl<C: Clone + 'static, S> CommandHandler<C, S> for FakeCommandHandler<C, S> {
     }
 }
 
-/// Fake event handler that records calls.
-///
-/// Records every event it receives. Uses [`Rc<RefCell>`] so the test retains
-/// access to the call log after the handler is moved into the bus.
+/// Fake event handler that records every event it receives.
 pub struct FakeEventHandler<E, S> {
     calls: Rc<RefCell<Vec<E>>>,
     _phantom: std::marker::PhantomData<S>,

@@ -1,25 +1,21 @@
-//! Handler traits for commands and events.
+//! Handler traits for reacting to specific message types.
 //!
-//! [`CommandHandler<C>`] and [`EventHandler<E>`] are generic traits that components
-//! implement for specific command or event types. The [`Bus`](crate::Bus) dispatches
-//! to handlers via [`TypeId`], so each handler receives the concrete type.
+//! Components implement [`CommandHandler`] or [`EventHandler`] to express interest
+//! in particular commands or events. The [`Bus`](crate::Bus) routes each message
+//! to every handler registered for that type.
 
 use nullslop_protocol::CommandAction;
 
 use crate::Out;
 
-/// Handler for a specific command type `C`.
+/// Handler for a specific command type.
 ///
-/// Implementations receive a concrete command reference and can inspect state
-/// and submit new commands/events via `out`.
+/// Implementations receive the concrete command and can read or mutate
+/// application state. New messages can be submitted via `out`.
 ///
-/// Return [`CommandAction::Stop`] to prevent further handlers from seeing this command.
-/// Return [`CommandAction::Continue`] to allow the next handler to run.
-///
-/// # Type parameter
-///
-/// `C` must be `'static` so the bus can use [`TypeId::of::<C>()`](TypeId::of)
-/// for dispatch.
+/// Return [`CommandAction::Stop`] to prevent further handlers from seeing
+/// this command. Return [`CommandAction::Continue`] to allow the next handler
+/// to run.
 pub trait CommandHandler<C: 'static, S> {
     /// Handle a command.
     ///
@@ -36,16 +32,12 @@ pub trait CommandHandler<C: 'static, S> {
     fn handle(&self, cmd: &C, state: &mut S, out: &mut Out) -> CommandAction;
 }
 
-/// Handler for a specific event type `E`.
+/// Handler for a specific event type.
 ///
-/// Implementations receive a concrete event reference and can inspect state
-/// and submit new commands/events via `out`. Events are fire-and-forget —
-/// all registered handlers always run; there is no interception.
-///
-/// # Type parameter
-///
-/// `E` must be `'static` so the bus can use [`TypeId::of::<E>()`](TypeId::of)
-/// for dispatch.
+/// Implementations receive the concrete event and can read or mutate
+/// application state. New messages can be submitted via `out`. Events are
+/// fire-and-forget — all registered handlers always run; there is no
+/// interception.
 pub trait EventHandler<E: 'static, S> {
     /// Handle an event.
     ///

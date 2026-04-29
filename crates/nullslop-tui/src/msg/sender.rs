@@ -1,4 +1,4 @@
-//! Thin wrapper around the message channel sender.
+//! The sending end of the message channel.
 
 use derive_more::Debug;
 
@@ -6,8 +6,8 @@ use super::Msg;
 
 /// A sender for [`Msg`] values.
 ///
-/// Wraps the channel sender to avoid leaking `kanal` internals.
-/// The underlying channel is unbounded, so [`Self::send`] never blocks.
+/// The sending half of the message channel. Since the channel is unbounded,
+/// [`Self::send`] never blocks.
 #[derive(Debug, Clone)]
 pub struct MsgSender {
     #[debug(skip)]

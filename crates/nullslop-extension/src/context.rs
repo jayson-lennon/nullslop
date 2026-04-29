@@ -49,8 +49,8 @@ pub trait ExtensionSink: Send + Sync + 'static {
 
 /// Extension sink that writes to stdout (process-based extensions).
 ///
-/// Serializes commands and events as JSON lines and writes them to stdout,
-/// following the wire protocol.
+/// Encodes commands and events as JSON lines on stdout, following the
+/// host ↔ extension wire protocol.
 pub struct StdoutExtensionSink;
 
 impl ExtensionSink for StdoutExtensionSink {
@@ -63,9 +63,9 @@ impl ExtensionSink for StdoutExtensionSink {
     }
 }
 
-/// Extension sink that sends through a kanal channel (in-memory extensions).
+/// Extension sink for in-memory extensions.
 ///
-/// Avoids serialization overhead by passing [`ExtensionOutput`] directly through a channel.
+/// Delivers commands and events directly without serialization.
 pub struct ChannelExtensionSink {
     sender: kanal::Sender<ExtensionOutput>,
 }

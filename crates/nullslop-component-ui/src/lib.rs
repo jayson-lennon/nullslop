@@ -1,8 +1,9 @@
-//! nullslop-component-ui: renderable UI elements for the component system.
+//! Rendering layer for the component system.
 //!
-//! This crate provides the [`UiElement`] trait and [`UiRegistry`] for composable,
-//! component-driven rendering. It bridges `nullslop-component-core` and `ratatui`,
-//! allowing components to register UI elements that the TUI render loop draws.
+//! This crate defines [`UiElement`] — the trait for drawable UI components —
+//! and [`UiRegistry`] — the collection that holds them for the render loop.
+//! Components register elements during startup, and the TUI layer iterates
+//! them each frame.
 //!
 //! # Two-struct pattern
 //!
@@ -14,8 +15,8 @@
 //!   during command/event processing.
 //! - **Elements** implement [`UiElement`] and read state during rendering.
 //!
-//! No shared instances, no `Arc`, no `RefCell` for the common case. If a handler
-//! and element genuinely need shared internal state, they set it up explicitly.
+//! Handlers and elements do not share instances. If a handler and element
+//! genuinely need shared internal state, they set it up explicitly.
 //!
 //! # Architecture
 //!

@@ -1,6 +1,7 @@
-//! Chat log entry types.
+//! Conversation data model for the chat log.
 //!
-//! Entries can be from the user, the system, or an extension.
+//! Each [`ChatEntry`] records a timestamped message from the user,
+//! the system, or an extension.
 
 use serde::{Deserialize, Serialize};
 

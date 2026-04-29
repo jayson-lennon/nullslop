@@ -1,25 +1,16 @@
-//! Declarative macro for defining components that handle messages (commands and events).
+//! Macro for declaring a message-handling component.
 //!
-//! The [`define_handler!`] macro reduces boilerplate by generating:
-//! - The handler struct definition (unit struct)
-//! - `impl CommandHandler<C>` for each command entry
-//! - `impl EventHandler<E>` for each event entry
-//! - A `register(&self, bus: &mut Bus)` method
-//!
-//! Users provide method implementations in a separate `impl` block for full
-//! IDE support (autocomplete, type checking, inline errors).
+//! The [`define_handler!`] macro lets extension authors declare which commands
+//! and events a component handles in a single block. It produces the handler
+//! struct, the trait implementations, and a `register` method that wires
+//! everything into the bus. Authors write the actual handler methods in a
+//! separate `impl` block, preserving full IDE support.
 
-/// Define a component that handles messages (commands and events).
+/// Declare a component that handles specific commands and events.
 ///
-/// A component can be a command/event handler (defined via this macro),
-/// a UI element (implementing `UiElement`), or both. This macro
-/// generates the handler struct and typed dispatch wiring.
-///
-/// Generates:
-/// - The handler struct definition (unit struct)
-/// - `impl CommandHandler<C, AppState>` for each command entry (forwards `CommandAction` return value)
-/// - `impl EventHandler<E, AppState>` for each event entry
-/// - A `register(&self, bus: &mut Bus<AppState>)` method
+/// Produces the handler struct, trait implementations for every listed
+/// command and event type, and a `register` method that wires the component
+/// into the bus.
 ///
 /// # Syntax
 ///

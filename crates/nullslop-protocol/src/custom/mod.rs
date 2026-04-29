@@ -1,4 +1,8 @@
-//! Custom command/event domain: trait definitions, custom command types, and `EchoCommand`.
+//! Extension-defined commands and events.
+//!
+//! Extensions register their own commands and events through the
+//! [`CommandMsg`] and [`EventMsg`] traits. This domain provides the
+//! routing infrastructure and built-in types like [`EchoCommand`].
 
 mod command;
 mod event;

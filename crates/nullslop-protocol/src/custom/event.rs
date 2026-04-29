@@ -1,4 +1,4 @@
-//! Custom events and the `EventMsg` trait.
+//! Extension event routing and custom event payloads.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

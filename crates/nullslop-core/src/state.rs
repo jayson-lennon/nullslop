@@ -1,8 +1,8 @@
-//! Thread-safe application state wrapper.
+//! Shared application state accessible from any thread.
 //!
-//! Provides [`State`] as a shared reference to [`AppState`] and
-//! [`ExtensionRegistry`] with read/write guards that don't expose
-//! the underlying lock implementation.
+//! [`State`] wraps [`AppState`] and the [`ExtensionRegistry`] into a single
+//! shared reference. Read and write guards provide access without exposing
+//! synchronization details.
 
 use std::sync::Arc;
 
@@ -20,21 +20,21 @@ struct CoreState {
     extensions: ExtensionRegistry,
 }
 
-/// Thread-safe shared state wrapper.
+/// Shared application state accessible from any thread.
 ///
-/// Wraps [`AppState`] from `nullslop-protocol` and the host-side
-/// [`ExtensionRegistry`] in a single [`RwLock`] for consistent snapshots.
+/// Wraps [`AppState`] and the host-side [`ExtensionRegistry`] together
+/// so readers always see a consistent snapshot.
 #[derive(Debug, Clone)]
 pub struct State {
     inner: Arc<RwLock<CoreState>>,
 }
 
-/// Read guard for application data. Does not expose the underlying lock.
+/// Read guard for application data.
 pub struct StateReadGuard<'a> {
     inner: parking_lot::RwLockReadGuard<'a, CoreState>,
 }
 
-/// Write guard for application data. Does not expose the underlying lock.
+/// Write guard for application data.
 pub struct StateWriteGuard<'a> {
     inner: parking_lot::RwLockWriteGuard<'a, CoreState>,
 }
@@ -162,11 +162,8 @@ mod tests {
         assert_eq!(guard.chat_history.len(), 1);
     }
 
-    /// Compile-time check that [`StateReadGuard`] does not expose
-    /// `parking_lot::RwLockReadGuard` in its public API.
-    ///
-    /// The guard type only implements `Deref<Target = AppState>`,
-    /// so consumers cannot access the underlying lock.
+    /// Compile-time check that [`StateReadGuard`] provides
+    /// access only through `Deref<Target = AppState>`.
     #[test]
     fn state_read_guard_hides_lock() {
         // Given a State.

@@ -1,7 +1,7 @@
 //! Key representation for keyboard events.
 //!
-//! Backend-agnostic key types that abstract away the underlying
-//! terminal library (crossterm, termion, etc.).
+//! Backend-agnostic key types that decouple key handling
+//! from any specific terminal library.
 
 use serde::{Deserialize, Serialize};
 

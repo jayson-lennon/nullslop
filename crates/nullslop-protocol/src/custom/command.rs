@@ -1,4 +1,4 @@
-//! Custom commands and the `CommandMsg` trait.
+//! Extension command routing and built-in commands.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

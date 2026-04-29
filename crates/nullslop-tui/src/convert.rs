@@ -1,13 +1,13 @@
-//! Conversions from crossterm key types to nullslop-core key types.
+//! Translates raw terminal key events into application-level key events.
 //!
-//! These conversions are used by the main key handling path to translate
-//! crossterm events into protocol keys before passing them to the keymap.
+//! Bridges platform-specific terminal input and the protocol key types
+//! used by the keymap and command routing.
 
 use nullslop_protocol::{Key, KeyEvent, Modifiers};
 
-/// Converts a crossterm `KeyEvent` to a nullslop-core `KeyEvent`.
+/// Converts a platform key event to an application key event.
 ///
-/// Returns `None` for crossterm key codes that have no nullslop equivalent
+/// Returns `None` for key codes that have no application equivalent
 /// (e.g., `KeyCode::Null`, `KeyCode::Modifier`).
 #[must_use]
 pub fn from_crossterm(event: crossterm::event::KeyEvent) -> Option<KeyEvent> {

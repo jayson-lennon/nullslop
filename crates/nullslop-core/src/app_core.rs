@@ -13,9 +13,9 @@ use crate::{AppMsg, ExtensionHostService, State};
 /// Result of a [`AppCore::tick`] call.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TickResult {
-    /// Whether `should_quit` is set after processing.
+    /// The application has requested to quit.
     pub should_quit: bool,
-    /// Whether any messages were processed or the bus had pending work.
+    /// At least one message was processed or the bus had pending work.
     pub did_work: bool,
 }
 
@@ -24,15 +24,15 @@ pub struct TickResult {
 /// Owns the processing pipeline. The caller feeds [`AppMsg`] values
 /// via [`Self::sender`] and drives processing with [`Self::tick`].
 pub struct AppCore {
-    /// Component command/event bus.
+    /// Command and event bus for routing between components.
     pub bus: Bus<AppState>,
     /// Shared application state.
     pub state: State,
-    /// Internal message channel sender.
+    /// Sender half of the internal message channel.
     sender: kanal::Sender<AppMsg>,
-    /// Internal message channel receiver.
+    /// Receiver half of the internal message channel.
     receiver: kanal::Receiver<AppMsg>,
-    /// Optional extension host service (shared `Arc` with [`Services`](nullslop_services::Services)).
+    /// Optional extension host for forwarding processed messages.
     ext_host: Option<ExtensionHostService>,
 }
 
@@ -71,9 +71,8 @@ impl AppCore {
 
     /// Sets the extension host service.
     ///
-    /// `AppCore` holds its own `ExtensionHostService` so that [`tick()`](Self::tick)
-    /// can forward processed events without depending on the `Services` container.
-    /// The underlying `Arc<dyn ExtensionHost>` is typically shared with `Services`.
+    /// `AppCore` holds its own [`ExtensionHostService`] so that [`tick()`](Self::tick)
+    /// can forward processed messages without depending on the [`Services`](nullslop_services::Services) container.
     pub fn set_ext_host(&mut self, svc: ExtensionHostService) {
         self.ext_host = Some(svc);
     }

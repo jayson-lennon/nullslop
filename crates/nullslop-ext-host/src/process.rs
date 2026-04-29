@@ -1,4 +1,4 @@
-//! Real extension host that spawns child processes via an async tokio task.
+//! Extension host that runs extensions as child processes.
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -7,11 +7,11 @@ use error_stack::Report;
 use nullslop_core::{AppCore, ExtHostSender, ExtensionError, ExtensionHost};
 use nullslop_protocol::{Command, Event};
 
-/// Real extension host that spawns child processes via an async tokio task.
+/// Extension host that runs extensions as child processes.
 ///
-/// [`ProcessExtensionHost::start`] spawns the background task that discovers
+/// [`ProcessExtensionHost::start`] spawns a background task that discovers
 /// manifests, spawns processes, and routes events. The trait methods are
-/// synchronous entry points that communicate with the task via channels.
+/// synchronous entry points that communicate with the background task.
 pub struct ProcessExtensionHost {
     /// Channel to send events to the host task for broadcasting.
     event_sender: kanal::Sender<Event>,

@@ -32,10 +32,10 @@ pub struct TuiApp {
     pub which_key: WhichKeyInstance,
     /// Deferred suspend action queue (e.g., for external editor).
     pub(crate) suspend: Suspend,
-    /// Background event stream task handle. Set by [`run`](crate::run::run).
+    /// Background event stream. Set by [`run`](crate::run::run).
     #[debug(skip)]
     pub event_task: Option<tokio::task::JoinHandle<()>>,
-    /// Runtime services (tokio handle, extension host). Set during startup.
+    /// Runtime services. Set during startup.
     pub services: Option<nullslop_services::Services>,
     /// Current application lifecycle status.
     pub status: AppStatus,

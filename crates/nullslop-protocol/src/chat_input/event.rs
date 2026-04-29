@@ -1,4 +1,4 @@
-//! Chat input events.
+//! Events produced when the chat input box emits a completed message.
 
 use serde::{Deserialize, Serialize};
 

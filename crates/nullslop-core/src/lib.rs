@@ -1,7 +1,10 @@
-//! nullslop-core: shared types for the nullslop TUI agent harness.
+//! nullslop-core: application runtime for the nullslop agent harness.
 //!
-//! This crate provides host-side concerns: thread-safe state wrapper,
-//! extension host trait and registry, and application core.
+//! The processing loop ([`AppCore`]) receives messages, routes commands and events
+//! through a component bus, and forwards them to the extension host. Shared state
+//! ([`State`]) is accessible from any thread via read/write guards. The extension
+//! host ([`ExtensionHost`]) manages discovery, lifecycle, and message routing for
+//! extension processes.
 //!
 //! Protocol types (commands, events, keys, chat entries) are in `nullslop-protocol`.
 //! Import them directly from there.
