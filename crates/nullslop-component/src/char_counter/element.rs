@@ -4,7 +4,7 @@
 //! number of grapheme clusters in the chat input buffer.
 
 use nullslop_component_ui::UiElement;
-use nullslop_protocol::AppState;
+use nullslop_component_core::AppState;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::Paragraph;
@@ -37,7 +37,7 @@ mod tests {
     use ratatui::layout::Rect;
 
     use super::*;
-    use nullslop_protocol::AppState;
+    use nullslop_component_core::AppState;
 
     #[test]
     fn name_returns_char_counter() {

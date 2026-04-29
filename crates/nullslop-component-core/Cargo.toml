@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 nullslop-protocol = { workspace = true }
+unicode-segmentation = { workspace = true }
 
 [dev-dependencies]
 rstest = { workspace = true }

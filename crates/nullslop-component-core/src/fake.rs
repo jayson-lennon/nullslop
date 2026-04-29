@@ -17,10 +17,11 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use nullslop_protocol::{AppState, CommandAction};
+use nullslop_protocol::CommandAction;
 
 use crate::handler::{CommandHandler, EventHandler};
 use crate::out::Out;
+use crate::AppState;
 
 /// Fake command handler that records calls.
 ///

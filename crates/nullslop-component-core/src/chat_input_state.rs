@@ -47,48 +47,30 @@ mod tests {
 
     #[test]
     fn new_state_has_empty_buffer() {
-        // Given a new ChatInputBoxState.
         let state = ChatInputBoxState::new();
-
-        // Then input_buffer is empty.
         assert!(state.input_buffer.is_empty());
     }
 
     #[test]
     fn pop_grapheme_removes_last() {
-        // Given state with "abc" in the buffer.
         let mut state = ChatInputBoxState::new();
         state.input_buffer = "abc".to_string();
-
-        // When popping a grapheme.
         state.pop_grapheme();
-
-        // Then buffer is "ab".
         assert_eq!(state.input_buffer, "ab");
     }
 
     #[test]
     fn pop_grapheme_handles_unicode() {
-        // Given state with "é" in the buffer.
         let mut state = ChatInputBoxState::new();
         state.input_buffer = "é".to_string();
-
-        // When popping a grapheme.
         state.pop_grapheme();
-
-        // Then buffer is empty.
         assert_eq!(state.input_buffer, "");
     }
 
     #[test]
     fn pop_grapheme_empty_is_noop() {
-        // Given state with empty buffer.
         let mut state = ChatInputBoxState::new();
-
-        // When popping a grapheme.
         state.pop_grapheme();
-
-        // Then buffer is still empty.
         assert!(state.input_buffer.is_empty());
     }
 }

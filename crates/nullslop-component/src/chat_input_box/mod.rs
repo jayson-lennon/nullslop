@@ -5,7 +5,7 @@
 //! `InputModeComponent` and `NormalModeComponent`), and a [`ChatInputBoxElement`]
 //! that renders the input box in the TUI.
 //!
-//! The [`ChatInputBoxState`] (defined in `nullslop-protocol`) encapsulates
+//! The [`ChatInputBoxState`] (defined in `nullslop-component-core`) encapsulates
 //! the input buffer and is re-exported here for co-location with the component.
 
 pub mod element;
@@ -16,9 +16,7 @@ use nullslop_component_ui::UiRegistry;
 
 pub use element::ChatInputBoxElement;
 pub(crate) use handler::ChatInputBoxHandler;
-pub use npr::ChatInputBoxState;
-
-use nullslop_protocol as npr;
+pub use nullslop_component_core::ChatInputBoxState;
 
 /// Register the chat input box handler and UI element.
 pub(crate) fn register(bus: &mut Bus, registry: &mut UiRegistry) {

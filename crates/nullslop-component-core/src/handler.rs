@@ -4,9 +4,9 @@
 //! implement for specific command or event types. The [`Bus`](crate::Bus) dispatches
 //! to handlers via [`TypeId`], so each handler receives the concrete type.
 
-use nullslop_protocol::{AppState, CommandAction};
+use nullslop_protocol::CommandAction;
 
-use crate::Out;
+use crate::{AppState, Out};
 
 /// Handler for a specific command type `C`.
 ///

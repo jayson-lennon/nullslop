@@ -25,7 +25,7 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
 use nullslop_protocol::{
-    AppState, Command, CommandAction, Event,
+    Command, CommandAction, Event,
     command::{
         AppEditInput, AppQuit, AppToggleWhichKey, ChatBoxClear, ChatBoxDeleteGrapheme,
         ProviderCancelStream,
@@ -35,6 +35,7 @@ use nullslop_protocol::{
 
 use crate::handler::{CommandHandler, EventHandler};
 use crate::out::Out;
+use crate::AppState;
 
 /// Type-erased command handler wrapper.
 ///

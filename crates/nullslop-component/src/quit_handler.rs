@@ -5,9 +5,9 @@
 
 use npr::CommandAction;
 use npr::command::AppQuit;
-use nullslop_component_core::{Bus, Out, define_handler};
+use nullslop_component_core::{AppState, Bus, Out, define_handler};
 use nullslop_component_ui::UiRegistry;
-use nullslop_protocol::{self as npr, AppState};
+use nullslop_protocol::{self as npr};
 
 define_handler! {
     /// Handles the quit command.
@@ -48,7 +48,7 @@ mod tests {
 
         // When processing AppQuit.
         bus.submit_command(Command::AppQuit);
-        let mut state = npr::AppState::new();
+        let mut state = AppState::new();
         bus.process_commands(&mut state);
 
         // Then should_quit is true.

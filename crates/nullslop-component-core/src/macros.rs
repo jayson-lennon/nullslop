@@ -74,7 +74,7 @@ macro_rules! define_handler {
                 fn handle(
                     &self,
                     cmd: &$cmd_type,
-                    state: &mut ::nullslop_protocol::AppState,
+                    state: &mut $crate::AppState,
                     out: &mut $crate::Out,
                 ) -> ::nullslop_protocol::CommandAction {
                     Self::$cmd_method(cmd, state, out)
@@ -89,7 +89,7 @@ macro_rules! define_handler {
                 fn handle(
                     &self,
                     evt: &$evt_type,
-                    state: &mut ::nullslop_protocol::AppState,
+                    state: &mut $crate::AppState,
                     out: &mut $crate::Out,
                 ) {
                     Self::$evt_method(evt, state, out);
@@ -115,10 +115,10 @@ macro_rules! define_handler {
 #[cfg(test)]
 mod tests {
     use crate::fake::FakeCommandHandler;
-    use crate::{Bus, Out};
+    use crate::{AppState, Bus, Out};
     use npr::command::{AppQuit, ChatBoxInsertChar};
     use npr::event::EventApplicationReady;
-    use npr::{AppState, Command, CommandAction, Event};
+    use npr::{Command, CommandAction, Event};
     use nullslop_protocol as npr;
 
     // --- Test handler: command handler returning Continue ---

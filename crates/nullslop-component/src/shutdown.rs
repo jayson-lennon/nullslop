@@ -3,12 +3,11 @@
 //! Subscribes to extension lifecycle events and emits `ProceedWithShutdown`
 //! when all tracked extensions have completed shutdown.
 
-use npr::AppState;
 use npr::command::ProceedWithShutdown;
 use npr::event::{
     EventApplicationShuttingDown, ExtensionShutdownCompleted, ExtensionStarted, ExtensionStarting,
 };
-use nullslop_component_core::{Bus, Out, define_handler};
+use nullslop_component_core::{AppState, Bus, Out, define_handler};
 use nullslop_component_ui::UiRegistry;
 use nullslop_protocol as npr;
 
@@ -75,7 +74,8 @@ mod tests {
     use npr::Command;
     use npr::event::{ExtensionShutdownCompleted, ExtensionStarting};
     use nullslop_component_core::Bus;
-    use nullslop_protocol::{AppState, Event};
+    use nullslop_component_core::AppState;
+    use nullslop_protocol::Event;
 
     use super::*;
 

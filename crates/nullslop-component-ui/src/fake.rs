@@ -60,7 +60,7 @@ impl UiElement for FakeUiElement {
         &mut self,
         _frame: &mut ratatui::Frame<'_>,
         area: ratatui::layout::Rect,
-        state: &nullslop_protocol::AppState,
+        state: &nullslop_component_core::AppState,
     ) {
         self.render_calls
             .borrow_mut()
@@ -70,7 +70,7 @@ impl UiElement for FakeUiElement {
 
 #[cfg(test)]
 mod tests {
-    use nullslop_protocol::AppState;
+    use nullslop_component_core::AppState;
     use ratatui::layout::Rect;
 
     use super::*;

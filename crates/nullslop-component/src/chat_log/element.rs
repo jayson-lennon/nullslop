@@ -7,7 +7,8 @@
 //! - Extension entries in yellow with a `[ext] {source}: {text}` format
 
 use nullslop_component_ui::UiElement;
-use nullslop_protocol::{AppState, ChatEntryKind};
+use nullslop_component_core::AppState;
+use nullslop_protocol::ChatEntryKind;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -61,7 +62,8 @@ mod tests {
     use ratatui::layout::Rect;
 
     use super::*;
-    use nullslop_protocol::{AppState, ChatEntry};
+    use nullslop_component_core::AppState;
+    use nullslop_protocol::ChatEntry;
 
     #[test]
     fn name_returns_chat_log() {

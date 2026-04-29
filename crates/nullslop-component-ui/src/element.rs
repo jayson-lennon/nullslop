@@ -37,6 +37,6 @@ pub trait UiElement: 'static + std::fmt::Debug {
         &mut self,
         frame: &mut ratatui::Frame<'_>,
         area: ratatui::layout::Rect,
-        state: &nullslop_protocol::AppState,
+        state: &nullslop_component_core::AppState,
     );
 }

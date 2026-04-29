@@ -1040,6 +1040,7 @@ version = "0.1.0"
 dependencies = [
  "nullslop-protocol",
  "rstest",
+ "unicode-segmentation",
 ]
 
 [[package]]
@@ -1128,7 +1129,6 @@ dependencies = [
  "rstest",
  "serde",
  "serde_json",
- "unicode-segmentation",
 ]
 
 [[package]]

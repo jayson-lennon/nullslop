@@ -5,9 +5,9 @@
 
 use npr::CommandAction;
 use npr::command::CustomCommand;
-use nullslop_component_core::{Bus, Out, define_handler};
+use nullslop_component_core::{AppState, Bus, Out, define_handler};
 use nullslop_component_ui::UiRegistry;
-use nullslop_protocol::{self as npr, AppState};
+use nullslop_protocol::{self as npr};
 
 define_handler! {
     /// Handles custom commands from extensions.
@@ -68,7 +68,7 @@ mod tests {
                 args: serde_json::json!({"source": "nullslop-echo", "text": "HELLO"}),
             },
         });
-        let mut state = npr::AppState::new();
+        let mut state = AppState::new();
         bus.process_commands(&mut state);
 
         // Then chat_history has an Extension entry.
@@ -95,7 +95,7 @@ mod tests {
                 args: serde_json::json!({"text": "hello"}),
             },
         });
-        let mut state = npr::AppState::new();
+        let mut state = AppState::new();
         bus.process_commands(&mut state);
 
         // Then no entry is added (handler ran but args lacked source).
@@ -115,7 +115,7 @@ mod tests {
                 args: serde_json::json!({}),
             },
         });
-        let mut state = npr::AppState::new();
+        let mut state = AppState::new();
         bus.process_commands(&mut state);
 
         // Then no entry is added.

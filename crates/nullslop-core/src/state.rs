@@ -9,7 +9,7 @@ use std::sync::Arc;
 use parking_lot::RwLock;
 
 use crate::extension::ExtensionRegistry;
-use nullslop_protocol::AppState;
+use nullslop_component_core::AppState;
 
 /// Internal state combining application data and extension registry.
 #[derive(Debug)]

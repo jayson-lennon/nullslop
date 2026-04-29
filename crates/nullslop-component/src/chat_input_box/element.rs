@@ -7,7 +7,8 @@
 //! point when in Input mode.
 
 use nullslop_component_ui::UiElement;
-use nullslop_protocol::{AppState, Mode};
+use nullslop_component_core::AppState;
+use nullslop_protocol::Mode;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -93,7 +94,7 @@ mod tests {
         // Given a ChatInputBoxElement with "hello" in state (Normal mode).
         let mut element = ChatInputBoxElement;
         let state = {
-            let mut s = nullslop_protocol::AppState::new();
+            let mut s = nullslop_component_core::AppState::new();
             s.chat_input.input_buffer = "hello".to_string();
             s
         };
@@ -119,7 +120,7 @@ mod tests {
     fn render_draws_empty_buffer() {
         // Given a ChatInputBoxElement with empty state.
         let mut element = ChatInputBoxElement;
-        let state = nullslop_protocol::AppState::new();
+        let state = nullslop_component_core::AppState::new();
 
         let backend = TestBackend::new(20, 3);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -143,7 +144,7 @@ mod tests {
         // Given a ChatInputBoxElement in Input mode with "hi" in buffer.
         let mut element = ChatInputBoxElement;
         let state = {
-            let mut s = nullslop_protocol::AppState::new();
+            let mut s = nullslop_component_core::AppState::new();
             s.mode = Mode::Input;
             s.chat_input.input_buffer = "hi".to_string();
             s
@@ -172,7 +173,7 @@ mod tests {
         // Given a ChatInputBoxElement in Input mode.
         let mut element = ChatInputBoxElement;
         let state = {
-            let mut s = nullslop_protocol::AppState::new();
+            let mut s = nullslop_component_core::AppState::new();
             s.mode = Mode::Input;
             s
         };
@@ -199,7 +200,7 @@ mod tests {
         // Given a ChatInputBoxElement in Input mode with "abc" in buffer.
         let mut element = ChatInputBoxElement;
         let state = {
-            let mut s = nullslop_protocol::AppState::new();
+            let mut s = nullslop_component_core::AppState::new();
             s.mode = Mode::Input;
             s.chat_input.input_buffer = "abc".to_string();
             s
@@ -226,7 +227,7 @@ mod tests {
     fn render_normal_mode_no_cursor() {
         // Given a ChatInputBoxElement in Normal mode.
         let mut element = ChatInputBoxElement;
-        let state = nullslop_protocol::AppState::new();
+        let state = nullslop_component_core::AppState::new();
 
         let backend = TestBackend::new(40, 3);
         let mut terminal = Terminal::new(backend).unwrap();

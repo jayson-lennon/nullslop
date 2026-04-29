@@ -6,7 +6,7 @@
 //! drives the processing loop.
 
 use nullslop_component_core::Bus;
-use nullslop_protocol::AppState;
+use nullslop_component_core::AppState;
 
 use crate::{AppMsg, ExtensionHostService, State};
 
