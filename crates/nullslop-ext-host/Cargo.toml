@@ -17,6 +17,8 @@ tracing = { workspace = true }
 rstest = { workspace = true }
 tempfile = { workspace = true }
 nullslop-protocol = { workspace = true }
+nullslop-plugin = { workspace = true }
+nullslop-plugin-ui = { workspace = true }
 serde_json = { workspace = true }
 
 [lints]

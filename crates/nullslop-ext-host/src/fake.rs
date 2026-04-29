@@ -5,7 +5,8 @@
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use nullslop_core::{Event, ExtensionHost};
+use error_stack::Report;
+use nullslop_core::{AppCore, Event, ExtensionError, ExtensionHost};
 
 /// Fake extension host for testing.
 pub struct FakeExtensionHost {
@@ -71,8 +72,9 @@ impl ExtensionHost for FakeExtensionHost {
         self.commands_sent.lock().unwrap().push(command.clone());
     }
 
-    fn shutdown(&self) {
+    fn shutdown(&self, _core: &mut AppCore) -> Result<(), Report<ExtensionError>> {
         self.shutdown_called.store(true, Ordering::SeqCst);
+        Ok(())
     }
 }
 
@@ -104,12 +106,14 @@ mod tests {
     fn fake_host_tracks_shutdown() {
         // Given a fake host.
         let host = FakeExtensionHost::new();
+        let mut core = nullslop_core::AppCore::new();
 
         // When calling shutdown.
-        host.shutdown();
+        let result = host.shutdown(&mut core);
 
-        // Then is_shutdown is true.
+        // Then is_shutdown is true and returns Ok.
         assert!(host.is_shutdown());
+        assert!(result.is_ok());
     }
 
     #[test]

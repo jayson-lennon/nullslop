@@ -160,7 +160,8 @@ mod tests {
         let mut element = ChatLogElement;
         let state = {
             let mut s = AppState::new();
-            s.chat_history.push(ChatEntry::extension("nullslop-echo", "HELLO"));
+            s.chat_history
+                .push(ChatEntry::extension("nullslop-echo", "HELLO"));
             s
         };
 
@@ -190,7 +191,8 @@ mod tests {
             let mut s = AppState::new();
             s.chat_history.push(ChatEntry::system("welcome"));
             s.chat_history.push(ChatEntry::user("hello"));
-            s.chat_history.push(ChatEntry::extension("nullslop-echo", "HELLO"));
+            s.chat_history
+                .push(ChatEntry::extension("nullslop-echo", "HELLO"));
             s
         };
 

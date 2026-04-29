@@ -1057,6 +1057,8 @@ dependencies = [
  "kanal",
  "nullslop-core",
  "nullslop-extension",
+ "nullslop-plugin",
+ "nullslop-plugin-ui",
  "nullslop-protocol",
  "rstest",
  "serde_json",

@@ -80,7 +80,10 @@ impl TuiApp {
                 self.route_command(cmd);
             }
             Msg::ExtensionsReady(registrations) => {
-                let _ = self.core.sender().send(AppMsg::ExtensionsReady(registrations));
+                let _ = self
+                    .core
+                    .sender()
+                    .send(AppMsg::ExtensionsReady(registrations));
             }
         }
     }

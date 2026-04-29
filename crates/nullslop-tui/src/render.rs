@@ -1,8 +1,8 @@
 //! Layout computation and rendering for the application.
 
-use ratatui::style::{Color, Style};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::style::{Color, Style};
 use ratatui::widgets::{Paragraph, Wrap};
 use ratatui_which_key::{PopupPosition, WhichKey};
 

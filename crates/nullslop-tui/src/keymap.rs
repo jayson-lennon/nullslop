@@ -6,7 +6,7 @@
 //! in both TUI and headless modes.
 
 use derive_more::Display;
-use nullslop_core::{KeyEvent, Key};
+use nullslop_core::{Key, KeyEvent};
 use nullslop_protocol::command::{AppSetMode, ChatBoxInsertChar, ChatBoxSubmitMessage};
 use nullslop_protocol::{Command, Mode};
 use ratatui_which_key::Keymap;

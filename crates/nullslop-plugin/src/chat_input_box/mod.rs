@@ -14,9 +14,9 @@ pub mod handler;
 use nullslop_plugin_core::Bus;
 use nullslop_plugin_ui::UiRegistry;
 
-pub use npr::ChatInputBoxState;
 pub use element::ChatInputBoxElement;
 pub(crate) use handler::ChatInputBoxHandler;
+pub use npr::ChatInputBoxState;
 
 use nullslop_protocol as npr;
 

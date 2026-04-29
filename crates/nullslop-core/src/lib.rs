@@ -5,8 +5,8 @@
 //! wrapper and extension registry.
 
 pub mod app_core;
-pub mod app_state;
 pub mod app_msg;
+pub mod app_state;
 pub mod chat;
 pub mod command;
 pub mod event;
@@ -17,8 +17,8 @@ pub mod state;
 
 // Re-export primary types from nullslop-protocol
 pub use app_core::{AppCore, TickResult};
-pub use app_state::AppState;
 pub use app_msg::AppMsg;
+pub use app_state::AppState;
 pub use chat::{ChatEntry, ChatEntryKind};
 pub use command::Command;
 pub use event::Event;

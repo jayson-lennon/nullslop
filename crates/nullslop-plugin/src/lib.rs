@@ -9,6 +9,7 @@ pub mod chat_input_box;
 pub mod chat_log;
 pub mod extension_command;
 pub mod quit_handler;
+pub mod shutdown;
 
 use nullslop_plugin_core::Bus;
 use nullslop_plugin_ui::UiRegistry;
@@ -22,4 +23,5 @@ pub fn register_all(bus: &mut Bus, registry: &mut UiRegistry) {
     chat_input_box::register(bus, registry);
     chat_log::register(bus, registry);
     char_counter::register(bus, registry);
+    shutdown::register(bus, registry);
 }

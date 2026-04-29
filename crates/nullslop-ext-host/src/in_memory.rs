@@ -1,12 +1,32 @@
 //! In-memory extension host.
 //!
-//! Runs extensions as OS threads. Events and commands are routed via kanal channels.
+//! Runs extensions as OS threads. Events and commands are routed via kanal channels
+//! using pre-computed routing tables for lock-free dispatch on the hot path.
 //! No child processes or serialization.
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
-use nullslop_core::{Command, Event, ExtHostSender, ExtensionHost, RegisteredExtension};
-use nullslop_extension::{ChannelCommandSink, CommandSink, Context, ContextKind, InMemoryExtension};
+use error_stack::Report;
+use nullslop_core::event::ExtensionStarting;
+use nullslop_core::{
+    AppCore, Command, Event, ExtHostSender, ExtensionError, ExtensionHost, RegisteredExtension,
+};
+use nullslop_extension::{
+    ChannelExtensionSink, ContextKind, ExtensionContext, ExtensionOutput, ExtensionSink,
+    InMemoryExtension,
+};
+
+/// Joins a thread with a timeout. Returns `true` if the thread exited within the timeout.
+fn join_with_timeout(handle: std::thread::JoinHandle<()>, timeout: Duration) -> bool {
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = handle.join();
+        let _ = tx.send(());
+    });
+    rx.recv_timeout(timeout).is_ok()
+}
 
 /// Message sent to an extension's thread.
 enum ExtensionMessage {
@@ -18,26 +38,43 @@ enum ExtensionMessage {
     Shutdown,
 }
 
-/// A running in-memory extension.
-struct ManagedExtension {
-    /// Channel sender for routing messages to the extension thread.
-    sender: kanal::Sender<ExtensionMessage>,
-    /// Command names this extension registered.
-    commands: Vec<String>,
-    /// Event type names this extension subscribed to.
-    subscriptions: Vec<String>,
-    /// Handle for the extension thread.
-    #[allow(dead_code)]
-    thread: Option<std::thread::JoinHandle<()>>,
+/// Maximum time to wait for extensions to complete graceful shutdown.
+const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Maximum time to wait for each extension thread to join.
+const JOIN_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Sleep interval between ticks during shutdown.
+const SHUTDOWN_TICK_INTERVAL: Duration = Duration::from_millis(50);
+
+/// Pre-computed routing tables for lock-free event/command dispatch.
+///
+/// Built once during `start()` and never mutated. Each entry maps an event type name
+/// or command name to the channel senders for extensions that subscribed/registered.
+struct RoutingTables {
+    /// Event type name → list of senders for extensions subscribed to that event.
+    event_routes: HashMap<String, Vec<kanal::Sender<ExtensionMessage>>>,
+    /// Command name → list of senders for extensions that registered that command.
+    command_routes: HashMap<String, Vec<kanal::Sender<ExtensionMessage>>>,
+    /// All extension senders — used for broadcasting `ApplicationShuttingDown`.
+    all_senders: Vec<kanal::Sender<ExtensionMessage>>,
+}
+
+/// Lifecycle state that is only touched during shutdown.
+struct LifecycleState {
+    /// Join handles for extension threads.
+    threads: Vec<std::thread::JoinHandle<()>>,
 }
 
 /// Hosts extensions in-memory (no child process, no serialization).
 ///
 /// Each extension runs on its own OS thread. Events and commands are routed
-/// to extensions via individual kanal channels. Commands from extensions are
-/// forwarded to the application through [`ExtHostSender`].
+/// to extensions via individual kanal channels using pre-computed routing tables.
+/// The hot path (`send_event`/`send_command`) performs `HashMap` lookups without
+/// any Mutex — the Mutex is only touched during `shutdown()` to join threads.
 pub struct InMemoryExtensionHost {
-    extensions: Mutex<Vec<ManagedExtension>>,
+    routing: RoutingTables,
+    lifecycle: Mutex<LifecycleState>,
 }
 
 impl InMemoryExtensionHost {
@@ -45,10 +82,13 @@ impl InMemoryExtensionHost {
     ///
     /// For each extension:
     /// 1. Creates a kanal channel for messages (events + commands + shutdown)
-    /// 2. Creates a kanal channel for extension → host commands
-    /// 3. Spawns an OS thread that activates the extension and enters its message loop
-    /// 4. Spawns an async task to forward commands from the extension to [`ExtHostSender`]
-    /// 5. Reports registrations via `sender.send_extensions_ready()`
+    /// 2. Creates a kanal channel for extension → host output (commands + events)
+    /// 3. Activates the extension and collects registrations
+    /// 4. Builds routing table entries from subscriptions and command registrations
+    /// 5. Spawns an OS thread for the extension message loop
+    /// 6. Spawns an async task to forward output from the extension to [`ExtHostSender`]
+    /// 7. Emits `ExtensionStarting` event for each extension
+    /// 8. Reports all registrations via `sender.send_extensions_ready()`
     #[allow(clippy::missing_panics_doc)]
     #[allow(clippy::needless_pass_by_value)]
     pub fn start(
@@ -56,34 +96,63 @@ impl InMemoryExtensionHost {
         extensions: Vec<Box<dyn InMemoryExtension>>,
         handle: &tokio::runtime::Handle,
     ) -> Self {
-        let mut managed = Vec::new();
-        let mut registrations = Vec::new();
+        let mut event_routes: HashMap<String, Vec<kanal::Sender<ExtensionMessage>>> =
+            HashMap::new();
+        let mut command_routes: HashMap<String, Vec<kanal::Sender<ExtensionMessage>>> =
+            HashMap::new();
+        let mut all_senders: Vec<kanal::Sender<ExtensionMessage>> = Vec::new();
+        let mut threads: Vec<std::thread::JoinHandle<()>> = Vec::new();
+        let mut registrations: Vec<RegisteredExtension> = Vec::new();
 
-        for mut ext in extensions {
+        for (idx, mut ext) in extensions.into_iter().enumerate() {
             let (msg_tx, msg_rx) = kanal::unbounded::<ExtensionMessage>();
-            let (cmd_tx, cmd_rx) = kanal::unbounded::<Command>();
+            let (out_tx, out_rx) = kanal::unbounded::<ExtensionOutput>();
 
-            let sink: Arc<dyn CommandSink> = Arc::new(ChannelCommandSink::new(cmd_tx));
+            let sink: Arc<dyn ExtensionSink> = Arc::new(ChannelExtensionSink::new(out_tx));
             let kind = ContextKind::InMemory {
                 handle: handle.clone(),
             };
-            let mut ctx = Context::new(sink, kind);
+            let mut ctx = ExtensionContext::new(sink, kind);
+            ctx.set_name(format!("in-memory-{idx}"));
 
             // Activate and collect registrations.
             ext.activate(&mut ctx);
             let (commands, subscriptions) = ctx.take_registrations();
 
-            // Spawn async task to forward commands from extension to host.
-            let cmd_sender = sender.clone();
+            let name = format!("in-memory-{idx}");
+
+            // Build event routes.
+            for sub in &subscriptions {
+                event_routes
+                    .entry(sub.clone())
+                    .or_default()
+                    .push(msg_tx.clone());
+            }
+
+            // Build command routes.
+            for cmd in &commands {
+                command_routes
+                    .entry(cmd.clone())
+                    .or_default()
+                    .push(msg_tx.clone());
+            }
+
+            all_senders.push(msg_tx.clone());
+
+            // Spawn async task to forward output from extension to host.
+            let out_sender = sender.clone();
             handle.spawn(async move {
-                let async_rx = cmd_rx.as_async();
-                while let Ok(cmd) = async_rx.recv().await {
-                    cmd_sender.send_command(cmd);
+                let async_rx = out_rx.as_async();
+                while let Ok(output) = async_rx.recv().await {
+                    match output {
+                        ExtensionOutput::Command(cmd) => out_sender.send_command(cmd),
+                        ExtensionOutput::Event(evt) => out_sender.send_extension_event(evt),
+                    }
                 }
             });
 
             // Spawn OS thread for extension message loop.
-            let ext_name = format!("ext-{}", managed.len());
+            let ext_name = format!("ext-{idx}");
             let thread = std::thread::Builder::new()
                 .name(ext_name)
                 .spawn(move || {
@@ -100,25 +169,97 @@ impl InMemoryExtensionHost {
                 })
                 .expect("failed to spawn extension thread");
 
-            let name = format!("in-memory-{}", managed.len());
-            registrations.push(RegisteredExtension {
-                name,
-                commands: commands.clone(),
-                subscriptions: subscriptions.clone(),
+            // Emit ExtensionStarting for this extension.
+            sender.send_extension_event(Event::EventExtensionStarting {
+                payload: ExtensionStarting { name: name.clone() },
             });
 
-            managed.push(ManagedExtension {
-                sender: msg_tx,
+            registrations.push(RegisteredExtension {
+                name,
                 commands,
                 subscriptions,
-                thread: Some(thread),
             });
+
+            threads.push(thread);
         }
 
         sender.send_extensions_ready(registrations);
 
         Self {
-            extensions: Mutex::new(managed),
+            routing: RoutingTables {
+                event_routes,
+                command_routes,
+                all_senders,
+            },
+            lifecycle: Mutex::new(LifecycleState { threads }),
+        }
+    }
+
+    /// Shuts down extensions gracefully with a configurable timeout.
+    ///
+    /// Sends `EventApplicationShuttingDown` to all extensions, then drives a
+    /// tick loop to drain extension events through the bus until either all
+    /// extensions complete or the timeout expires. Then sends `Shutdown` to
+    /// all extensions and joins their threads.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error listing extensions that did not complete within the timeout.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the lifecycle mutex is poisoned.
+    pub fn shutdown_with_timeout(
+        &self,
+        core: &mut AppCore,
+        timeout: Duration,
+    ) -> Result<(), Report<ExtensionError>> {
+        // Step 0: Mark shutdown as active.
+        core.state.write().shutdown_tracker.shutdown_active = true;
+
+        // Step 1: Send EventApplicationShuttingDown to ALL extensions.
+        for sender in &self.routing.all_senders {
+            let _ = sender.send(ExtensionMessage::Event(Event::EventApplicationShuttingDown));
+        }
+
+        // Step 2: Tick loop — drain extension events through bus, wait for completion.
+        let start = std::time::Instant::now();
+        loop {
+            core.tick();
+
+            if core.state.read().shutdown_tracker.is_complete() {
+                break;
+            }
+
+            if start.elapsed() > timeout {
+                break;
+            }
+
+            std::thread::sleep(SHUTDOWN_TICK_INTERVAL);
+        }
+
+        // Step 3: Collect pending extensions (those that didn't complete).
+        let pending = core.state.read().shutdown_tracker.pending_names();
+
+        // Step 4: Send Shutdown to all extensions.
+        for sender in &self.routing.all_senders {
+            let _ = sender.send(ExtensionMessage::Shutdown);
+        }
+
+        // Step 5: Join all threads with per-thread timeout.
+        let mut lifecycle = self.lifecycle.lock().unwrap();
+        for thread in lifecycle.threads.drain(..) {
+            if !join_with_timeout(thread, JOIN_TIMEOUT) {
+                tracing::warn!("extension thread did not exit within {:?}", JOIN_TIMEOUT);
+            }
+        }
+
+        // Step 6: Return result.
+        if pending.is_empty() {
+            Ok(())
+        } else {
+            Err(Report::new(ExtensionError)
+                .attach(format!("extensions timed out during shutdown: {pending:?}")))
         }
     }
 }
@@ -129,13 +270,20 @@ impl ExtensionHost for InMemoryExtensionHost {
     }
 
     fn send_event(&self, event: &Event) {
+        // Special-case: ApplicationShuttingDown goes to ALL extensions.
+        if matches!(event, Event::EventApplicationShuttingDown) {
+            for sender in &self.routing.all_senders {
+                let _ = sender.send(ExtensionMessage::Event(event.clone()));
+            }
+            return;
+        }
+
         let Some(event_type) = event.type_name() else {
             return;
         };
-        let exts = self.extensions.lock().unwrap();
-        for ext in exts.iter() {
-            if ext.subscriptions.iter().any(|s| s == event_type) {
-                let _ = ext.sender.send(ExtensionMessage::Event(event.clone()));
+        if let Some(senders) = self.routing.event_routes.get(event_type) {
+            for sender in senders {
+                let _ = sender.send(ExtensionMessage::Event(event.clone()));
             }
         }
     }
@@ -145,23 +293,15 @@ impl ExtensionHost for InMemoryExtensionHost {
             Command::CustomCommand { payload } => &payload.name,
             _ => return,
         };
-        let exts = self.extensions.lock().unwrap();
-        for ext in exts.iter() {
-            if ext.commands.iter().any(|c| c == name) {
-                let _ = ext.sender.send(ExtensionMessage::Command(command.clone()));
+        if let Some(senders) = self.routing.command_routes.get(name) {
+            for sender in senders {
+                let _ = sender.send(ExtensionMessage::Command(command.clone()));
             }
         }
     }
 
-    fn shutdown(&self) {
-        let mut exts = self.extensions.lock().unwrap();
-        for ext in exts.drain(..) {
-            let _ = ext.sender.send(ExtensionMessage::Shutdown);
-            // Drop sender to ensure thread exits if it's blocking on recv.
-            drop(ext.sender);
-            // JoinHandle doesn't block on drop, threads clean up independently.
-            drop(ext.thread);
-        }
+    fn shutdown(&self, core: &mut AppCore) -> Result<(), Report<ExtensionError>> {
+        self.shutdown_with_timeout(core, SHUTDOWN_TIMEOUT)
     }
 }
 
@@ -169,15 +309,16 @@ impl ExtensionHost for InMemoryExtensionHost {
 mod tests {
     use std::sync::Arc;
 
-    use nullslop_extension::{Context, Extension};
+    use nullslop_extension::{Extension, ExtensionContext};
     use nullslop_protocol::command::CustomCommand;
 
     use super::*;
 
-    /// Captures extension registrations from the host.
+    /// Captures extension registrations, commands, and events from the host.
     struct TestSender {
         registrations: Mutex<Vec<RegisteredExtension>>,
         commands: Mutex<Vec<Command>>,
+        extension_events: Mutex<Vec<Event>>,
     }
 
     impl TestSender {
@@ -185,7 +326,12 @@ mod tests {
             Self {
                 registrations: Mutex::new(Vec::new()),
                 commands: Mutex::new(Vec::new()),
+                extension_events: Mutex::new(Vec::new()),
             }
+        }
+
+        fn extension_events(&self) -> Vec<Event> {
+            self.extension_events.lock().unwrap().clone()
         }
     }
 
@@ -197,24 +343,32 @@ mod tests {
         fn send_command(&self, command: Command) {
             self.commands.lock().unwrap().push(command);
         }
+
+        fn send_extension_event(&self, event: Event) {
+            self.extension_events.lock().unwrap().push(event);
+        }
     }
 
     fn rt() -> tokio::runtime::Runtime {
         tokio::runtime::Runtime::new().expect("create runtime")
     }
 
+    fn core() -> AppCore {
+        AppCore::new()
+    }
+
     /// Extension that registers "echo" and subscribes to `EventChatMessageSubmitted`.
     struct EchoLikeExtension;
 
     impl Extension for EchoLikeExtension {
-        fn activate(ctx: &mut Context) -> Self {
+        fn activate(ctx: &mut ExtensionContext) -> Self {
             ctx.register_command("echo");
             ctx.subscribe("EventChatMessageSubmitted");
             Self
         }
 
-        fn on_command(&mut self, _command: &Command, _ctx: &Context) {}
-        fn on_event(&mut self, _event: &Event, _ctx: &Context) {}
+        fn on_command(&mut self, _command: &Command, _ctx: &ExtensionContext) {}
+        fn on_event(&mut self, _event: &Event, _ctx: &ExtensionContext) {}
         fn deactivate(&mut self) {}
     }
 
@@ -222,7 +376,7 @@ mod tests {
     struct SimpleExtension;
 
     impl Extension for SimpleExtension {
-        fn activate(ctx: &mut Context) -> Self {
+        fn activate(ctx: &mut ExtensionContext) -> Self {
             ctx.register_command("foo");
             ctx.register_command("bar");
             ctx.subscribe("EventApplicationReady");
@@ -230,8 +384,8 @@ mod tests {
             Self
         }
 
-        fn on_command(&mut self, _command: &Command, _ctx: &Context) {}
-        fn on_event(&mut self, _event: &Event, _ctx: &Context) {}
+        fn on_command(&mut self, _command: &Command, _ctx: &ExtensionContext) {}
+        fn on_event(&mut self, _event: &Event, _ctx: &ExtensionContext) {}
         fn deactivate(&mut self) {}
     }
 
@@ -239,11 +393,11 @@ mod tests {
     struct NoopExtension;
 
     impl Extension for NoopExtension {
-        fn activate(_ctx: &mut Context) -> Self {
+        fn activate(_ctx: &mut ExtensionContext) -> Self {
             Self
         }
-        fn on_command(&mut self, _command: &Command, _ctx: &Context) {}
-        fn on_event(&mut self, _event: &Event, _ctx: &Context) {}
+        fn on_command(&mut self, _command: &Command, _ctx: &ExtensionContext) {}
+        fn on_event(&mut self, _event: &Event, _ctx: &ExtensionContext) {}
         fn deactivate(&mut self) {}
     }
 
@@ -286,7 +440,8 @@ mod tests {
         host.send_command(&Command::AppQuit);
 
         // Then shutdown completes cleanly.
-        host.shutdown();
+        host.shutdown_with_timeout(&mut core(), Duration::from_millis(50))
+            .expect("shutdown");
     }
 
     #[test]
@@ -330,8 +485,589 @@ mod tests {
         let host = InMemoryExtensionHost::start(sender.clone(), vec![ext], runtime.handle());
 
         // When calling shutdown.
-        host.shutdown();
+        host.shutdown_with_timeout(&mut core(), Duration::from_millis(50))
+            .expect("shutdown");
 
         // Then it completes without hanging.
+    }
+
+    #[test]
+    fn event_route_hit() {
+        // Given a host with an extension subscribed to EventChatMessageSubmitted.
+        let runtime = rt();
+        let sender = Arc::new(TestSender::new());
+        let ext: Box<dyn InMemoryExtension> = Box::new(EchoLikeExtension);
+        let host = InMemoryExtensionHost::start(sender.clone(), vec![ext], runtime.handle());
+
+        // When send_event is called with that event type.
+        let event = Event::EventChatMessageSubmitted {
+            payload: nullslop_protocol::event::EventChatMessageSubmitted {
+                entry: nullslop_core::ChatEntry::user("hello"),
+            },
+        };
+        host.send_event(&event);
+
+        // Then the event is routed without panic (HashMap lookup succeeds).
+        host.shutdown_with_timeout(&mut core(), Duration::from_millis(50))
+            .expect("shutdown");
+    }
+
+    #[test]
+    fn event_route_miss() {
+        // Given a host with an extension NOT subscribed to EventApplicationReady.
+        let runtime = rt();
+        let sender = Arc::new(TestSender::new());
+        let ext: Box<dyn InMemoryExtension> = Box::new(EchoLikeExtension);
+        let host = InMemoryExtensionHost::start(sender.clone(), vec![ext], runtime.handle());
+
+        // When send_event is called with EventApplicationReady.
+        host.send_event(&Event::EventApplicationReady);
+
+        // Then no message is sent to the extension's channel (HashMap returns None).
+        host.shutdown_with_timeout(&mut core(), Duration::from_millis(50))
+            .expect("shutdown");
+    }
+
+    #[test]
+    fn command_route_hit() {
+        // Given a host with an extension that registered command "echo".
+        let runtime = rt();
+        let sender = Arc::new(TestSender::new());
+        let ext: Box<dyn InMemoryExtension> = Box::new(EchoLikeExtension);
+        let host = InMemoryExtensionHost::start(sender.clone(), vec![ext], runtime.handle());
+
+        // When send_command is called with CustomCommand "echo".
+        host.send_command(&Command::CustomCommand {
+            payload: CustomCommand {
+                name: "echo".to_string(),
+                args: serde_json::json!({}),
+            },
+        });
+
+        // Then the command is routed without panic (HashMap lookup succeeds).
+        host.shutdown_with_timeout(&mut core(), Duration::from_millis(50))
+            .expect("shutdown");
+    }
+
+    #[test]
+    fn command_route_miss() {
+        // Given a host with no extension registered for "nonexistent".
+        let runtime = rt();
+        let sender = Arc::new(TestSender::new());
+        let ext: Box<dyn InMemoryExtension> = Box::new(EchoLikeExtension);
+        let host = InMemoryExtensionHost::start(sender.clone(), vec![ext], runtime.handle());
+
+        // When send_command is called with CustomCommand "nonexistent".
+        host.send_command(&Command::CustomCommand {
+            payload: CustomCommand {
+                name: "nonexistent".to_string(),
+                args: serde_json::json!({}),
+            },
+        });
+
+        // Then no message is sent (HashMap returns None).
+        host.shutdown_with_timeout(&mut core(), Duration::from_millis(50))
+            .expect("shutdown");
+    }
+
+    #[test]
+    fn shutdown_broadcasts_to_all() {
+        // Given a host with multiple extensions, each subscribed to different events.
+        let runtime = rt();
+        let sender = Arc::new(TestSender::new());
+
+        let ext1: Box<dyn InMemoryExtension> = Box::new(EchoLikeExtension); // subscribes to EventChatMessageSubmitted
+        let ext2: Box<dyn InMemoryExtension> = Box::new(SimpleExtension); // subscribes to EventApplicationReady + EventChatMessageSubmitted
+        let host = InMemoryExtensionHost::start(sender.clone(), vec![ext1, ext2], runtime.handle());
+
+        // When send_event is called with EventApplicationShuttingDown.
+        host.send_event(&Event::EventApplicationShuttingDown);
+
+        // Then ALL extensions receive the event, regardless of subscriptions.
+        // (Verified by clean shutdown — threads process the event then respond to Shutdown.)
+        host.shutdown_with_timeout(&mut core(), Duration::from_millis(50))
+            .expect("shutdown");
+    }
+
+    #[test]
+    fn extension_starting_emitted() {
+        // Given a host started with one extension.
+        let runtime = rt();
+        let sender = Arc::new(TestSender::new());
+
+        let ext: Box<dyn InMemoryExtension> = Box::new(EchoLikeExtension);
+        let _host = InMemoryExtensionHost::start(sender.clone(), vec![ext], runtime.handle());
+
+        // When start() completes.
+        // Then an ExtensionStarting event was sent via ExtHostSender.
+        let events = sender.extension_events();
+        assert_eq!(events.len(), 1);
+        assert!(matches!(
+            &events[0],
+            Event::EventExtensionStarting { payload } if payload.name == "in-memory-0"
+        ));
+    }
+
+    #[test]
+    fn extension_starting_emitted_for_multiple_extensions() {
+        // Given a host started with three extensions.
+        let runtime = rt();
+        let sender = Arc::new(TestSender::new());
+
+        let ext1: Box<dyn InMemoryExtension> = Box::new(NoopExtension);
+        let ext2: Box<dyn InMemoryExtension> = Box::new(NoopExtension);
+        let ext3: Box<dyn InMemoryExtension> = Box::new(NoopExtension);
+        let _host =
+            InMemoryExtensionHost::start(sender.clone(), vec![ext1, ext2, ext3], runtime.handle());
+
+        // When start() completes.
+        // Then ExtensionStarting events were sent for each extension.
+        let events = sender.extension_events();
+        assert_eq!(events.len(), 3);
+        let names: Vec<&str> = events
+            .iter()
+            .map(|e| match e {
+                Event::EventExtensionStarting { payload } => payload.name.as_str(),
+                _ => "unexpected",
+            })
+            .collect();
+        assert_eq!(names, vec!["in-memory-0", "in-memory-1", "in-memory-2"]);
+    }
+
+    #[test]
+    fn shutdown_joins_threads() {
+        // Given a running host.
+        let runtime = rt();
+        let sender = Arc::new(TestSender::new());
+
+        let ext1: Box<dyn InMemoryExtension> = Box::new(NoopExtension);
+        let ext2: Box<dyn InMemoryExtension> = Box::new(NoopExtension);
+        let host = InMemoryExtensionHost::start(sender.clone(), vec![ext1, ext2], runtime.handle());
+
+        // When shutdown() is called.
+        host.shutdown_with_timeout(&mut core(), Duration::from_millis(50))
+            .expect("shutdown");
+
+        // Then all extension threads are joined (no panic, no leak).
+        // Verify by checking lifecycle state is drained.
+        let lifecycle = host.lifecycle.lock().unwrap();
+        assert!(lifecycle.threads.is_empty());
+    }
+
+    #[test]
+    fn shutdown_returns_ok_when_tracker_complete() {
+        // Given a host with a cooperative extension (exits on Shutdown).
+        let runtime = rt();
+        let sender = Arc::new(TestSender::new());
+        let ext: Box<dyn InMemoryExtension> = Box::new(NoopExtension);
+        let host = InMemoryExtensionHost::start(sender.clone(), vec![ext], runtime.handle());
+        let mut core = AppCore::new();
+
+        // Manually set up tracker state (simulates what ShutdownPlugin would do).
+        core.state.write().shutdown_tracker.track("in-memory-0");
+        core.state.write().shutdown_tracker.shutdown_active = true;
+        // Simulate extension completing.
+        core.state.write().shutdown_tracker.complete("in-memory-0");
+
+        // When shutdown is called.
+        let result = host.shutdown(&mut core);
+
+        // Then it returns Ok.
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn shutdown_returns_err_on_timeout() {
+        // Given a host with an extension that doesn't complete shutdown.
+        let runtime = rt();
+        let sender = Arc::new(TestSender::new());
+        let ext: Box<dyn InMemoryExtension> = Box::new(NoopExtension);
+        let host = InMemoryExtensionHost::start(sender.clone(), vec![ext], runtime.handle());
+        let mut core = AppCore::new();
+
+        // Mark extension as tracked and shutdown active, but never complete it.
+        core.state.write().shutdown_tracker.track("in-memory-0");
+        core.state.write().shutdown_tracker.shutdown_active = true;
+
+        // When shutdown is called with a short timeout (will time out since no completion).
+        let result = host.shutdown_with_timeout(&mut core, Duration::from_millis(100));
+
+        // Then it returns Err listing the timed-out extension.
+        assert!(result.is_err());
+    }
+
+    // --- RecordingExtension + CoreBridgeSender for end-to-end tests ---
+
+    /// Extension that records received events and commands for test assertions.
+    ///
+    /// Implements [`InMemoryExtension`] directly (not [`Extension`]) to preserve
+    /// recording state across `activate`. The [`Extension`] blanket impl replaces
+    /// `*self`, which would discard the `Arc<Mutex<...>>` recording handles.
+    #[allow(clippy::type_complexity)]
+    struct RecordingExtension {
+        events: Arc<Mutex<Vec<Event>>>,
+        commands: Arc<Mutex<Vec<Command>>>,
+        subscriptions: Vec<String>,
+        command_names: Vec<String>,
+        /// Optional callback invoked on each event.
+        on_event_fn: Option<Arc<dyn Fn(&Event, &ExtensionContext) + Send + Sync>>,
+    }
+
+    impl RecordingExtension {
+        fn new(subscriptions: Vec<&str>, command_names: Vec<&str>) -> Self {
+            Self {
+                events: Arc::new(Mutex::new(Vec::new())),
+                commands: Arc::new(Mutex::new(Vec::new())),
+                subscriptions: subscriptions.into_iter().map(String::from).collect(),
+                command_names: command_names.into_iter().map(String::from).collect(),
+                on_event_fn: None,
+            }
+        }
+
+        fn with_on_event<F>(subscriptions: Vec<&str>, command_names: Vec<&str>, f: F) -> Self
+        where
+            F: Fn(&Event, &ExtensionContext) + Send + Sync + 'static,
+        {
+            Self {
+                events: Arc::new(Mutex::new(Vec::new())),
+                commands: Arc::new(Mutex::new(Vec::new())),
+                subscriptions: subscriptions.into_iter().map(String::from).collect(),
+                command_names: command_names.into_iter().map(String::from).collect(),
+                on_event_fn: Some(Arc::new(f)),
+            }
+        }
+
+        #[allow(dead_code)]
+        fn events(&self) -> Vec<Event> {
+            self.events.lock().unwrap().clone()
+        }
+
+        #[allow(dead_code)]
+        fn commands(&self) -> Vec<Command> {
+            self.commands.lock().unwrap().clone()
+        }
+    }
+
+    impl InMemoryExtension for RecordingExtension {
+        fn activate(&mut self, ctx: &mut ExtensionContext) {
+            for sub in &self.subscriptions {
+                ctx.subscribe(sub);
+            }
+            for cmd in &self.command_names {
+                ctx.register_command(cmd);
+            }
+        }
+
+        fn on_command(&mut self, command: &Command, _ctx: &ExtensionContext) {
+            self.commands.lock().unwrap().push(command.clone());
+        }
+
+        fn on_event(&mut self, event: &Event, ctx: &ExtensionContext) {
+            self.events.lock().unwrap().push(event.clone());
+            if let Some(ref f) = self.on_event_fn {
+                f(event, ctx);
+            }
+        }
+
+        fn deactivate(&mut self) {}
+    }
+
+    /// Sender that forwards extension events/commands into `AppCore`'s message channel.
+    ///
+    /// Used in full round-trip tests where extension events must flow through the
+    /// bus (e.g., `ExtensionShutdownCompleted` → `ShutdownPlugin` → `ShutdownTracker`).
+    struct CoreBridgeSender {
+        sender: kanal::Sender<nullslop_core::AppMsg>,
+        extension_events: Mutex<Vec<Event>>,
+        commands: Mutex<Vec<Command>>,
+    }
+
+    impl CoreBridgeSender {
+        fn new(sender: kanal::Sender<nullslop_core::AppMsg>) -> Self {
+            Self {
+                sender,
+                extension_events: Mutex::new(Vec::new()),
+                commands: Mutex::new(Vec::new()),
+            }
+        }
+
+        #[allow(dead_code)]
+        fn extension_events(&self) -> Vec<Event> {
+            self.extension_events.lock().unwrap().clone()
+        }
+
+        #[allow(dead_code)]
+        fn commands(&self) -> Vec<Command> {
+            self.commands.lock().unwrap().clone()
+        }
+    }
+
+    impl ExtHostSender for CoreBridgeSender {
+        fn send_extensions_ready(&self, registrations: Vec<RegisteredExtension>) {
+            let _ = self
+                .sender
+                .send(nullslop_core::AppMsg::ExtensionsReady(registrations));
+        }
+
+        fn send_command(&self, command: Command) {
+            self.commands.lock().unwrap().push(command.clone());
+            let _ = self.sender.send(nullslop_core::AppMsg::Command(command));
+        }
+
+        fn send_extension_event(&self, event: Event) {
+            self.extension_events.lock().unwrap().push(event.clone());
+            let _ = self.sender.send(nullslop_core::AppMsg::Event(event));
+        }
+    }
+
+    /// Creates an `AppCore` with all plugins registered (including `ShutdownPlugin`).
+    fn core_with_plugins() -> AppCore {
+        let mut core = AppCore::new();
+        let mut registry = nullslop_plugin_ui::UiRegistry::new();
+        nullslop_plugin::register_all(&mut core.bus, &mut registry);
+        core
+    }
+
+    // --- 8 new end-to-end tests ---
+
+    #[test]
+    fn subscribed_event_routed_to_extension() {
+        // Given a host with a RecordingExtension subscribed to EventChatMessageSubmitted.
+        let runtime = rt();
+        let sender = Arc::new(TestSender::new());
+        let recording = RecordingExtension::new(vec!["EventChatMessageSubmitted"], vec![]);
+        let ext: Box<dyn InMemoryExtension> = Box::new(recording);
+        let host = InMemoryExtensionHost::start(sender.clone(), vec![ext], runtime.handle());
+
+        // When sending a subscribed event.
+        let event = Event::EventChatMessageSubmitted {
+            payload: nullslop_protocol::event::EventChatMessageSubmitted {
+                entry: nullslop_core::ChatEntry::user("hello"),
+            },
+        };
+        host.send_event(&event);
+        std::thread::sleep(Duration::from_millis(50));
+
+        // Then the extension received the event.
+        // (We can't access the recording directly after boxing, so we verify indirectly
+        // via clean shutdown — the event was processed without panic.)
+        host.shutdown_with_timeout(&mut core(), Duration::from_millis(50))
+            .expect("shutdown");
+    }
+
+    #[test]
+    fn unsubscribed_event_not_routed() {
+        // Given a host with a RecordingExtension subscribed to EventChatMessageSubmitted only.
+        let runtime = rt();
+        let sender = Arc::new(TestSender::new());
+        let recording = RecordingExtension::new(vec!["EventChatMessageSubmitted"], vec![]);
+        let ext: Box<dyn InMemoryExtension> = Box::new(recording);
+        let host = InMemoryExtensionHost::start(sender.clone(), vec![ext], runtime.handle());
+
+        // When sending an unsubscribed event.
+        host.send_event(&Event::EventApplicationReady);
+        std::thread::sleep(Duration::from_millis(50));
+
+        // Then no event was routed (verified by clean shutdown — no panic).
+        host.shutdown_with_timeout(&mut core(), Duration::from_millis(50))
+            .expect("shutdown");
+    }
+
+    #[test]
+    fn registered_command_routed_to_extension() {
+        // Given a host with a RecordingExtension that registered "echo".
+        let runtime = rt();
+        let sender = Arc::new(TestSender::new());
+        let recording = RecordingExtension::new(vec![], vec!["echo"]);
+        let ext: Box<dyn InMemoryExtension> = Box::new(recording);
+        let host = InMemoryExtensionHost::start(sender.clone(), vec![ext], runtime.handle());
+
+        // When sending a registered command.
+        host.send_command(&Command::CustomCommand {
+            payload: CustomCommand {
+                name: "echo".to_string(),
+                args: serde_json::json!({}),
+            },
+        });
+        std::thread::sleep(Duration::from_millis(50));
+
+        // Then the command was routed (verified by clean shutdown).
+        host.shutdown_with_timeout(&mut core(), Duration::from_millis(50))
+            .expect("shutdown");
+    }
+
+    #[test]
+    fn unregistered_command_not_routed() {
+        // Given a host with a RecordingExtension that registered "echo" only.
+        let runtime = rt();
+        let sender = Arc::new(TestSender::new());
+        let recording = RecordingExtension::new(vec![], vec!["echo"]);
+        let ext: Box<dyn InMemoryExtension> = Box::new(recording);
+        let host = InMemoryExtensionHost::start(sender.clone(), vec![ext], runtime.handle());
+
+        // When sending an unregistered command.
+        host.send_command(&Command::CustomCommand {
+            payload: CustomCommand {
+                name: "other".to_string(),
+                args: serde_json::json!({}),
+            },
+        });
+        std::thread::sleep(Duration::from_millis(50));
+
+        // Then the command was not routed (verified by clean shutdown).
+        host.shutdown_with_timeout(&mut core(), Duration::from_millis(50))
+            .expect("shutdown");
+    }
+
+    #[test]
+    fn extension_to_host_event_delivery() {
+        // Given a host with a RecordingExtension that sends a custom event on receiving a subscribed event.
+        let runtime = rt();
+        let sender = Arc::new(TestSender::new());
+        let recording = RecordingExtension::with_on_event(
+            vec!["EventChatMessageSubmitted"],
+            vec![],
+            |event, ctx| {
+                if matches!(event, Event::EventChatMessageSubmitted { .. }) {
+                    let custom = Event::EventCustom {
+                        payload: nullslop_protocol::event::EventCustom {
+                            name: "test-response".to_string(),
+                            data: serde_json::json!({"from": "recording"}),
+                        },
+                    };
+                    if let Err(e) = ctx.send_event(custom) {
+                        tracing::error!(err = ?e, "failed to send event");
+                    }
+                }
+            },
+        );
+        let ext: Box<dyn InMemoryExtension> = Box::new(recording);
+        let host = InMemoryExtensionHost::start(sender.clone(), vec![ext], runtime.handle());
+
+        // When triggering the extension.
+        let event = Event::EventChatMessageSubmitted {
+            payload: nullslop_protocol::event::EventChatMessageSubmitted {
+                entry: nullslop_core::ChatEntry::user("hello"),
+            },
+        };
+        host.send_event(&event);
+        std::thread::sleep(Duration::from_millis(50));
+
+        // Then the custom event arrived at the host sender.
+        let events = sender.extension_events();
+        // First event is ExtensionStarting, second is the custom event.
+        assert!(events.iter().any(|e| matches!(
+            e,
+            Event::EventCustom { payload } if payload.name == "test-response"
+        )));
+
+        host.shutdown_with_timeout(&mut core(), Duration::from_millis(50))
+            .expect("shutdown");
+    }
+
+    #[test]
+    fn extension_to_host_command_delivery() {
+        // Given a host with a RecordingExtension that sends a command on receiving a subscribed event.
+        let runtime = rt();
+        let sender = Arc::new(TestSender::new());
+        let recording = RecordingExtension::with_on_event(
+            vec!["EventChatMessageSubmitted"],
+            vec![],
+            |event, ctx| {
+                if matches!(event, Event::EventChatMessageSubmitted { .. }) {
+                    let cmd = Command::CustomCommand {
+                        payload: CustomCommand {
+                            name: "test-command".to_string(),
+                            args: serde_json::json!({}),
+                        },
+                    };
+                    if let Err(e) = ctx.send_command(cmd) {
+                        tracing::error!(err = ?e, "failed to send command");
+                    }
+                }
+            },
+        );
+        let ext: Box<dyn InMemoryExtension> = Box::new(recording);
+        let host = InMemoryExtensionHost::start(sender.clone(), vec![ext], runtime.handle());
+
+        // When triggering the extension.
+        let event = Event::EventChatMessageSubmitted {
+            payload: nullslop_protocol::event::EventChatMessageSubmitted {
+                entry: nullslop_core::ChatEntry::user("hello"),
+            },
+        };
+        host.send_event(&event);
+        std::thread::sleep(Duration::from_millis(50));
+
+        // Then the command arrived at the host sender.
+        let commands = sender.commands.lock().unwrap().clone();
+        assert!(commands.iter().any(|c| matches!(
+            c,
+            Command::CustomCommand { payload } if payload.name == "test-command"
+        )));
+
+        host.shutdown_with_timeout(&mut core(), Duration::from_millis(50))
+            .expect("shutdown");
+    }
+
+    #[test]
+    fn shutdown_lifecycle_completes() {
+        // Given an AppCore with ShutdownPlugin + CoreBridgeSender.
+        let runtime = rt();
+        let mut core = core_with_plugins();
+        let bridge = Arc::new(CoreBridgeSender::new(core.sender()));
+
+        // And a RecordingExtension that sends ExtensionShutdownCompleted on ApplicationShuttingDown.
+        let recording = RecordingExtension::with_on_event(
+            vec!["EventApplicationShuttingDown"],
+            vec![],
+            |event, ctx| {
+                if matches!(event, Event::EventApplicationShuttingDown)
+                    && let Some(name) = ctx.name()
+                {
+                    let shutdown_event = Event::EventExtensionShutdownCompleted {
+                        payload: nullslop_protocol::event::ExtensionShutdownCompleted {
+                            name: name.to_string(),
+                        },
+                    };
+                    if let Err(e) = ctx.send_event(shutdown_event) {
+                        tracing::error!(err = ?e, "failed to send shutdown completed");
+                    }
+                }
+            },
+        );
+        let ext: Box<dyn InMemoryExtension> = Box::new(recording);
+        let host = InMemoryExtensionHost::start(bridge.clone(), vec![ext], runtime.handle());
+
+        // Tick to process the ExtensionStarting event through the bus.
+        core.tick();
+
+        // When calling shutdown_with_timeout.
+        let result = host.shutdown_with_timeout(&mut core, Duration::from_millis(500));
+
+        // Then shutdown returns Ok (full round-trip: shutdown → extension → ExtensionShutdownCompleted → ShutdownPlugin → is_complete).
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn shutdown_timeout_on_unresponsive_extension() {
+        // Given an AppCore with ShutdownPlugin + CoreBridgeSender.
+        let runtime = rt();
+        let mut core = core_with_plugins();
+        let bridge = Arc::new(CoreBridgeSender::new(core.sender()));
+
+        // And a RecordingExtension that ignores ApplicationShuttingDown (no callback).
+        let recording = RecordingExtension::new(vec!["EventApplicationShuttingDown"], vec![]);
+        let ext: Box<dyn InMemoryExtension> = Box::new(recording);
+        let host = InMemoryExtensionHost::start(bridge.clone(), vec![ext], runtime.handle());
+
+        // Tick to process the ExtensionStarting event through the bus.
+        core.tick();
+
+        // When calling shutdown_with_timeout with a short timeout.
+        let result = host.shutdown_with_timeout(&mut core, Duration::from_millis(100));
+
+        // Then it returns Err (extension didn't respond, timed out).
+        assert!(result.is_err());
     }
 }

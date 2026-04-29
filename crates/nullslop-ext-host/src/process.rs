@@ -3,7 +3,8 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use nullslop_core::{Event, ExtHostSender, ExtensionHost};
+use error_stack::Report;
+use nullslop_core::{AppCore, Event, ExtHostSender, ExtensionError, ExtensionHost};
 
 /// Real extension host that spawns child processes via an async tokio task.
 ///
@@ -57,9 +58,10 @@ impl ExtensionHost for ProcessExtensionHost {
         // routing to process extensions will be added in a future phase.
     }
 
-    fn shutdown(&self) {
+    fn shutdown(&self, _core: &mut AppCore) -> Result<(), Report<ExtensionError>> {
         if let Some(task) = self.host_task.lock().unwrap().take() {
             task.abort();
         }
+        Ok(())
     }
 }

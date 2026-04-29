@@ -164,6 +164,9 @@ async fn read_extension_stdout(
                 Ok(OutboundMessage::Command { command }) => {
                     sender.send_command(command);
                 }
+                Ok(OutboundMessage::Event { event }) => {
+                    sender.send_extension_event(event);
+                }
                 Ok(OutboundMessage::Register { .. }) => {
                     // Unexpected after init — ignore.
                 }

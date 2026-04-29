@@ -79,11 +79,7 @@ mod tests {
     ///
     /// Uses `Terminal::draw()` to obtain a frame, which is the standard
     /// way to create a `Frame` in ratatui 0.30+.
-    fn render_element(
-        element: &mut dyn crate::UiElement,
-        area: Rect,
-        state: &AppState,
-    ) {
+    fn render_element(element: &mut dyn crate::UiElement, area: Rect, state: &AppState) {
         let backend = ratatui::backend::TestBackend::new(80, 24);
         let mut terminal = ratatui::Terminal::new(backend).expect("test backend should init");
         terminal

@@ -52,6 +52,31 @@ pub struct EventCustom {
     pub data: Value,
 }
 
+/// An extension is starting up.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtensionStarting {
+    /// The extension's name.
+    pub name: String,
+}
+
+/// An extension has finished starting up.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtensionStarted {
+    /// The extension's name.
+    pub name: String,
+}
+
+/// An extension has completed shutdown.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtensionShutdownCompleted {
+    /// The extension's name.
+    pub name: String,
+}
+
+/// The application is shutting down.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EventApplicationShuttingDown;
+
 /// Wrapper enum for all events.
 ///
 /// Used for serialization and the wire protocol between host and extensions.
@@ -98,6 +123,30 @@ pub enum Event {
         #[serde(flatten)]
         payload: EventCustom,
     },
+    /// An extension is starting up.
+    #[serde(rename = "event_extension_starting")]
+    EventExtensionStarting {
+        /// The event payload.
+        #[serde(flatten)]
+        payload: ExtensionStarting,
+    },
+    /// An extension has finished starting up.
+    #[serde(rename = "event_extension_started")]
+    EventExtensionStarted {
+        /// The event payload.
+        #[serde(flatten)]
+        payload: ExtensionStarted,
+    },
+    /// An extension has completed shutdown.
+    #[serde(rename = "event_extension_shutdown_completed")]
+    EventExtensionShutdownCompleted {
+        /// The event payload.
+        #[serde(flatten)]
+        payload: ExtensionShutdownCompleted,
+    },
+    /// The application is shutting down.
+    #[serde(rename = "event_application_shutting_down")]
+    EventApplicationShuttingDown,
 }
 
 impl Event {
@@ -111,6 +160,10 @@ impl Event {
             Self::EventChatMessageSubmitted { .. } => Some("EventChatMessageSubmitted"),
             Self::EventApplicationReady => Some("EventApplicationReady"),
             Self::EventCustom { payload, .. } => Some(payload.name.as_str()),
+            Self::EventExtensionStarting { .. } => Some("EventExtensionStarting"),
+            Self::EventExtensionStarted { .. } => Some("EventExtensionStarted"),
+            Self::EventExtensionShutdownCompleted { .. } => Some("EventExtensionShutdownCompleted"),
+            Self::EventApplicationShuttingDown => Some("EventApplicationShuttingDown"),
             Self::EventKeyDown { .. } | Self::EventKeyUp { .. } | Self::EventModeChanged { .. } => {
                 None
             }
@@ -166,6 +219,10 @@ mod tests {
     #[case::mode_changed(Event::EventModeChanged { payload: EventModeChanged { from: Mode::Normal, to: Mode::Input } })]
     #[case::application_ready(Event::EventApplicationReady)]
     #[case::custom(Event::EventCustom { payload: EventCustom { name: "my_event".into(), data: serde_json::json!({"key": "value"}) } })]
+    #[case::extension_starting(Event::EventExtensionStarting { payload: ExtensionStarting { name: "ext-a".into() } })]
+    #[case::extension_started(Event::EventExtensionStarted { payload: ExtensionStarted { name: "ext-a".into() } })]
+    #[case::extension_shutdown_completed(Event::EventExtensionShutdownCompleted { payload: ExtensionShutdownCompleted { name: "ext-a".into() } })]
+    #[case::application_shutting_down(Event::EventApplicationShuttingDown)]
     fn event_roundtrip_all_variants(#[case] event: Event) {
         // Given an event variant.
         let json = serde_json::to_string(&event).expect("serialize");
@@ -215,6 +272,22 @@ mod tests {
                 to: Mode::Input,
             },
         };
+        let ext_starting = Event::EventExtensionStarting {
+            payload: ExtensionStarting {
+                name: "ext-a".into(),
+            },
+        };
+        let ext_started = Event::EventExtensionStarted {
+            payload: ExtensionStarted {
+                name: "ext-a".into(),
+            },
+        };
+        let ext_shutdown = Event::EventExtensionShutdownCompleted {
+            payload: ExtensionShutdownCompleted {
+                name: "ext-a".into(),
+            },
+        };
+        let shutting_down = Event::EventApplicationShuttingDown;
 
         // Then type_name returns expected values.
         assert_eq!(chat.type_name(), Some("EventChatMessageSubmitted"));
@@ -223,5 +296,15 @@ mod tests {
         assert_eq!(key_down.type_name(), None);
         assert_eq!(key_up.type_name(), None);
         assert_eq!(mode_changed.type_name(), None);
+        assert_eq!(ext_starting.type_name(), Some("EventExtensionStarting"));
+        assert_eq!(ext_started.type_name(), Some("EventExtensionStarted"));
+        assert_eq!(
+            ext_shutdown.type_name(),
+            Some("EventExtensionShutdownCompleted")
+        );
+        assert_eq!(
+            shutting_down.type_name(),
+            Some("EventApplicationShuttingDown")
+        );
     }
 }

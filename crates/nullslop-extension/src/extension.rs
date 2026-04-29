@@ -9,7 +9,7 @@
 
 use nullslop_core::{Command, Event};
 
-use crate::Context;
+use crate::ExtensionContext;
 
 /// Trait for implementing a nullslop extension.
 ///
@@ -21,17 +21,17 @@ pub trait Extension {
     ///
     /// This is an associated function (not a method) — it returns `Self`,
     /// constructing the extension during activation.
-    fn activate(ctx: &mut Context) -> Self;
+    fn activate(ctx: &mut ExtensionContext) -> Self;
 
     /// Handles a command dispatched to this extension.
     ///
     /// Errors are logged, not propagated across the process boundary.
-    fn on_command(&mut self, command: &Command, ctx: &Context);
+    fn on_command(&mut self, command: &Command, ctx: &ExtensionContext);
 
     /// Handles an event this extension subscribed to.
     ///
     /// Errors are logged, not propagated across the process boundary.
-    fn on_event(&mut self, event: &Event, ctx: &Context);
+    fn on_event(&mut self, event: &Event, ctx: &ExtensionContext);
 
     /// Deactivates the extension. Called before the process exits.
     fn deactivate(&mut self);
@@ -48,26 +48,26 @@ pub trait Extension {
 /// via `*self = E::activate(ctx)`.
 pub trait InMemoryExtension: Send + 'static {
     /// Activates the extension.
-    fn activate(&mut self, ctx: &mut Context);
+    fn activate(&mut self, ctx: &mut ExtensionContext);
     /// Handles a command dispatched to this extension.
-    fn on_command(&mut self, command: &Command, ctx: &Context);
+    fn on_command(&mut self, command: &Command, ctx: &ExtensionContext);
     /// Handles an event this extension subscribed to.
-    fn on_event(&mut self, event: &Event, ctx: &Context);
+    fn on_event(&mut self, event: &Event, ctx: &ExtensionContext);
     /// Deactivates the extension.
     fn deactivate(&mut self);
 }
 
 impl<E: Extension + Send + 'static> InMemoryExtension for E {
-    fn activate(&mut self, ctx: &mut Context) {
+    fn activate(&mut self, ctx: &mut ExtensionContext) {
         // Replace dummy self with properly-activated instance.
         *self = E::activate(ctx);
     }
 
-    fn on_command(&mut self, command: &Command, ctx: &Context) {
+    fn on_command(&mut self, command: &Command, ctx: &ExtensionContext) {
         Extension::on_command(self, command, ctx);
     }
 
-    fn on_event(&mut self, event: &Event, ctx: &Context) {
+    fn on_event(&mut self, event: &Event, ctx: &ExtensionContext) {
         Extension::on_event(self, event, ctx);
     }
 

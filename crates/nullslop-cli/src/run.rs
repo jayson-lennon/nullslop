@@ -58,10 +58,7 @@ fn run_tui(app: &mut App) -> Result<(), Report<CliError>> {
 /// # Errors
 ///
 /// Returns an error if the headless runner fails to send commands.
-fn run_headless(
-    app: &mut App,
-    command: Option<HeadlessCommands>,
-) -> Result<(), Report<CliError>> {
+fn run_headless(app: &mut App, command: Option<HeadlessCommands>) -> Result<(), Report<CliError>> {
     let handle = app.handle();
 
     // Create AppCore with all plugins registered.
@@ -73,11 +70,8 @@ fn run_headless(
     let sender = HeadlessExtSender::new(core.sender());
     let echo_ext: Box<dyn nullslop_extension::InMemoryExtension> =
         Box::new(nullslop_echo::EchoExtension);
-    let ext_host = nullslop_ext_host::InMemoryExtensionHost::start(
-        Arc::new(sender),
-        vec![echo_ext],
-        &handle,
-    );
+    let ext_host =
+        nullslop_ext_host::InMemoryExtensionHost::start(Arc::new(sender), vec![echo_ext], &handle);
     let ext_arc: Arc<dyn nullslop_core::ExtensionHost> = Arc::new(ext_host);
     core.set_ext_host(nullslop_core::ExtensionHostService::new(ext_arc.clone()));
 
@@ -107,14 +101,19 @@ fn run_headless(
     run_until_settled(&mut core);
 
     // Print final state for visibility.
-    let state = core.state.read();
-    for entry in &state.chat_history {
-        tracing::info!("{entry:?}");
+    {
+        let state = core.state.read();
+        for entry in &state.chat_history {
+            tracing::info!("{entry:?}");
+        }
     }
 
     // Shut down extension host.
-    if let Some(ext) = core.ext_host() {
-        ext.shutdown();
+    let ext = core.ext_host().cloned();
+    if let Some(ext) = ext
+        && let Err(e) = ext.shutdown(&mut core)
+    {
+        tracing::error!(err = ?e, "extension host shutdown error");
     }
 
     Ok(())
@@ -133,7 +132,8 @@ fn run_headless(
 /// be sent.
 fn run_script(core: &mut AppCore, path: &str) -> Result<(), Report<CliError>> {
     let keymap = nullslop_tui::keymap::init();
-    let mut which_key = nullslop_tui::app::WhichKeyInstance::new(keymap, nullslop_tui::Scope::Normal);
+    let mut which_key =
+        nullslop_tui::app::WhichKeyInstance::new(keymap, nullslop_tui::Scope::Normal);
     let leader = nullslop_core::KeyEvent {
         key: nullslop_core::Key::Char('\\'),
         modifiers: nullslop_core::Modifiers::none(),

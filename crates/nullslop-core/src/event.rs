@@ -4,3 +4,4 @@
 //! This module re-exports them for backward compatibility.
 
 pub use nullslop_protocol::Event;
+pub use nullslop_protocol::event::{EventApplicationShuttingDown, ExtensionStarting};

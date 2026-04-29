@@ -30,7 +30,7 @@ use nullslop_protocol::{
         AppEditInput, AppQuit, AppToggleWhichKey, ChatBoxClear, ChatBoxDeleteGrapheme,
         ProviderCancelStream,
     },
-    event::EventApplicationReady,
+    event::{EventApplicationReady, EventApplicationShuttingDown},
 };
 
 use crate::handler::{CommandHandler, EventHandler};
@@ -297,6 +297,9 @@ impl Bus {
             Command::CustomCommand { payload } => {
                 self.dispatch_command_to_handlers(&payload, state, &mut out);
             }
+            Command::ProceedWithShutdown { payload } => {
+                self.dispatch_command_to_handlers(&payload, state, &mut out);
+            }
             // #[non_exhaustive] requires a wildcard arm. Unknown command types
             // are silently dropped — handlers for future variants must be added here.
             _ => {}
@@ -346,6 +349,19 @@ impl Bus {
             }
             Event::EventCustom { payload } => {
                 self.dispatch_event_to_handlers(&payload, state, &mut out);
+            }
+            Event::EventExtensionStarting { payload } => {
+                self.dispatch_event_to_handlers(&payload, state, &mut out);
+            }
+            Event::EventExtensionStarted { payload } => {
+                self.dispatch_event_to_handlers(&payload, state, &mut out);
+            }
+            Event::EventExtensionShutdownCompleted { payload } => {
+                self.dispatch_event_to_handlers(&payload, state, &mut out);
+            }
+            Event::EventApplicationShuttingDown => {
+                let unit = EventApplicationShuttingDown;
+                self.dispatch_event_to_handlers(&unit, state, &mut out);
             }
             // #[non_exhaustive] requires a wildcard arm. Unknown event types
             // are silently dropped — handlers for future variants must be added here.

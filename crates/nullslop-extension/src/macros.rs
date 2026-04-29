@@ -1,7 +1,7 @@
 //! The `run!` macro for generating an extension's `main()` function.
 //!
 //! This macro generates a synchronous `main()` that:
-//! 1. Creates a [`Context`](crate::Context)
+//! 1. Creates a [`ExtensionContext`](crate::ExtensionContext)
 //! 2. Calls `<ExtensionType>::activate(&mut ctx)` to construct the extension
 //! 3. Flushes registrations/subscriptions to stdout
 //! 4. Enters a blocking loop reading stdin lines:
@@ -16,12 +16,12 @@
 /// # Example
 ///
 /// ```ignore
-/// use nullslop_extension::{Extension, Context, run};
+/// use nullslop_extension::{Extension, ExtensionContext, run};
 ///
 /// struct MyExtension;
 ///
 /// impl Extension for MyExtension {
-///     fn activate(ctx: &mut Context) -> Self {
+///     fn activate(ctx: &mut ExtensionContext) -> Self {
 ///         ctx.register_command("hello");
 ///         Self
 ///     }
@@ -34,10 +34,10 @@
 macro_rules! run {
     ($extension_type:ty) => {
         fn main() {
-            let mut ctx = $crate::Context::new(
-            std::sync::Arc::new($crate::context::StdoutCommandSink),
-            $crate::context::ContextKind::Process,
-        );
+            let mut ctx = $crate::ExtensionContext::new(
+                std::sync::Arc::new($crate::context::StdoutExtensionSink),
+                $crate::context::ContextKind::Process,
+            );
             let mut extension = <$extension_type as $crate::Extension>::activate(&mut ctx);
 
             // Flush registrations.

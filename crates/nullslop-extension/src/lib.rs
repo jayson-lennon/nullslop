@@ -9,5 +9,8 @@ pub mod extension;
 pub mod macros;
 
 pub use codec::{InboundMessage, OutboundMessage};
-pub use context::{ChannelCommandSink, CommandSink, Context, ContextKind, StdoutCommandSink};
+pub use context::{
+    ChannelExtensionSink, ContextKind, ExtensionContext, ExtensionOutput, ExtensionSink,
+    StdoutExtensionSink,
+};
 pub use extension::{Extension, InMemoryExtension};

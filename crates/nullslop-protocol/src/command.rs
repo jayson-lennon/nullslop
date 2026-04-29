@@ -70,6 +70,15 @@ pub struct CustomCommand {
     pub args: Value,
 }
 
+/// Proceed with shutdown after extension coordination.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProceedWithShutdown {
+    /// Extensions that completed shutdown successfully.
+    pub completed: Vec<String>,
+    /// Extensions that did not respond before timeout.
+    pub timed_out: Vec<String>,
+}
+
 /// Wrapper enum for all commands.
 ///
 /// Used for serialization and the wire protocol between host and extensions.
@@ -131,6 +140,13 @@ pub enum Command {
         #[serde(flatten)]
         payload: CustomCommand,
     },
+    /// Proceed with shutdown after extension coordination.
+    #[serde(rename = "proceed_with_shutdown")]
+    ProceedWithShutdown {
+        /// The command payload.
+        #[serde(flatten)]
+        payload: ProceedWithShutdown,
+    },
 }
 
 impl std::fmt::Display for Command {
@@ -147,6 +163,14 @@ impl std::fmt::Display for Command {
             Command::ProviderSendMessage { .. } => write!(f, "send message"),
             Command::ProviderCancelStream => write!(f, "cancel stream"),
             Command::CustomCommand { payload } => write!(f, "{}", payload.name),
+            Command::ProceedWithShutdown { payload } => {
+                write!(
+                    f,
+                    "proceed with shutdown ({} completed, {} timed out)",
+                    payload.completed.len(),
+                    payload.timed_out.len()
+                )
+            }
         }
     }
 }
@@ -215,6 +239,7 @@ mod tests {
     #[case::send_message(Command::ProviderSendMessage { payload: ProviderSendMessage { text: "hi".into() } })]
     #[case::cancel_stream(Command::ProviderCancelStream)]
     #[case::custom(Command::CustomCommand { payload: CustomCommand { name: "echo".into(), args: serde_json::json!({}) } })]
+    #[case::proceed_with_shutdown(Command::ProceedWithShutdown { payload: ProceedWithShutdown { completed: vec!["ext-a".into()], timed_out: vec!["ext-b".into()] } })]
     fn command_roundtrip_all_variants(#[case] cmd: Command) {
         // Given a command variant.
         let json = serde_json::to_string(&cmd).expect("serialize");

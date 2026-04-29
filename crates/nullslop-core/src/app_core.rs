@@ -114,6 +114,7 @@ impl AppCore {
             received_messages = true;
             match msg {
                 AppMsg::Command(cmd) => self.route_command(cmd),
+                AppMsg::Event(evt) => self.bus.submit_event(evt),
                 AppMsg::ExtensionsReady(registrations) => {
                     for reg in registrations {
                         self.state.write().extensions_mut().register(reg);
@@ -209,13 +210,13 @@ mod tests {
         let mut core = AppCore::new();
 
         // When sending ExtensionsReady with a registration.
-        let _ = core.sender().send(AppMsg::ExtensionsReady(vec![
-            crate::RegisteredExtension {
+        let _ = core
+            .sender()
+            .send(AppMsg::ExtensionsReady(vec![crate::RegisteredExtension {
                 name: "test-ext".to_string(),
                 commands: vec!["echo".to_string()],
                 subscriptions: vec![],
-            },
-        ]));
+            }]));
         core.tick();
 
         // Then the extension is registered in state.

@@ -13,7 +13,7 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use error_stack::{Report, ResultExt};
-use nullslop_core::{AppMsg, Command, ExtHostSender, RegisteredExtension};
+use nullslop_core::{AppMsg, Command, Event, ExtHostSender, RegisteredExtension};
 use ratatui::{Terminal, backend::CrosstermBackend};
 use tokio::runtime::Handle;
 use wherror::Error;
@@ -36,6 +36,10 @@ impl ExtHostSender for TuiExtSender {
 
     fn send_command(&self, command: Command) {
         let _ = self.0.send(AppMsg::Command(command));
+    }
+
+    fn send_extension_event(&self, event: Event) {
+        let _ = self.0.send(AppMsg::Event(event));
     }
 }
 
@@ -73,11 +77,8 @@ pub fn run(mut app: TuiApp, handle: &Handle) -> Result<(), Report<TuiRunError>> 
     let sender = TuiExtSender(app.core.sender());
     let echo_ext: Box<dyn nullslop_extension::InMemoryExtension> =
         Box::new(nullslop_echo::EchoExtension);
-    let ext_host = nullslop_ext_host::InMemoryExtensionHost::start(
-        Arc::new(sender),
-        vec![echo_ext],
-        handle,
-    );
+    let ext_host =
+        nullslop_ext_host::InMemoryExtensionHost::start(Arc::new(sender), vec![echo_ext], handle);
     let ext_arc: Arc<dyn nullslop_core::ExtensionHost> = Arc::new(ext_host);
 
     // Share the extension host between AppCore and Services.
@@ -96,8 +97,11 @@ pub fn run(mut app: TuiApp, handle: &Handle) -> Result<(), Report<TuiRunError>> 
     }
 
     // Shut down extension host.
-    if let Some(ext) = app.core.ext_host() {
-        ext.shutdown();
+    let ext = app.core.ext_host().cloned();
+    if let Some(ext) = ext
+        && let Err(e) = ext.shutdown(&mut app.core)
+    {
+        tracing::error!(err = ?e, "extension host shutdown error");
     }
 
     // Restore terminal.

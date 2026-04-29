@@ -8,6 +8,7 @@
 use std::sync::Arc;
 
 use derive_more::Debug;
+use error_stack::Report;
 use wherror::Error;
 
 use crate::{Command, RegisteredExtension};
@@ -33,7 +34,11 @@ pub trait ExtensionHost: Send + Sync + 'static {
     fn send_command(&self, command: &crate::Command);
 
     /// Shuts down all extension processes gracefully.
-    fn shutdown(&self);
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any extensions fail to shut down within the timeout.
+    fn shutdown(&self, core: &mut crate::AppCore) -> Result<(), Report<ExtensionError>>;
 }
 
 /// Service wrapper for the extension host.
@@ -70,8 +75,12 @@ impl ExtensionHostService {
     }
 
     /// Delegates to [`ExtensionHost::shutdown`].
-    pub fn shutdown(&self) {
-        self.svc.shutdown();
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any extensions fail to shut down.
+    pub fn shutdown(&self, core: &mut crate::AppCore) -> Result<(), Report<ExtensionError>> {
+        self.svc.shutdown(core)
     }
 }
 
@@ -86,6 +95,8 @@ pub trait ExtHostSender: Send + Sync + 'static {
     fn send_extensions_ready(&self, registrations: Vec<RegisteredExtension>);
     /// Called when an extension sends a command.
     fn send_command(&self, command: Command);
+    /// Called when an extension sends an event to the host.
+    fn send_extension_event(&self, event: crate::Event);
 }
 
 #[cfg(test)]

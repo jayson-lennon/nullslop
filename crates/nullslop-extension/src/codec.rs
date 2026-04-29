@@ -57,6 +57,12 @@ pub enum OutboundMessage {
         /// The command to send.
         command: nullslop_core::Command,
     },
+    /// Extension sends an event to the host.
+    #[serde(rename = "event")]
+    Event {
+        /// The event to send.
+        event: nullslop_core::Event,
+    },
 }
 
 /// Reads the next inbound message from stdin.
@@ -192,6 +198,26 @@ mod tests {
                 assert!(matches!(command, Command::AppQuit));
             }
             other => panic!("expected Command, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn outbound_event_roundtrip() {
+        // Given an Event outbound message.
+        let msg = OutboundMessage::Event {
+            event: nullslop_core::Event::EventApplicationReady,
+        };
+
+        // When serialized and deserialized.
+        let json = serde_json::to_string(&msg).expect("serialize");
+        let back: OutboundMessage = serde_json::from_str(&json).expect("deserialize");
+
+        // Then it preserves the event.
+        match back {
+            OutboundMessage::Event { event } => {
+                assert!(matches!(event, nullslop_core::Event::EventApplicationReady));
+            }
+            other => panic!("expected Event, got {other:?}"),
         }
     }
 }
