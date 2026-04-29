@@ -3,79 +3,19 @@
 //! Each event is a separate struct with an `Event` prefix.
 //! The [`Event`] wrapper enum provides a single type for
 //! serialization and the wire protocol.
+//!
+//! Individual event structs live in domain modules ([`chat_input`], [`system`],
+//! [`custom`], [`shutdown`]). This module re-exports them for convenience.
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
-use crate::{ChatEntry, KeyEvent, Mode};
-
-/// A key was pressed down.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventKeyDown {
-    /// The key event.
-    pub key: KeyEvent,
-}
-
-/// A key was released.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventKeyUp {
-    /// The key event.
-    pub key: KeyEvent,
-}
-
-/// A chat message was submitted by the user.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventChatMessageSubmitted {
-    /// The chat entry that was submitted.
-    pub entry: ChatEntry,
-}
-
-/// The application mode changed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventModeChanged {
-    /// The previous mode.
-    pub from: Mode,
-    /// The new mode.
-    pub to: Mode,
-}
-
-/// The application has finished starting up.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventApplicationReady;
-
-/// A custom event from an extension.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventCustom {
-    /// The event name.
-    pub name: String,
-    /// The event data.
-    pub data: Value,
-}
-
-/// An extension is starting up.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExtensionStarting {
-    /// The extension's name.
-    pub name: String,
-}
-
-/// An extension has finished starting up.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExtensionStarted {
-    /// The extension's name.
-    pub name: String,
-}
-
-/// An extension has completed shutdown.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExtensionShutdownCompleted {
-    /// The extension's name.
-    pub name: String,
-}
-
-/// The application is shutting down.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventApplicationShuttingDown;
+// Re-export event structs and trait from domain modules.
+pub use crate::chat_input::EventChatMessageSubmitted;
+pub use crate::custom::{EventCustom, EventMsg};
+pub use crate::shutdown::{
+    EventApplicationShuttingDown, ExtensionShutdownCompleted, ExtensionStarted, ExtensionStarting,
+};
+pub use crate::system::{EventApplicationReady, EventKeyDown, EventKeyUp, EventModeChanged};
 
 /// Wrapper enum for all events.
 ///
@@ -157,13 +97,15 @@ impl Event {
     #[must_use]
     pub fn type_name(&self) -> Option<&str> {
         match self {
-            Self::EventChatMessageSubmitted { .. } => Some("EventChatMessageSubmitted"),
-            Self::EventApplicationReady => Some("EventApplicationReady"),
+            Self::EventChatMessageSubmitted { .. } => Some(EventChatMessageSubmitted::TYPE_NAME),
+            Self::EventApplicationReady => Some(EventApplicationReady::TYPE_NAME),
             Self::EventCustom { payload, .. } => Some(payload.name.as_str()),
-            Self::EventExtensionStarting { .. } => Some("EventExtensionStarting"),
-            Self::EventExtensionStarted { .. } => Some("EventExtensionStarted"),
-            Self::EventExtensionShutdownCompleted { .. } => Some("EventExtensionShutdownCompleted"),
-            Self::EventApplicationShuttingDown => Some("EventApplicationShuttingDown"),
+            Self::EventExtensionStarting { .. } => Some(ExtensionStarting::TYPE_NAME),
+            Self::EventExtensionStarted { .. } => Some(ExtensionStarted::TYPE_NAME),
+            Self::EventExtensionShutdownCompleted { .. } => {
+                Some(ExtensionShutdownCompleted::TYPE_NAME)
+            }
+            Self::EventApplicationShuttingDown => Some(EventApplicationShuttingDown::TYPE_NAME),
             Self::EventKeyDown { .. } | Self::EventKeyUp { .. } | Self::EventModeChanged { .. } => {
                 None
             }
@@ -174,7 +116,7 @@ impl Event {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Key, Modifiers};
+    use crate::{ChatEntry, Key, KeyEvent, Mode, Modifiers};
 
     #[test]
     fn event_application_ready_serialization() {
@@ -236,75 +178,118 @@ mod tests {
     }
 
     #[test]
-    fn event_type_name_returns_correct_names() {
-        // Given various event variants.
-        let chat = Event::EventChatMessageSubmitted {
-            payload: EventChatMessageSubmitted {
-                entry: ChatEntry::user("test"),
-            },
-        };
-        let ready = Event::EventApplicationReady;
-        let custom = Event::EventCustom {
-            payload: EventCustom {
-                name: "my-event".to_string(),
-                data: serde_json::json!(null),
-            },
-        };
-        let key_down = Event::EventKeyDown {
-            payload: EventKeyDown {
-                key: KeyEvent {
-                    key: Key::Enter,
-                    modifiers: Modifiers::none(),
-                },
-            },
-        };
-        let key_up = Event::EventKeyUp {
-            payload: EventKeyUp {
-                key: KeyEvent {
-                    key: Key::Char('a'),
-                    modifiers: Modifiers::none(),
-                },
-            },
-        };
-        let mode_changed = Event::EventModeChanged {
-            payload: EventModeChanged {
-                from: Mode::Normal,
-                to: Mode::Input,
-            },
-        };
-        let ext_starting = Event::EventExtensionStarting {
-            payload: ExtensionStarting {
-                name: "ext-a".into(),
-            },
-        };
-        let ext_started = Event::EventExtensionStarted {
-            payload: ExtensionStarted {
-                name: "ext-a".into(),
-            },
-        };
-        let ext_shutdown = Event::EventExtensionShutdownCompleted {
-            payload: ExtensionShutdownCompleted {
-                name: "ext-a".into(),
-            },
-        };
-        let shutting_down = Event::EventApplicationShuttingDown;
-
-        // Then type_name returns expected values.
-        assert_eq!(chat.type_name(), Some("EventChatMessageSubmitted"));
-        assert_eq!(ready.type_name(), Some("EventApplicationReady"));
-        assert_eq!(custom.type_name(), Some("my-event"));
-        assert_eq!(key_down.type_name(), None);
-        assert_eq!(key_up.type_name(), None);
-        assert_eq!(mode_changed.type_name(), None);
-        assert_eq!(ext_starting.type_name(), Some("EventExtensionStarting"));
-        assert_eq!(ext_started.type_name(), Some("EventExtensionStarted"));
+    #[allow(clippy::too_many_lines)]
+    fn event_type_name_exhaustive_coverage() {
+        // Given all Event variants.
+        // Then subscribable events return their EventMsg TYPE_NAME.
         assert_eq!(
-            ext_shutdown.type_name(),
-            Some("EventExtensionShutdownCompleted")
+            Event::EventChatMessageSubmitted {
+                payload: EventChatMessageSubmitted {
+                    entry: ChatEntry::user("test"),
+                }
+            }
+            .type_name(),
+            Some(EventChatMessageSubmitted::TYPE_NAME)
         );
         assert_eq!(
-            shutting_down.type_name(),
-            Some("EventApplicationShuttingDown")
+            Event::EventApplicationReady.type_name(),
+            Some(EventApplicationReady::TYPE_NAME)
+        );
+        assert_eq!(
+            Event::EventExtensionStarting {
+                payload: ExtensionStarting {
+                    name: "ext-a".into(),
+                }
+            }
+            .type_name(),
+            Some(ExtensionStarting::TYPE_NAME)
+        );
+        assert_eq!(
+            Event::EventExtensionStarted {
+                payload: ExtensionStarted {
+                    name: "ext-a".into(),
+                }
+            }
+            .type_name(),
+            Some(ExtensionStarted::TYPE_NAME)
+        );
+        assert_eq!(
+            Event::EventExtensionShutdownCompleted {
+                payload: ExtensionShutdownCompleted {
+                    name: "ext-a".into(),
+                }
+            }
+            .type_name(),
+            Some(ExtensionShutdownCompleted::TYPE_NAME)
+        );
+        assert_eq!(
+            Event::EventApplicationShuttingDown.type_name(),
+            Some(EventApplicationShuttingDown::TYPE_NAME)
+        );
+
+        // Then EventCustom uses the dynamic name.
+        assert_eq!(
+            Event::EventCustom {
+                payload: EventCustom {
+                    name: "my-event".to_string(),
+                    data: serde_json::json!(null),
+                }
+            }
+            .type_name(),
+            Some("my-event")
+        );
+
+        // Then non-subscribable events return None.
+        assert_eq!(
+            Event::EventKeyDown {
+                payload: EventKeyDown {
+                    key: KeyEvent {
+                        key: Key::Enter,
+                        modifiers: Modifiers::none(),
+                    },
+                }
+            }
+            .type_name(),
+            None
+        );
+        assert_eq!(
+            Event::EventKeyUp {
+                payload: EventKeyUp {
+                    key: KeyEvent {
+                        key: Key::Char('a'),
+                        modifiers: Modifiers::none(),
+                    },
+                }
+            }
+            .type_name(),
+            None
+        );
+        assert_eq!(
+            Event::EventModeChanged {
+                payload: EventModeChanged {
+                    from: Mode::Normal,
+                    to: Mode::Input,
+                }
+            }
+            .type_name(),
+            None
+        );
+
+        // Then TYPE_NAME constants match the expected string values.
+        assert_eq!(
+            EventChatMessageSubmitted::TYPE_NAME,
+            "EventChatMessageSubmitted"
+        );
+        assert_eq!(EventApplicationReady::TYPE_NAME, "EventApplicationReady");
+        assert_eq!(ExtensionStarting::TYPE_NAME, "EventExtensionStarting");
+        assert_eq!(ExtensionStarted::TYPE_NAME, "EventExtensionStarted");
+        assert_eq!(
+            ExtensionShutdownCompleted::TYPE_NAME,
+            "EventExtensionShutdownCompleted"
+        );
+        assert_eq!(
+            EventApplicationShuttingDown::TYPE_NAME,
+            "EventApplicationShuttingDown"
         );
     }
 }

@@ -26,13 +26,13 @@ pub enum InboundMessage {
     #[serde(rename = "command")]
     Command {
         /// The command to handle.
-        command: nullslop_core::Command,
+        command: nullslop_protocol::Command,
     },
     /// Host sends a subscribed event to the extension.
     #[serde(rename = "event")]
     Event {
         /// The event payload.
-        event: nullslop_core::Event,
+        event: nullslop_protocol::Event,
     },
     /// Host requests graceful shutdown.
     #[serde(rename = "shutdown")]
@@ -55,13 +55,13 @@ pub enum OutboundMessage {
     #[serde(rename = "command")]
     Command {
         /// The command to send.
-        command: nullslop_core::Command,
+        command: nullslop_protocol::Command,
     },
     /// Extension sends an event to the host.
     #[serde(rename = "event")]
     Event {
         /// The event to send.
-        event: nullslop_core::Event,
+        event: nullslop_protocol::Event,
     },
 }
 
@@ -114,8 +114,8 @@ pub fn write_message(msg: &OutboundMessage) -> Result<(), Report<CodecError>> {
 mod tests {
     use super::*;
     use npr::command::CustomCommand;
-    use nullslop_core::Command;
     use nullslop_protocol as npr;
+    use nullslop_protocol::Command;
 
     #[test]
     fn inbound_initialize_roundtrip() {
@@ -205,7 +205,7 @@ mod tests {
     fn outbound_event_roundtrip() {
         // Given an Event outbound message.
         let msg = OutboundMessage::Event {
-            event: nullslop_core::Event::EventApplicationReady,
+            event: nullslop_protocol::Event::EventApplicationReady,
         };
 
         // When serialized and deserialized.
@@ -215,7 +215,10 @@ mod tests {
         // Then it preserves the event.
         match back {
             OutboundMessage::Event { event } => {
-                assert!(matches!(event, nullslop_core::Event::EventApplicationReady));
+                assert!(matches!(
+                    event,
+                    nullslop_protocol::Event::EventApplicationReady
+                ));
             }
             other => panic!("expected Event, got {other:?}"),
         }

@@ -8,9 +8,13 @@
 
 use std::time::Duration;
 
-use nullslop_core::{ChatEntryKind, Command, Event};
 use nullslop_extension::{Extension, ExtensionContext};
 use nullslop_protocol as npr;
+use nullslop_protocol::command::EchoCommand;
+use nullslop_protocol::event::{
+    EventApplicationReady, EventApplicationShuttingDown, EventChatMessageSubmitted,
+};
+use nullslop_protocol::{ChatEntryKind, Command, CommandMsg, Event};
 
 /// Reference extension that echoes user messages back as extension entries.
 pub struct EchoExtension;
@@ -18,10 +22,10 @@ pub struct EchoExtension;
 impl Extension for EchoExtension {
     /// Registers the "echo" command and subscribes to events.
     fn activate(ctx: &mut ExtensionContext) -> Self {
-        ctx.register_command("echo");
-        ctx.subscribe("EventChatMessageSubmitted");
-        ctx.subscribe("EventApplicationShuttingDown");
-        ctx.subscribe("EventApplicationReady");
+        ctx.subscribe_command::<EchoCommand>();
+        ctx.subscribe_event::<EventChatMessageSubmitted>();
+        ctx.subscribe_event::<EventApplicationShuttingDown>();
+        ctx.subscribe_event::<EventApplicationReady>();
         Self
     }
 
@@ -34,7 +38,7 @@ impl Extension for EchoExtension {
             Event::EventApplicationShuttingDown => {
                 if let Some(name) = ctx.name()
                     && let Err(e) = ctx.send_event(Event::EventExtensionShutdownCompleted {
-                        payload: npr::event::ExtensionShutdownCompleted {
+                        payload: npr::shutdown::ExtensionShutdownCompleted {
                             name: name.to_string(),
                         },
                     })
@@ -45,7 +49,7 @@ impl Extension for EchoExtension {
             Event::EventApplicationReady => {
                 if let Some(name) = ctx.name()
                     && let Err(e) = ctx.send_event(Event::EventExtensionStarted {
-                        payload: npr::event::ExtensionStarted {
+                        payload: npr::shutdown::ExtensionStarted {
                             name: name.to_string(),
                         },
                     })
@@ -64,14 +68,14 @@ impl Extension for EchoExtension {
 /// Shared echo logic: sleep 1s, then send ALL CAPS echo command.
 fn send_echo(event: &Event, ctx: &ExtensionContext) {
     if let Event::EventChatMessageSubmitted {
-        payload: npr::event::EventChatMessageSubmitted { entry },
+        payload: npr::chat_input::EventChatMessageSubmitted { entry },
     } = event
         && let ChatEntryKind::User(text) = &entry.kind
     {
         std::thread::sleep(Duration::from_secs(1));
         if let Err(e) = ctx.send_command(Command::CustomCommand {
             payload: npr::command::CustomCommand {
-                name: "echo".to_string(),
+                name: EchoCommand::NAME.to_string(),
                 args: serde_json::json!({
                     "source": "nullslop-echo",
                     "text": text.to_uppercase(),

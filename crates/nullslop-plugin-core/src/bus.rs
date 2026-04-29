@@ -80,6 +80,18 @@ where
     h.handle(e, state, out);
 }
 
+/// A command in the bus queue, tagged with the extension that submitted it.
+struct QueuedCommand {
+    command: Command,
+    source: Option<String>,
+}
+
+/// An event in the bus queue, tagged with the extension that submitted it.
+struct QueuedEvent {
+    event: Event,
+    source: Option<String>,
+}
+
 /// Bus for dispatching commands and events to registered handlers.
 ///
 /// The bus maintains separate handler maps and queues for commands and events.
@@ -89,16 +101,16 @@ where
 pub struct Bus {
     command_handlers: HashMap<TypeId, Vec<AnyCommandHandler>>,
     event_handlers: HashMap<TypeId, Vec<AnyEventHandler>>,
-    command_queue: Vec<Command>,
-    event_queue: Vec<Event>,
-    /// Events that were dispatched during the last processing cycle.
+    command_queue: Vec<QueuedCommand>,
+    event_queue: Vec<QueuedEvent>,
+    /// Events that were dispatched during the last processing cycle, with source.
     /// Populated by `dispatch_event` so consumers can forward them
     /// after bus processing completes.
-    processed_events: Vec<Event>,
-    /// Commands that were dispatched during the last processing cycle.
+    processed_events: Vec<(Event, Option<String>)>,
+    /// Commands that were dispatched during the last processing cycle, with source.
     /// Populated by `dispatch_command` so consumers can forward them
     /// to the extension host after bus processing completes.
-    processed_commands: Vec<Command>,
+    processed_commands: Vec<(Command, Option<String>)>,
     max_iterations: usize,
 }
 
@@ -173,15 +185,34 @@ impl Bus {
     /// Submit a command to the bus queue.
     ///
     /// The command will be dispatched when [`process_commands`](Self::process_commands) is called.
+    /// The source is `None` (originated from the user or host, not an extension).
     pub fn submit_command(&mut self, cmd: Command) {
-        self.command_queue.push(cmd);
+        self.submit_command_from(cmd, None);
+    }
+
+    /// Submit a command to the bus queue with an optional source extension name.
+    ///
+    /// The command will be dispatched when [`process_commands`](Self::process_commands) is called.
+    pub fn submit_command_from(&mut self, cmd: Command, source: Option<String>) {
+        self.command_queue.push(QueuedCommand {
+            command: cmd,
+            source,
+        });
     }
 
     /// Submit an event to the bus queue.
     ///
     /// The event will be dispatched when [`process_events`](Self::process_events) is called.
+    /// The source is `None` (originated from the user or host, not an extension).
     pub fn submit_event(&mut self, evt: Event) {
-        self.event_queue.push(evt);
+        self.submit_event_from(evt, None);
+    }
+
+    /// Submit an event to the bus queue with an optional source extension name.
+    ///
+    /// The event will be dispatched when [`process_events`](Self::process_events) is called.
+    pub fn submit_event_from(&mut self, evt: Event, source: Option<String>) {
+        self.event_queue.push(QueuedEvent { event: evt, source });
     }
 
     /// Process all pending commands, including those submitted by handlers.
@@ -200,8 +231,8 @@ impl Bus {
             if iterations > self.max_iterations {
                 break;
             }
-            for cmd in commands {
-                self.dispatch_command(cmd, state);
+            for queued in commands {
+                self.dispatch_command(queued.command, queued.source, state);
             }
         }
     }
@@ -213,8 +244,8 @@ impl Bus {
     /// processing are queued for a future call.
     pub fn process_events(&mut self, state: &mut AppState) {
         let events = std::mem::take(&mut self.event_queue);
-        for evt in events {
-            self.dispatch_event(evt, state);
+        for queued in events {
+            self.dispatch_event(queued.event, queued.source, state);
         }
     }
 
@@ -226,36 +257,26 @@ impl Bus {
 
     /// Drain all events that were dispatched during processing.
     ///
-    /// Returns the events and clears the internal buffer. Useful for
-    /// forwarding processed events to external systems (e.g., extension host)
-    /// after bus processing completes.
-    pub fn drain_processed_events(&mut self) -> Vec<Event> {
+    /// Returns tuples of `(event, source)` and clears the internal buffer.
+    /// Useful for forwarding processed events to external systems
+    /// (e.g., extension host) after bus processing completes.
+    pub fn drain_processed_events(&mut self) -> Vec<(Event, Option<String>)> {
         std::mem::take(&mut self.processed_events)
     }
 
     /// Drain all commands that were dispatched during processing.
     ///
-    /// Returns a snapshot of the command queue after processing.
-    /// This captures commands that were submitted by handlers and already
-    /// processed by the bus. Useful for forwarding processed commands
-    /// to external systems (e.g., extension host) after bus processing.
-    pub fn drain_processed_commands(&mut self) -> Vec<Command> {
-        // Commands that were dispatched during processing are not tracked
-        // individually like events. Instead, we drain any remaining commands
-        // in the queue after processing completes. These are commands that
-        // were submitted by handlers during the last process_commands call
-        // but not yet drained by process_commands (already processed).
-        //
-        // For the extension host use case, we need commands that were
-        // submitted to the bus and fully processed. Since process_commands
-        // empties the queue, we need a separate tracking mechanism.
+    /// Returns tuples of `(command, source)` and clears the internal buffer.
+    /// Useful for forwarding processed commands to external systems
+    /// (e.g., extension host) after bus processing.
+    pub fn drain_processed_commands(&mut self) -> Vec<(Command, Option<String>)> {
         std::mem::take(&mut self.processed_commands)
     }
 
     /// Dispatch a single command to its registered handlers.
-    fn dispatch_command(&mut self, cmd: Command, state: &mut AppState) {
+    fn dispatch_command(&mut self, cmd: Command, source: Option<String>, state: &mut AppState) {
         // Record the command before dispatching so consumers can drain it later.
-        self.processed_commands.push(cmd.clone());
+        self.processed_commands.push((cmd.clone(), source));
         let mut out = Out::new();
         match cmd {
             Command::ChatBoxInsertChar { payload } => {
@@ -326,9 +347,9 @@ impl Bus {
     }
 
     /// Dispatch a single event to its registered handlers.
-    fn dispatch_event(&mut self, evt: Event, state: &mut AppState) {
+    fn dispatch_event(&mut self, evt: Event, source: Option<String>, state: &mut AppState) {
         // Record the event before dispatching so consumers can drain it later.
-        self.processed_events.push(evt.clone());
+        self.processed_events.push((evt.clone(), source));
         let mut out = Out::new();
         match evt {
             Event::EventKeyDown { payload } => {
@@ -382,8 +403,18 @@ impl Bus {
 
     /// Flush buffered output from a handler into the bus queues.
     fn flush_out(&mut self, mut out: Out) {
-        self.command_queue.extend(out.drain_commands());
-        self.event_queue.extend(out.drain_events());
+        for cmd in out.drain_commands() {
+            self.command_queue.push(QueuedCommand {
+                command: cmd,
+                source: None,
+            });
+        }
+        for evt in out.drain_events() {
+            self.event_queue.push(QueuedEvent {
+                event: evt,
+                source: None,
+            });
+        }
     }
 }
 
@@ -752,10 +783,12 @@ mod tests {
         let mut state = AppState::new();
         bus.process_events(&mut state);
 
-        // Then drain_processed_events returns the dispatched event.
+        // Then drain_processed_events returns the dispatched event with no source.
         let processed = bus.drain_processed_events();
         assert_eq!(processed.len(), 1);
-        assert!(matches!(processed[0], Event::EventApplicationReady));
+        let (evt, source) = &processed[0];
+        assert!(matches!(evt, Event::EventApplicationReady));
+        assert!(source.is_none());
     }
 
     #[test]
@@ -791,10 +824,12 @@ mod tests {
         let mut state = AppState::new();
         bus.process_commands(&mut state);
 
-        // Then drain_processed_commands returns the dispatched command.
+        // Then drain_processed_commands returns the dispatched command with no source.
         let processed = bus.drain_processed_commands();
         assert_eq!(processed.len(), 1);
-        assert!(matches!(processed[0], Command::AppQuit));
+        let (cmd, source) = &processed[0];
+        assert!(matches!(cmd, Command::AppQuit));
+        assert!(source.is_none());
     }
 
     #[test]
@@ -814,5 +849,60 @@ mod tests {
         // Then first has the command and second is empty.
         assert_eq!(first.len(), 1);
         assert!(second.is_empty());
+    }
+
+    // --- Source tagging tests ---
+
+    #[test]
+    fn submit_command_from_preserves_source() {
+        // Given a bus with a command handler.
+        let (handler, _calls) = FakeCommandHandler::<AppQuit>::continuing();
+        let mut bus = Bus::new();
+        bus.register_command_handler::<AppQuit, _>(handler);
+
+        // When submitting a command with a source.
+        bus.submit_command_from(Command::AppQuit, Some("ext-test".to_string()));
+        let mut state = AppState::new();
+        bus.process_commands(&mut state);
+
+        // Then the source is preserved through drain.
+        let processed = bus.drain_processed_commands();
+        assert_eq!(processed.len(), 1);
+        assert_eq!(processed[0].1, Some("ext-test".to_string()));
+    }
+
+    #[test]
+    fn submit_event_from_preserves_source() {
+        // Given a bus with an event handler.
+        let (handler, _calls) = FakeEventHandler::<EventApplicationReady>::new();
+        let mut bus = Bus::new();
+        bus.register_event_handler::<EventApplicationReady, _>(handler);
+
+        // When submitting an event with a source.
+        bus.submit_event_from(Event::EventApplicationReady, Some("ext-test".to_string()));
+        let mut state = AppState::new();
+        bus.process_events(&mut state);
+
+        // Then the source is preserved through drain.
+        let processed = bus.drain_processed_events();
+        assert_eq!(processed.len(), 1);
+        assert_eq!(processed[0].1, Some("ext-test".to_string()));
+    }
+
+    #[test]
+    fn submit_command_without_source_has_none() {
+        // Given a bus with a command handler.
+        let (handler, _calls) = FakeCommandHandler::<AppQuit>::continuing();
+        let mut bus = Bus::new();
+        bus.register_command_handler::<AppQuit, _>(handler);
+
+        // When submitting a command without source.
+        bus.submit_command(Command::AppQuit);
+        let mut state = AppState::new();
+        bus.process_commands(&mut state);
+
+        // Then the source is None.
+        let processed = bus.drain_processed_commands();
+        assert_eq!(processed[0].1, None);
     }
 }

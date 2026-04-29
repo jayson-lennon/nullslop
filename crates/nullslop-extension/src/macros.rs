@@ -22,7 +22,7 @@
 ///
 /// impl Extension for MyExtension {
 ///     fn activate(ctx: &mut ExtensionContext) -> Self {
-///         ctx.register_command("hello");
+///         ctx.subscribe_command_by_name("hello");
 ///         Self
 ///     }
 ///     // ...

@@ -7,7 +7,7 @@
 //! a blanket impl for all types that implement [`Extension`] + [`Send`].
 //! Extension authors never need to implement [`InMemoryExtension`] directly.
 
-use nullslop_core::{Command, Event};
+use nullslop_protocol::{Command, Event};
 
 use crate::ExtensionContext;
 

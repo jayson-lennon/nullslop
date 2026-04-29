@@ -1,9 +1,4 @@
 //! Extension host trait, service wrapper, and sender abstraction.
-//!
-//! Defines the [`ExtensionHost`] trait for managing extension processes,
-//! the [`ExtensionHostService`] service wrapper, [`ExtensionError`],
-//! and the [`ExtHostSender`] trait that decouples the extension host
-//! from TUI-specific message types.
 
 use std::sync::Arc;
 
@@ -11,7 +6,9 @@ use derive_more::Debug;
 use error_stack::Report;
 use wherror::Error;
 
-use crate::{Command, RegisteredExtension};
+use nullslop_protocol::command::Command;
+
+use crate::RegisteredExtension;
 
 /// Error type for extension operations.
 #[derive(Debug, Error)]
@@ -27,11 +24,11 @@ pub trait ExtensionHost: Send + Sync + 'static {
     /// Returns the host's name (for debugging/logging).
     fn name(&self) -> &'static str;
 
-    /// Broadcasts an event to all subscribed extensions.
-    fn send_event(&self, event: &crate::Event);
+    /// Broadcasts an event to all subscribed extensions, skipping the source.
+    fn send_event(&self, event: &nullslop_protocol::Event, source: Option<&str>);
 
-    /// Routes a command to extensions that registered for it.
-    fn send_command(&self, command: &crate::Command);
+    /// Routes a command to extensions that registered for it, skipping the source.
+    fn send_command(&self, command: &Command, source: Option<&str>);
 
     /// Shuts down all extension processes gracefully.
     ///
@@ -65,13 +62,13 @@ impl ExtensionHostService {
     }
 
     /// Delegates to [`ExtensionHost::send_event`].
-    pub fn send_event(&self, event: &crate::Event) {
-        self.svc.send_event(event);
+    pub fn send_event(&self, event: &nullslop_protocol::Event, source: Option<&str>) {
+        self.svc.send_event(event, source);
     }
 
     /// Delegates to [`ExtensionHost::send_command`].
-    pub fn send_command(&self, command: &crate::Command) {
-        self.svc.send_command(command);
+    pub fn send_command(&self, command: &Command, source: Option<&str>) {
+        self.svc.send_command(command, source);
     }
 
     /// Delegates to [`ExtensionHost::shutdown`].
@@ -88,15 +85,15 @@ impl ExtensionHostService {
 ///
 /// Implementations map extension host events into the application's message type.
 /// This trait decouples the extension host from TUI-specific message types,
-/// enabling headless mode (Phase 4) to receive extension events without
+/// enabling headless mode to receive extension events without
 /// depending on crossterm or the TUI message enum.
 pub trait ExtHostSender: Send + Sync + 'static {
     /// Called when extensions have completed discovery and registration.
     fn send_extensions_ready(&self, registrations: Vec<RegisteredExtension>);
     /// Called when an extension sends a command.
-    fn send_command(&self, command: Command);
+    fn send_command(&self, command: Command, source: Option<&str>);
     /// Called when an extension sends an event to the host.
-    fn send_extension_event(&self, event: crate::Event);
+    fn send_extension_event(&self, event: nullslop_protocol::Event, source: Option<&str>);
 }
 
 #[cfg(test)]

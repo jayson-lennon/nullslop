@@ -123,7 +123,10 @@ mod tests {
         bus.process_commands(&mut state);
         let commands = bus.drain_processed_commands();
         assert_eq!(commands.len(), 1);
-        assert!(matches!(commands[0], Command::ProceedWithShutdown { .. }));
+        assert!(matches!(
+            commands[0],
+            (Command::ProceedWithShutdown { .. }, _)
+        ));
     }
 
     #[test]

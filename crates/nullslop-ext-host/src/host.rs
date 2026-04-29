@@ -7,8 +7,9 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use nullslop_core::{Event, ExtHostSender, ExtensionManifest, RegisteredExtension};
+use nullslop_core::{ExtHostSender, ExtensionManifest, RegisteredExtension};
 use nullslop_extension::codec::OutboundMessage;
+use nullslop_protocol::Event;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 
 use crate::discovery;
@@ -162,10 +163,10 @@ async fn read_extension_stdout(
         if let Ok(Some(line)) = lines.next_line().await {
             match serde_json::from_str::<OutboundMessage>(&line) {
                 Ok(OutboundMessage::Command { command }) => {
-                    sender.send_command(command);
+                    sender.send_command(command, Some(&name));
                 }
                 Ok(OutboundMessage::Event { event }) => {
-                    sender.send_extension_event(event);
+                    sender.send_extension_event(event, Some(&name));
                 }
                 Ok(OutboundMessage::Register { .. }) => {
                     // Unexpected after init — ignore.
@@ -225,8 +226,8 @@ async fn send_shutdown(ext: &mut ManagedExtension) {
 mod tests {
     use super::*;
     use npr::event::EventChatMessageSubmitted;
-    use nullslop_core::{ChatEntry, Key, KeyEvent, Modifiers};
     use nullslop_protocol as npr;
+    use nullslop_protocol::{ChatEntry, Key, KeyEvent, Modifiers};
 
     #[test]
     fn new_chat_entry_maps_to_name() {

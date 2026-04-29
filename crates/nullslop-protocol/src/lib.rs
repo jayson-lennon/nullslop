@@ -8,18 +8,22 @@
 pub mod action;
 pub mod app_state;
 pub mod chat;
-pub mod chat_input_state;
+pub mod chat_input;
 pub mod command;
+pub mod custom;
 pub mod event;
 pub mod key;
 pub mod mode;
+pub mod shutdown;
+pub mod system;
 
 // Re-export primary types
 pub use action::CommandAction;
 pub use app_state::AppState;
 pub use chat::{ChatEntry, ChatEntryKind};
-pub use chat_input_state::ChatInputBoxState;
+pub use chat_input::ChatInputBoxState;
 pub use command::Command;
+pub use custom::{CommandMsg, EchoCommand, EventMsg};
 pub use event::Event;
 pub use key::{Key, KeyEvent, Modifiers};
 pub use mode::Mode;

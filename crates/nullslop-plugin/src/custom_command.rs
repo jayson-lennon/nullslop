@@ -1,7 +1,7 @@
-//! Plugin for commands received from extensions.
+//! Plugin for custom commands received from extensions.
 //!
-//! Handles `CustomCommand` (e.g., the "echo" command) by adding
-//! extension-branded chat entries with source identification.
+//! Handles [`CustomCommand`]s using a match arm on command name.
+//! Unknown commands are logged as warnings.
 
 use npr::CommandAction;
 use npr::command::CustomCommand;
@@ -10,8 +10,8 @@ use nullslop_plugin_ui::UiRegistry;
 use nullslop_protocol::{self as npr, AppState};
 
 define_handler! {
-    /// Handles commands from extensions.
-    pub(crate) struct ExtensionCommandPlugin;
+    /// Handles custom commands from extensions.
+    pub(crate) struct CustomCommandHandler;
 
     commands {
         CustomCommand: on_custom_command,
@@ -20,24 +20,28 @@ define_handler! {
     events {}
 }
 
-/// Register the extension command plugin.
+/// Register the custom command handler.
 pub(crate) fn register(bus: &mut Bus, _registry: &mut UiRegistry) {
-    ExtensionCommandPlugin.register(bus);
+    CustomCommandHandler.register(bus);
 }
 
-impl ExtensionCommandPlugin {
+impl CustomCommandHandler {
     fn on_custom_command(
         cmd: &CustomCommand,
         state: &mut AppState,
         _out: &mut Out,
     ) -> CommandAction {
-        if cmd.name == "echo"
-            && let Some(source) = cmd.args.get("source").and_then(|v| v.as_str())
-            && let Some(text) = cmd.args.get("text").and_then(|v| v.as_str())
-        {
-            state.push_entry(npr::ChatEntry::extension(source, text));
-        } else {
-            tracing::warn!(name = %cmd.name, "unhandled extension command");
+        match cmd.name.as_str() {
+            "echo" => {
+                if let Some(source) = cmd.args.get("source").and_then(|v| v.as_str())
+                    && let Some(text) = cmd.args.get("text").and_then(|v| v.as_str())
+                {
+                    state.push_entry(npr::ChatEntry::extension(source, text));
+                }
+            }
+            other => {
+                tracing::warn!(name = other, "unhandled extension command");
+            }
         }
         CommandAction::Continue
     }
@@ -53,9 +57,9 @@ mod tests {
 
     #[test]
     fn echo_command_adds_extension_entry() {
-        // Given a bus with ExtensionCommandPlugin registered.
+        // Given a bus with CustomCommandHandler registered.
         let mut bus = Bus::new();
-        ExtensionCommandPlugin.register(&mut bus);
+        CustomCommandHandler.register(&mut bus);
 
         // When processing a CustomCommand "echo" with source and text.
         bus.submit_command(Command::CustomCommand {
@@ -80,9 +84,9 @@ mod tests {
 
     #[test]
     fn echo_command_requires_source() {
-        // Given a bus with ExtensionCommandPlugin registered.
+        // Given a bus with CustomCommandHandler registered.
         let mut bus = Bus::new();
-        ExtensionCommandPlugin.register(&mut bus);
+        CustomCommandHandler.register(&mut bus);
 
         // When processing a CustomCommand "echo" missing source field.
         bus.submit_command(Command::CustomCommand {
@@ -94,15 +98,15 @@ mod tests {
         let mut state = npr::AppState::new();
         bus.process_commands(&mut state);
 
-        // Then no entry is added (falls through to warning).
+        // Then no entry is added (handler ran but args lacked source).
         assert!(state.chat_history.is_empty());
     }
 
     #[test]
     fn unknown_command_logs_warning() {
-        // Given a bus with ExtensionCommandPlugin registered.
+        // Given a bus with CustomCommandHandler registered.
         let mut bus = Bus::new();
-        ExtensionCommandPlugin.register(&mut bus);
+        CustomCommandHandler.register(&mut bus);
 
         // When processing an unknown CustomCommand.
         bus.submit_command(Command::CustomCommand {

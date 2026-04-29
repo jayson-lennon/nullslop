@@ -3,7 +3,7 @@
 //! These conversions are used by the main key handling path to translate
 //! crossterm events into protocol keys before passing them to the keymap.
 
-use nullslop_core::{Key, KeyEvent, Modifiers};
+use nullslop_protocol::{Key, KeyEvent, Modifiers};
 
 /// Converts a crossterm `KeyEvent` to a nullslop-core `KeyEvent`.
 ///

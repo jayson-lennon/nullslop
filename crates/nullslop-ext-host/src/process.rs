@@ -4,7 +4,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use error_stack::Report;
-use nullslop_core::{AppCore, Event, ExtHostSender, ExtensionError, ExtensionHost};
+use nullslop_core::{AppCore, ExtHostSender, ExtensionError, ExtensionHost};
+use nullslop_protocol::{Command, Event};
 
 /// Real extension host that spawns child processes via an async tokio task.
 ///
@@ -47,11 +48,11 @@ impl ExtensionHost for ProcessExtensionHost {
         "ProcessExtensionHost"
     }
 
-    fn send_event(&self, event: &Event) {
+    fn send_event(&self, event: &Event, _source: Option<&str>) {
         let _ = self.event_sender.send(event.clone());
     }
 
-    fn send_command(&self, _command: &nullslop_core::Command) {
+    fn send_command(&self, _command: &Command, _source: Option<&str>) {
         // Process-mode command routing is not yet implemented.
         // The process host receives commands from extensions via stdout
         // and routes events to extensions via stdin. Bidirectional command

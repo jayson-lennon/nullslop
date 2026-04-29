@@ -4,7 +4,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use error_stack::{Report, ResultExt};
-use nullslop_core::{AppCore, AppMsg, Command, TickResult};
+use nullslop_core::{AppCore, AppMsg, TickResult};
+use nullslop_protocol::Command;
 use nullslop_protocol::command::ChatBoxSubmitMessage;
 use wherror::Error;
 
@@ -85,9 +86,12 @@ fn run_headless(app: &mut App, command: Option<HeadlessCommands>) -> Result<(), 
     match command {
         Some(HeadlessCommands::SendChat { message }) => {
             core.sender()
-                .send(AppMsg::Command(Command::ChatBoxSubmitMessage {
-                    payload: ChatBoxSubmitMessage { text: message },
-                }))
+                .send(AppMsg::Command {
+                    command: Command::ChatBoxSubmitMessage {
+                        payload: ChatBoxSubmitMessage { text: message },
+                    },
+                    source: None,
+                })
                 .change_context(CliError)
                 .attach("failed to send chat command")?;
         }
@@ -134,9 +138,9 @@ fn run_script(core: &mut AppCore, path: &str) -> Result<(), Report<CliError>> {
     let keymap = nullslop_tui::keymap::init();
     let mut which_key =
         nullslop_tui::app::WhichKeyInstance::new(keymap, nullslop_tui::Scope::Normal);
-    let leader = nullslop_core::KeyEvent {
-        key: nullslop_core::Key::Char('\\'),
-        modifiers: nullslop_core::Modifiers::none(),
+    let leader = nullslop_protocol::KeyEvent {
+        key: nullslop_protocol::Key::Char('\\'),
+        modifiers: nullslop_protocol::Modifiers::none(),
     };
 
     let content = std::fs::read_to_string(path)
@@ -156,7 +160,10 @@ fn run_script(core: &mut AppCore, path: &str) -> Result<(), Report<CliError>> {
 
             if let Some(cmd) = which_key.handle_key(key) {
                 core.sender()
-                    .send(AppMsg::Command(cmd))
+                    .send(AppMsg::Command {
+                        command: cmd,
+                        source: None,
+                    })
                     .change_context(CliError)
                     .attach("failed to send script command")?;
             }

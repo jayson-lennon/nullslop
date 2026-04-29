@@ -13,7 +13,8 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use error_stack::{Report, ResultExt};
-use nullslop_core::{AppMsg, Command, Event, ExtHostSender, RegisteredExtension};
+use nullslop_core::{AppMsg, ExtHostSender, RegisteredExtension};
+use nullslop_protocol::{Command, Event};
 use ratatui::{Terminal, backend::CrosstermBackend};
 use tokio::runtime::Handle;
 use wherror::Error;
@@ -34,12 +35,18 @@ impl ExtHostSender for TuiExtSender {
         let _ = self.0.send(AppMsg::ExtensionsReady(registrations));
     }
 
-    fn send_command(&self, command: Command) {
-        let _ = self.0.send(AppMsg::Command(command));
+    fn send_command(&self, command: Command, _source: Option<&str>) {
+        let _ = self.0.send(AppMsg::Command {
+            command,
+            source: None,
+        });
     }
 
-    fn send_extension_event(&self, event: Event) {
-        let _ = self.0.send(AppMsg::Event(event));
+    fn send_extension_event(&self, event: Event, _source: Option<&str>) {
+        let _ = self.0.send(AppMsg::Event {
+            event,
+            source: None,
+        });
     }
 }
 

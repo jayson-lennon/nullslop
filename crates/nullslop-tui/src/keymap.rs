@@ -2,13 +2,13 @@
 //!
 //! Defines the key categories and builds the keymap with all scope bindings
 //! using the `ratatui-which-key` crate. Binds keys to [`Command`](nullslop_protocol::Command)
-//! variants. Parameterized on [`nullslop_core::KeyEvent`] so the keymap works
+//! variants. Parameterized on [`nullslop_protocol::KeyEvent`] so the keymap works
 //! in both TUI and headless modes.
 
 use derive_more::Display;
-use nullslop_core::{Key, KeyEvent};
 use nullslop_protocol::command::{AppSetMode, ChatBoxInsertChar, ChatBoxSubmitMessage};
 use nullslop_protocol::{Command, Mode};
+use nullslop_protocol::{Key, KeyEvent};
 use ratatui_which_key::Keymap;
 
 use crate::scope::Scope;

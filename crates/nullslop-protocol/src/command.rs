@@ -3,81 +3,21 @@
 //! Each command is a separate struct with a component prefix (`ChatBox*`,
 //! `App*`, `Provider*`). The [`Command`] wrapper enum provides a single
 //! type for serialization and the wire protocol.
+//!
+//! Individual command structs live in domain modules ([`chat_input`], [`system`],
+//! [`custom`], [`shutdown`]). This module re-exports them for convenience.
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
-use crate::Mode;
-
-/// Insert a character into the chat input buffer.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatBoxInsertChar {
-    /// The character to insert.
-    pub ch: char,
-}
-
-/// Delete the last grapheme from the chat input buffer.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatBoxDeleteGrapheme;
-
-/// Submit the chat input buffer as a message.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatBoxSubmitMessage {
-    /// The message text.
-    pub text: String,
-}
-
-/// Clear the chat input buffer.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatBoxClear;
-
-/// Set the application interaction mode.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppSetMode {
-    /// The mode to switch to.
-    pub mode: Mode,
-}
-
-/// Quit the application.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppQuit;
-
-/// Open an external editor for the input buffer.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppEditInput;
-
-/// Toggle the which-key popup.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppToggleWhichKey;
-
-/// Send a message to the AI provider.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProviderSendMessage {
-    /// The message text.
-    pub text: String,
-}
-
-/// Cancel the active provider stream.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProviderCancelStream;
-
-/// A custom command from an extension.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CustomCommand {
-    /// The command name.
-    pub name: String,
-    /// The command arguments.
-    pub args: Value,
-}
-
-/// Proceed with shutdown after extension coordination.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProceedWithShutdown {
-    /// Extensions that completed shutdown successfully.
-    pub completed: Vec<String>,
-    /// Extensions that did not respond before timeout.
-    pub timed_out: Vec<String>,
-}
+// Re-export command structs and trait from domain modules.
+pub use crate::chat_input::{
+    ChatBoxClear, ChatBoxDeleteGrapheme, ChatBoxInsertChar, ChatBoxSubmitMessage,
+};
+pub use crate::custom::{CommandMsg, CustomCommand, EchoCommand};
+pub use crate::shutdown::ProceedWithShutdown;
+pub use crate::system::{
+    AppEditInput, AppQuit, AppSetMode, AppToggleWhichKey, ProviderCancelStream, ProviderSendMessage,
+};
 
 /// Wrapper enum for all commands.
 ///
@@ -178,6 +118,7 @@ impl std::fmt::Display for Command {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Mode;
 
     #[test]
     fn command_insert_char_serialization() {

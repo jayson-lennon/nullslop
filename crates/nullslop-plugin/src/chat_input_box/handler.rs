@@ -194,7 +194,7 @@ mod tests {
         assert_eq!(processed.len(), 1);
         assert!(matches!(
             &processed[0],
-            npr::Event::EventChatMessageSubmitted { .. }
+            (npr::Event::EventChatMessageSubmitted { .. }, _)
         ));
     }
 

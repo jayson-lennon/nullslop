@@ -6,12 +6,13 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use error_stack::Report;
-use nullslop_core::{AppCore, Event, ExtensionError, ExtensionHost};
+use nullslop_core::{AppCore, ExtensionError, ExtensionHost};
+use nullslop_protocol::Event;
 
 /// Fake extension host for testing.
 pub struct FakeExtensionHost {
     events_sent: Mutex<Vec<Event>>,
-    commands_sent: Mutex<Vec<nullslop_core::Command>>,
+    commands_sent: Mutex<Vec<nullslop_protocol::Command>>,
     shutdown_called: AtomicBool,
 }
 
@@ -42,7 +43,7 @@ impl FakeExtensionHost {
     ///
     /// Panics if the internal mutex is poisoned.
     #[must_use]
-    pub fn commands_sent(&self) -> Vec<nullslop_core::Command> {
+    pub fn commands_sent(&self) -> Vec<nullslop_protocol::Command> {
         self.commands_sent.lock().unwrap().clone()
     }
 
@@ -64,11 +65,11 @@ impl ExtensionHost for FakeExtensionHost {
         "FakeExtensionHost"
     }
 
-    fn send_event(&self, event: &Event) {
+    fn send_event(&self, event: &Event, _source: Option<&str>) {
         self.events_sent.lock().unwrap().push(event.clone());
     }
 
-    fn send_command(&self, command: &nullslop_core::Command) {
+    fn send_command(&self, command: &nullslop_protocol::Command, _source: Option<&str>) {
         self.commands_sent.lock().unwrap().push(command.clone());
     }
 
@@ -89,13 +90,16 @@ mod tests {
         let host = FakeExtensionHost::new();
 
         // When sending events.
-        host.send_event(&Event::EventApplicationReady);
-        host.send_event(&Event::EventCustom {
-            payload: npr::event::EventCustom {
-                name: "test".to_string(),
-                data: serde_json::json!({}),
+        host.send_event(&Event::EventApplicationReady, None);
+        host.send_event(
+            &Event::EventCustom {
+                payload: npr::event::EventCustom {
+                    name: "test".to_string(),
+                    data: serde_json::json!({}),
+                },
             },
-        });
+            None,
+        );
 
         // Then events_sent returns both.
         let events = host.events_sent();

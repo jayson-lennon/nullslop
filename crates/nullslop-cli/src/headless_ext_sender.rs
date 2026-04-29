@@ -4,7 +4,8 @@
 //! [`ExtHostSender`](nullslop_core::ExtHostSender) trait, bridging
 //! extension events into the headless `AppCore` message channel.
 
-use nullslop_core::{AppMsg, Command, Event, ExtHostSender, RegisteredExtension};
+use nullslop_core::{AppMsg, ExtHostSender, RegisteredExtension};
+use nullslop_protocol::{Command, Event};
 
 /// Sender that bridges the extension host into the headless `AppCore` channel.
 pub(crate) struct HeadlessExtSender(kanal::Sender<AppMsg>);
@@ -21,11 +22,17 @@ impl ExtHostSender for HeadlessExtSender {
         let _ = self.0.send(AppMsg::ExtensionsReady(registrations));
     }
 
-    fn send_command(&self, command: Command) {
-        let _ = self.0.send(AppMsg::Command(command));
+    fn send_command(&self, command: Command, _source: Option<&str>) {
+        let _ = self.0.send(AppMsg::Command {
+            command,
+            source: None,
+        });
     }
 
-    fn send_extension_event(&self, event: Event) {
-        let _ = self.0.send(AppMsg::Event(event));
+    fn send_extension_event(&self, event: Event, _source: Option<&str>) {
+        let _ = self.0.send(AppMsg::Event {
+            event,
+            source: None,
+        });
     }
 }

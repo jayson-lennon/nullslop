@@ -87,17 +87,14 @@ impl AppCore {
     /// Submits a command to the core's message channel.
     ///
     /// Convenience method equivalent to
-    /// `self.sender().send(AppMsg::Command(cmd))`.
-    pub fn submit_command(&self, cmd: crate::Command) {
-        let _ = self.sender.send(AppMsg::Command(cmd));
+    /// `self.sender().send(AppMsg::Command { command: cmd, source: None })`.
+    pub fn submit_command(&self, cmd: nullslop_protocol::Command) {
+        let _ = self.sender.send(AppMsg::Command {
+            command: cmd,
+            source: None,
+        });
     }
 
-    /// Processes one batch of pending messages.
-    ///
-    /// Drains all available [`AppMsg`] values from the internal channel,
-    /// routes them, processes the bus (commands then events), and forwards
-    /// processed events to the extension host.
-    ///
     /// Processes one batch of pending messages.
     ///
     /// Drains all available [`AppMsg`] values from the internal channel,
@@ -113,8 +110,12 @@ impl AppCore {
         while let Ok(Some(msg)) = self.receiver.try_recv() {
             received_messages = true;
             match msg {
-                AppMsg::Command(cmd) => self.route_command(cmd),
-                AppMsg::Event(evt) => self.bus.submit_event(evt),
+                AppMsg::Command { command, source } => {
+                    self.route_command(command, source);
+                }
+                AppMsg::Event { event, source } => {
+                    self.bus.submit_event_from(event, source);
+                }
                 AppMsg::ExtensionsReady(registrations) => {
                     for reg in registrations {
                         self.state.write().extensions_mut().register(reg);
@@ -139,8 +140,8 @@ impl AppCore {
         if !processed_events.is_empty()
             && let Some(ext) = &self.ext_host
         {
-            for evt in &processed_events {
-                ext.send_event(evt);
+            for (evt, source) in &processed_events {
+                ext.send_event(evt, source.as_deref());
             }
         }
 
@@ -149,8 +150,8 @@ impl AppCore {
         if !processed_commands.is_empty()
             && let Some(ext) = &self.ext_host
         {
-            for cmd in &processed_commands {
-                ext.send_command(cmd);
+            for (cmd, source) in &processed_commands {
+                ext.send_command(cmd, source.as_deref());
             }
         }
 
@@ -161,8 +162,8 @@ impl AppCore {
     }
 
     /// Routes a command through the bus.
-    fn route_command(&mut self, cmd: crate::Command) {
-        self.bus.submit_command(cmd);
+    fn route_command(&mut self, cmd: nullslop_protocol::Command, source: Option<String>) {
+        self.bus.submit_command_from(cmd, source);
     }
 }
 
@@ -175,7 +176,7 @@ impl Default for AppCore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Mode;
+    use nullslop_protocol::Mode;
 
     #[test]
     fn new_core_has_empty_state() {
@@ -196,7 +197,7 @@ mod tests {
         nullslop_plugin::register_all(&mut core.bus, &mut registry);
 
         // When submitting a quit command and ticking.
-        core.submit_command(crate::Command::AppQuit);
+        core.submit_command(nullslop_protocol::Command::AppQuit);
         let result = core.tick();
 
         // Then should_quit is true and work was done.
@@ -246,7 +247,7 @@ mod tests {
         core.state.write().mode = Mode::Input;
 
         // When submitting ChatBoxInsertChar and ticking.
-        core.submit_command(crate::Command::ChatBoxInsertChar {
+        core.submit_command(nullslop_protocol::Command::ChatBoxInsertChar {
             payload: nullslop_protocol::command::ChatBoxInsertChar { ch: 'x' },
         });
         core.tick();

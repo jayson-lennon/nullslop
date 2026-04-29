@@ -16,7 +16,7 @@ use std::sync::Arc;
 use error_stack::Report;
 
 use crate::codec::{CodecError, OutboundMessage, write_message};
-use nullslop_core::{Command, Event};
+use nullslop_protocol::{Command, Event};
 
 /// Output from an extension to the host (command or event).
 #[derive(Debug, Clone)]
@@ -141,14 +141,56 @@ impl ExtensionContext {
         &self.kind
     }
 
-    /// Registers a command that this extension handles.
-    pub fn register_command(&mut self, name: &str) {
+    /// Subscribes to a command by name.
+    ///
+    /// For compile-time-checked subscriptions, prefer
+    /// [`subscribe_command`](Self::subscribe_command).
+    pub fn subscribe_command_by_name(&mut self, name: &str) {
         self.commands.push(name.to_string());
     }
 
+    /// Subscribes to a typed command.
+    ///
+    /// Uses the [`CommandMsg::NAME`](nullslop_protocol::CommandMsg::NAME)
+    /// constant for routing, providing compile-time validation.
+    pub fn subscribe_command<T: nullslop_protocol::CommandMsg>(&mut self) {
+        self.commands.push(T::NAME.to_string());
+    }
+
+    /// Sends a custom command to the host application.
+    ///
+    /// Convenience method that constructs a [`Command::CustomCommand`] from
+    /// the given name and arguments.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the command cannot be delivered.
+    pub fn send_custom_command(
+        &self,
+        name: &str,
+        args: serde_json::Value,
+    ) -> Result<(), Report<CodecError>> {
+        self.sink.send_command(Command::CustomCommand {
+            payload: nullslop_protocol::command::CustomCommand {
+                name: name.to_string(),
+                args,
+            },
+        })
+    }
+
     /// Subscribes to an event by name.
-    pub fn subscribe(&mut self, event: &str) {
+    ///
+    /// For compile-time-checked subscriptions, prefer [`subscribe_event`](Self::subscribe_event).
+    pub fn subscribe_event_by_name(&mut self, event: &str) {
         self.subscriptions.push(event.to_string());
+    }
+
+    /// Subscribes to a typed event.
+    ///
+    /// Uses the [`EventMsg::TYPE_NAME`](nullslop_protocol::EventMsg::TYPE_NAME)
+    /// constant for routing, providing compile-time validation.
+    pub fn subscribe_event<T: nullslop_protocol::EventMsg>(&mut self) {
+        self.subscriptions.push(T::TYPE_NAME.to_string());
     }
 
     /// Sends a command to the host application.
@@ -205,13 +247,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn register_command_accumulates() {
+    fn subscribe_command_by_name_accumulates() {
         // Given a new context.
         let mut ctx = ExtensionContext::default();
 
-        // When registering two commands.
-        ctx.register_command("echo");
-        ctx.register_command("reverse");
+        // When subscribing to two commands by name.
+        ctx.subscribe_command_by_name("echo");
+        ctx.subscribe_command_by_name("reverse");
 
         // Then take_registrations returns both.
         let (commands, _) = ctx.take_registrations();
@@ -224,8 +266,8 @@ mod tests {
         let mut ctx = ExtensionContext::default();
 
         // When subscribing to events.
-        ctx.subscribe("NewChatEntry");
-        ctx.subscribe("ApplicationReady");
+        ctx.subscribe_event_by_name("NewChatEntry");
+        ctx.subscribe_event_by_name("ApplicationReady");
 
         // Then take_registrations returns both subscriptions.
         let (_, subscriptions) = ctx.take_registrations();
@@ -236,10 +278,8 @@ mod tests {
     fn take_registrations_clears() {
         // Given a context with registrations.
         let mut ctx = ExtensionContext::default();
-        ctx.register_command("echo");
-        ctx.subscribe("NewChatEntry");
-
-        // When calling take_registrations twice.
+        ctx.subscribe_command_by_name("echo");
+        ctx.subscribe_event_by_name("NewChatEntry");
         let first = ctx.take_registrations();
         let second = ctx.take_registrations();
 
@@ -266,7 +306,7 @@ mod tests {
         let sink = ChannelExtensionSink::new(tx);
 
         // When sending a command.
-        let cmd = nullslop_core::Command::AppQuit;
+        let cmd = nullslop_protocol::Command::AppQuit;
         sink.send_command(cmd).expect("send should succeed");
 
         // Then the command is received on the channel.
@@ -276,7 +316,7 @@ mod tests {
             .expect("should have value");
         assert!(matches!(
             output,
-            ExtensionOutput::Command(nullslop_core::Command::AppQuit)
+            ExtensionOutput::Command(nullslop_protocol::Command::AppQuit)
         ));
     }
 
@@ -288,7 +328,7 @@ mod tests {
         let sink = ChannelExtensionSink::new(tx);
 
         // When sending a command.
-        let result = sink.send_command(nullslop_core::Command::AppQuit);
+        let result = sink.send_command(nullslop_protocol::Command::AppQuit);
 
         // Then it returns an error.
         assert!(result.is_err());
@@ -301,7 +341,7 @@ mod tests {
         let sink = ChannelExtensionSink::new(tx);
 
         // When sending an event.
-        let event = nullslop_core::Event::EventApplicationReady;
+        let event = nullslop_protocol::Event::EventApplicationReady;
         sink.send_event(event).expect("send should succeed");
 
         // Then the event is received on the channel.
@@ -311,7 +351,7 @@ mod tests {
             .expect("should have value");
         assert!(matches!(
             output,
-            ExtensionOutput::Event(nullslop_core::Event::EventApplicationReady)
+            ExtensionOutput::Event(nullslop_protocol::Event::EventApplicationReady)
         ));
     }
 
@@ -323,7 +363,7 @@ mod tests {
         let sink = ChannelExtensionSink::new(tx);
 
         // When sending an event.
-        let result = sink.send_event(nullslop_core::Event::EventApplicationReady);
+        let result = sink.send_event(nullslop_protocol::Event::EventApplicationReady);
 
         // Then it returns an error.
         assert!(result.is_err());
@@ -337,7 +377,7 @@ mod tests {
         let ctx = ExtensionContext::new(sink, ContextKind::Process);
 
         // When sending an event.
-        ctx.send_event(nullslop_core::Event::EventApplicationReady)
+        ctx.send_event(nullslop_protocol::Event::EventApplicationReady)
             .expect("should succeed");
 
         // Then the event arrives on the channel.
@@ -347,7 +387,7 @@ mod tests {
             .expect("should have value");
         assert!(matches!(
             output,
-            ExtensionOutput::Event(nullslop_core::Event::EventApplicationReady)
+            ExtensionOutput::Event(nullslop_protocol::Event::EventApplicationReady)
         ));
     }
 

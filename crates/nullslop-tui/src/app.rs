@@ -16,7 +16,7 @@ use crate::{AppStatus, MsgHandler};
 
 /// Type alias for the which-key state parameterized for nullslop.
 pub type WhichKeyInstance =
-    WhichKeyState<nullslop_core::KeyEvent, Scope, Command, crate::keymap::KeyCategory>;
+    WhichKeyState<nullslop_protocol::KeyEvent, Scope, Command, crate::keymap::KeyCategory>;
 
 /// Top-level application state and event loop.
 #[derive(Debug)]
@@ -105,7 +105,10 @@ impl TuiApp {
                 });
             }
             _ => {
-                let _ = self.core.sender().send(AppMsg::Command(cmd));
+                let _ = self.core.sender().send(AppMsg::Command {
+                    command: cmd,
+                    source: None,
+                });
             }
         }
     }
@@ -255,7 +258,7 @@ mod tests {
     }
 
     #[test]
-    fn app_extension_command_routes_through_bus() {
+    fn app_custom_command_routes_through_bus() {
         // Given an App with plugins registered.
         let mut app = TuiApp::new();
 
