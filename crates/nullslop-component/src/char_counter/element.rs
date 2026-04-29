@@ -3,8 +3,8 @@
 //! [`CharCounterElement`] implements [`UiElement`] to render the total
 //! number of grapheme clusters in the chat input buffer.
 
+use crate::AppState;
 use nullslop_component_ui::UiElement;
-use nullslop_component_core::AppState;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::Paragraph;
@@ -17,7 +17,7 @@ use unicode_segmentation::UnicodeSegmentation;
 #[derive(Debug)]
 pub struct CharCounterElement;
 
-impl UiElement for CharCounterElement {
+impl UiElement<AppState> for CharCounterElement {
     fn name(&self) -> String {
         "char-counter".to_string()
     }
@@ -37,7 +37,7 @@ mod tests {
     use ratatui::layout::Rect;
 
     use super::*;
-    use nullslop_component_core::AppState;
+    use crate::AppState;
 
     #[test]
     fn name_returns_char_counter() {

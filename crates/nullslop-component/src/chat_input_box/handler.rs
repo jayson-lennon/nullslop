@@ -3,11 +3,12 @@
 //! Consolidates all chat input command handling from the old `InputModeComponent`
 //! and `NormalModeComponent` into a single [`ChatInputBoxHandler`].
 
+use crate::AppState;
 use npr::CommandAction;
 use npr::command::{
     AppSetMode, ChatBoxClear, ChatBoxDeleteGrapheme, ChatBoxInsertChar, ChatBoxSubmitMessage,
 };
-use nullslop_component_core::{AppState, Out, define_handler};
+use nullslop_component_core::{Out, define_handler};
 use nullslop_protocol as npr;
 
 define_handler! {
@@ -75,9 +76,10 @@ impl ChatInputBoxHandler {
 
 #[cfg(test)]
 mod tests {
+    use crate::AppState;
     use npr::Command;
     use npr::command::{AppSetMode, ChatBoxInsertChar, ChatBoxSubmitMessage};
-    use nullslop_component_core::{AppState, Bus};
+    use nullslop_component_core::Bus;
     use nullslop_protocol as npr;
 
     use super::*;
@@ -85,7 +87,7 @@ mod tests {
     #[test]
     fn insert_char_appends_to_buffer() {
         // Given a bus with ChatInputBoxHandler registered.
-        let mut bus = Bus::new();
+        let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
         // When processing ChatBoxInsertChar('x').
@@ -102,7 +104,7 @@ mod tests {
     #[test]
     fn delete_grapheme_removes_last() {
         // Given a bus with ChatInputBoxHandler registered.
-        let mut bus = Bus::new();
+        let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
         // When processing ChatBoxInsertChar('a') then ChatBoxInsertChar('b') then ChatBoxDeleteGrapheme.
@@ -123,7 +125,7 @@ mod tests {
     #[test]
     fn submit_message_adds_entry_and_clears_buffer() {
         // Given a bus with ChatInputBoxHandler registered and "hello" in buffer.
-        let mut bus = Bus::new();
+        let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
         let mut state = AppState::new();
@@ -149,7 +151,7 @@ mod tests {
     #[test]
     fn submit_message_ignores_empty_buffer() {
         // Given a bus with ChatInputBoxHandler registered and empty buffer.
-        let mut bus = Bus::new();
+        let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
         // When processing ChatBoxSubmitMessage with empty buffer.
@@ -169,7 +171,7 @@ mod tests {
     #[test]
     fn submit_message_emits_event() {
         // Given a bus with ChatInputBoxHandler registered and "hello" in buffer.
-        let mut bus = Bus::new();
+        let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
         let mut state = AppState::new();
@@ -201,7 +203,7 @@ mod tests {
     #[test]
     fn clear_empties_buffer() {
         // Given a bus with ChatInputBoxHandler registered.
-        let mut bus = Bus::new();
+        let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
         let mut state = AppState::new();
@@ -218,7 +220,7 @@ mod tests {
     #[test]
     fn set_mode_changes_app_mode() {
         // Given a bus with ChatInputBoxHandler registered.
-        let mut bus = Bus::new();
+        let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
         // When processing AppSetMode(Input).

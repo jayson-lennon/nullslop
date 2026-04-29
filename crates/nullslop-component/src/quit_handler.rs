@@ -3,10 +3,11 @@
 //! Handles the `AppQuit` command by setting the `should_quit` flag
 //! and stopping command propagation.
 
+use crate::AppUiRegistry;
+use crate::{AppBus, AppState};
 use npr::CommandAction;
 use npr::command::AppQuit;
-use nullslop_component_core::{AppState, Bus, Out, define_handler};
-use nullslop_component_ui::UiRegistry;
+use nullslop_component_core::{Out, define_handler};
 use nullslop_protocol::{self as npr};
 
 define_handler! {
@@ -21,7 +22,7 @@ define_handler! {
 }
 
 /// Register the quit handler component.
-pub(crate) fn register(bus: &mut Bus, _: &mut UiRegistry) {
+pub(crate) fn register(bus: &mut AppBus, _: &mut AppUiRegistry) {
     QuitHandler.register(bus);
 }
 
@@ -34,8 +35,8 @@ impl QuitHandler {
 
 #[cfg(test)]
 mod tests {
+    use crate::AppBus;
     use npr::Command;
-    use nullslop_component_core::Bus;
     use nullslop_protocol as npr;
 
     use super::*;
@@ -43,7 +44,7 @@ mod tests {
     #[test]
     fn quit_sets_should_quit() {
         // Given a bus with QuitHandler registered.
-        let mut bus = Bus::new();
+        let mut bus: AppBus = AppBus::new();
         QuitHandler.register(&mut bus);
 
         // When processing AppQuit.

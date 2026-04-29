@@ -5,12 +5,12 @@
 
 pub mod element;
 
-use nullslop_component_core::Bus;
-use nullslop_component_ui::UiRegistry;
+use crate::AppBus;
+use crate::AppUiRegistry;
 
 pub use element::ChatLogElement;
 
 /// Register the chat log UI element.
-pub(crate) fn register(_bus: &mut Bus, registry: &mut UiRegistry) {
+pub(crate) fn register(_bus: &mut AppBus, registry: &mut AppUiRegistry) {
     registry.register(Box::new(ChatLogElement));
 }

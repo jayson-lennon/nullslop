@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 nullslop-protocol = { workspace = true }
+nullslop-component = { workspace = true }
 nullslop-component-core = { workspace = true }
 kanal = { workspace = true }
 wherror = { workspace = true }

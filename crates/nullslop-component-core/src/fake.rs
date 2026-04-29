@@ -21,19 +21,19 @@ use nullslop_protocol::CommandAction;
 
 use crate::handler::{CommandHandler, EventHandler};
 use crate::out::Out;
-use crate::AppState;
 
 /// Fake command handler that records calls.
 ///
 /// Returns a configurable [`CommandAction`] and records every command it receives.
 /// Uses [`Rc<RefCell>`] so the test retains access to the call log after
 /// the handler is moved into the bus.
-pub struct FakeCommandHandler<C> {
+pub struct FakeCommandHandler<C, S> {
     calls: Rc<RefCell<Vec<C>>>,
     action: CommandAction,
+    _phantom: std::marker::PhantomData<S>,
 }
 
-impl<C: Clone + 'static> FakeCommandHandler<C> {
+impl<C: Clone + 'static, S> FakeCommandHandler<C, S> {
     /// Create a new fake that returns the given action.
     ///
     /// Returns a tuple of `(handler, call_log)`. The handler should be registered
@@ -43,6 +43,7 @@ impl<C: Clone + 'static> FakeCommandHandler<C> {
         let handler = Self {
             calls: Rc::clone(&calls),
             action,
+            _phantom: std::marker::PhantomData,
         };
         (handler, calls)
     }
@@ -58,8 +59,8 @@ impl<C: Clone + 'static> FakeCommandHandler<C> {
     }
 }
 
-impl<C: Clone + 'static> CommandHandler<C> for FakeCommandHandler<C> {
-    fn handle(&self, cmd: &C, _state: &mut AppState, _out: &mut Out) -> CommandAction {
+impl<C: Clone + 'static, S> CommandHandler<C, S> for FakeCommandHandler<C, S> {
+    fn handle(&self, cmd: &C, _state: &mut S, _out: &mut Out) -> CommandAction {
         self.calls.borrow_mut().push(cmd.clone());
         self.action
     }
@@ -69,11 +70,12 @@ impl<C: Clone + 'static> CommandHandler<C> for FakeCommandHandler<C> {
 ///
 /// Records every event it receives. Uses [`Rc<RefCell>`] so the test retains
 /// access to the call log after the handler is moved into the bus.
-pub struct FakeEventHandler<E> {
+pub struct FakeEventHandler<E, S> {
     calls: Rc<RefCell<Vec<E>>>,
+    _phantom: std::marker::PhantomData<S>,
 }
 
-impl<E: Clone + 'static> FakeEventHandler<E> {
+impl<E: Clone + 'static, S> FakeEventHandler<E, S> {
     /// Create a new fake event handler.
     ///
     /// Returns a tuple of `(handler, call_log)`. The handler should be registered
@@ -82,19 +84,20 @@ impl<E: Clone + 'static> FakeEventHandler<E> {
         let calls = Rc::new(RefCell::new(Vec::new()));
         let handler = Self {
             calls: Rc::clone(&calls),
+            _phantom: std::marker::PhantomData,
         };
         (handler, calls)
     }
 }
 
-impl<E: Clone + 'static> Default for FakeEventHandler<E> {
+impl<E: Clone + 'static, S> Default for FakeEventHandler<E, S> {
     fn default() -> Self {
         Self::new().0
     }
 }
 
-impl<E: Clone + 'static> EventHandler<E> for FakeEventHandler<E> {
-    fn handle(&self, evt: &E, _state: &mut AppState, _out: &mut Out) {
+impl<E: Clone + 'static, S> EventHandler<E, S> for FakeEventHandler<E, S> {
+    fn handle(&self, evt: &E, _state: &mut S, _out: &mut Out) {
         self.calls.borrow_mut().push(evt.clone());
     }
 }
@@ -105,11 +108,15 @@ mod tests {
     use npr::command::AppQuit;
     use nullslop_protocol as npr;
 
+    /// Simple state type for testing fake handlers.
+    #[derive(Debug, Default)]
+    struct TestState;
+
     #[test]
     fn fake_command_handler_records_call() {
         // Given a continuing fake handler.
-        let (handler, calls) = FakeCommandHandler::<AppQuit>::continuing();
-        let mut state = AppState::new();
+        let (handler, calls) = FakeCommandHandler::<AppQuit, TestState>::continuing();
+        let mut state = TestState;
         let mut out = Out::new();
 
         // When handling a command.
@@ -123,8 +130,8 @@ mod tests {
     #[test]
     fn fake_command_handler_stopping() {
         // Given a stopping fake handler.
-        let (handler, calls) = FakeCommandHandler::<AppQuit>::stopping();
-        let mut state = AppState::new();
+        let (handler, calls) = FakeCommandHandler::<AppQuit, TestState>::stopping();
+        let mut state = TestState;
         let mut out = Out::new();
 
         // When handling a command.
@@ -138,7 +145,7 @@ mod tests {
     #[test]
     fn fake_command_handler_shared_call_log() {
         // Given a handler whose call_log is cloned.
-        let (handler, calls) = FakeCommandHandler::<AppQuit>::continuing();
+        let (handler, calls) = FakeCommandHandler::<AppQuit, TestState>::continuing();
         let calls_clone = Rc::clone(&calls);
 
         // When moving the handler (simulating bus registration).
@@ -152,8 +159,8 @@ mod tests {
     fn fake_event_handler_records_call() {
         // Given a fake event handler.
         use npr::event::EventApplicationReady;
-        let (handler, calls) = FakeEventHandler::<EventApplicationReady>::new();
-        let mut state = AppState::new();
+        let (handler, calls) = FakeEventHandler::<EventApplicationReady, TestState>::new();
+        let mut state = TestState;
         let mut out = Out::new();
 
         // When handling an event.

@@ -12,14 +12,14 @@
 /// anywhere on the frame if needed.
 ///
 /// UI elements are separate from command/event handlers. They communicate
-/// through [`AppState`] — handlers mutate state during processing, elements
+/// through state — handlers mutate state during processing, elements
 /// read state during rendering.
 ///
 /// # Type parameter
 ///
 /// `'static` bound is required for `Box<dyn UiElement>` storage in the
 /// [`UiRegistry`](crate::UiRegistry).
-pub trait UiElement: 'static + std::fmt::Debug {
+pub trait UiElement<S>: 'static + std::fmt::Debug {
     /// Returns the unique name identifying this element.
     ///
     /// Names are used by the registry for lookup and must be unique
@@ -33,10 +33,5 @@ pub trait UiElement: 'static + std::fmt::Debug {
     /// * `frame` - Full ratatui frame (elements may draw outside `area` if needed).
     /// * `area` - The allocated region where this element should draw.
     /// * `state` - Read-only application state for rendering decisions.
-    fn render(
-        &mut self,
-        frame: &mut ratatui::Frame<'_>,
-        area: ratatui::layout::Rect,
-        state: &nullslop_component_core::AppState,
-    );
+    fn render(&mut self, frame: &mut ratatui::Frame<'_>, area: ratatui::layout::Rect, state: &S);
 }

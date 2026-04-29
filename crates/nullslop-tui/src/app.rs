@@ -1,7 +1,7 @@
 //! Main application state and per-frame rendering.
 
 use derive_more::Debug;
-use nullslop_component_ui::UiRegistry;
+use nullslop_component::AppUiRegistry;
 use nullslop_core::{AppCore, AppMsg};
 use nullslop_protocol::{Command, Mode};
 use ratatui::Frame;
@@ -24,7 +24,7 @@ pub struct TuiApp {
     /// Application core (bus, state, message channel).
     pub core: AppCore,
     /// UI element registry.
-    pub ui_registry: UiRegistry,
+    pub ui_registry: AppUiRegistry,
     /// Message channel for the event loop.
     pub events: MsgHandler,
     /// Which-key keybinding system state.
@@ -46,7 +46,7 @@ impl TuiApp {
     #[must_use]
     pub fn new() -> Self {
         let mut core = AppCore::new();
-        let mut ui_registry = UiRegistry::new();
+        let mut ui_registry = AppUiRegistry::new();
         nullslop_component::register_all(&mut core.bus, &mut ui_registry);
         let keymap = keymap::init();
         let which_key = WhichKeyInstance::new(keymap, Scope::Normal);

@@ -17,9 +17,9 @@
 ///
 /// Generates:
 /// - The handler struct definition (unit struct)
-/// - `impl CommandHandler<C>` for each command entry (forwards `CommandAction` return value)
-/// - `impl EventHandler<E>` for each event entry
-/// - A `register(&self, bus: &mut Bus)` method
+/// - `impl CommandHandler<C, AppState>` for each command entry (forwards `CommandAction` return value)
+/// - `impl EventHandler<E, AppState>` for each event entry
+/// - A `register(&self, bus: &mut Bus<AppState>)` method
 ///
 /// # Syntax
 ///
@@ -49,6 +49,9 @@
 ///
 /// Command methods return `CommandAction` directly — the macro forwards the return value.
 /// Event methods return `()`.
+///
+/// `AppState` is a bare identifier that resolves at the call site — it must be in scope
+/// wherever this macro is invoked.
 #[macro_export]
 macro_rules! define_handler {
     (
@@ -69,12 +72,12 @@ macro_rules! define_handler {
 
         // Generate CommandHandler impls (forward return value)
         $(
-            impl $crate::CommandHandler<$cmd_type> for $name {
+            impl $crate::CommandHandler<$cmd_type, AppState> for $name {
                 #[allow(clippy::unused_self, clippy::trivially_copy_pass_by_ref)]
                 fn handle(
                     &self,
                     cmd: &$cmd_type,
-                    state: &mut $crate::AppState,
+                    state: &mut AppState,
                     out: &mut $crate::Out,
                 ) -> ::nullslop_protocol::CommandAction {
                     Self::$cmd_method(cmd, state, out)
@@ -84,12 +87,12 @@ macro_rules! define_handler {
 
         // Generate EventHandler impls
         $(
-            impl $crate::EventHandler<$evt_type> for $name {
+            impl $crate::EventHandler<$evt_type, AppState> for $name {
                 #[allow(clippy::unused_self, clippy::trivially_copy_pass_by_ref)]
                 fn handle(
                     &self,
                     evt: &$evt_type,
-                    state: &mut $crate::AppState,
+                    state: &mut AppState,
                     out: &mut $crate::Out,
                 ) {
                     Self::$evt_method(evt, state, out);
@@ -100,7 +103,7 @@ macro_rules! define_handler {
         // Generate register method
         impl $name {
             #[doc = concat!("Register all handlers with the bus.\n\n⚠️ This must be called during application startup. Add a `", stringify!($name), ".register(&mut bus);` call in the component registration section of `run.rs`.")]
-            pub fn register(&self, bus: &mut $crate::Bus) {
+            pub fn register(&self, bus: &mut $crate::Bus<AppState>) {
                 $(
                     bus.register_command_handler::<$cmd_type, Self>(*self);
                 )*
@@ -110,192 +113,4 @@ macro_rules! define_handler {
             }
         }
     };
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::fake::FakeCommandHandler;
-    use crate::{AppState, Bus, Out};
-    use npr::command::{AppQuit, ChatBoxInsertChar};
-    use npr::event::EventApplicationReady;
-    use npr::{Command, CommandAction, Event};
-    use nullslop_protocol as npr;
-
-    // --- Test handler: command handler returning Continue ---
-
-    define_handler! {
-        struct ContinueHandler;
-
-        commands {
-            ChatBoxInsertChar: on_insert_char,
-        }
-
-        events {}
-    }
-
-    impl ContinueHandler {
-        fn on_insert_char(
-            cmd: &ChatBoxInsertChar,
-            state: &mut AppState,
-            _out: &mut Out,
-        ) -> CommandAction {
-            state.chat_input.input_buffer.push(cmd.ch);
-            CommandAction::Continue
-        }
-    }
-
-    #[test]
-    fn command_handler_returning_continue() {
-        // Given a handler registered with the bus.
-        let mut bus = Bus::new();
-        ContinueHandler.register(&mut bus);
-
-        // When submitting a ChatBoxInsertChar command.
-        bus.submit_command(Command::ChatBoxInsertChar {
-            payload: ChatBoxInsertChar { ch: 'x' },
-        });
-        let mut state = AppState::new();
-        bus.process_commands(&mut state);
-
-        // Then the handler ran and mutated state.
-        assert_eq!(state.chat_input.input_buffer, "x");
-    }
-
-    // --- Test handler: command handler returning Stop ---
-
-    define_handler! {
-        struct StopHandler;
-
-        commands {
-            AppQuit: on_quit,
-        }
-
-        events {}
-    }
-
-    impl StopHandler {
-        fn on_quit(_cmd: &AppQuit, state: &mut AppState, _out: &mut Out) -> CommandAction {
-            state.should_quit = true;
-            CommandAction::Stop
-        }
-    }
-
-    #[test]
-    fn command_handler_returning_stop_prevents_later_handlers() {
-        // Given a StopHandler and a fake handler both registered for AppQuit.
-        let mut bus = Bus::new();
-        StopHandler.register(&mut bus);
-        let (fake, fake_calls) = FakeCommandHandler::<AppQuit>::continuing();
-        bus.register_command_handler::<AppQuit, _>(fake);
-
-        // When processing an AppQuit command.
-        bus.submit_command(Command::AppQuit);
-        let mut state = AppState::new();
-        bus.process_commands(&mut state);
-
-        // Then the stop handler ran and prevented the fake from running.
-        assert!(state.should_quit);
-        assert!(fake_calls.borrow().is_empty());
-    }
-
-    // --- Test handler: event handler ---
-
-    define_handler! {
-        struct EventHandlerTest;
-
-        commands {}
-
-        events {
-            EventApplicationReady: on_ready,
-        }
-    }
-
-    impl EventHandlerTest {
-        fn on_ready(_evt: &EventApplicationReady, state: &mut AppState, _out: &mut Out) {
-            state.should_quit = true;
-        }
-    }
-
-    #[test]
-    fn event_handler_mutates_state() {
-        // Given an EventHandlerTest registered with the bus.
-        let mut bus = Bus::new();
-        EventHandlerTest.register(&mut bus);
-
-        // When processing an EventApplicationReady event.
-        bus.submit_event(Event::EventApplicationReady);
-        let mut state = AppState::new();
-        bus.process_events(&mut state);
-
-        // Then the handler ran and mutated state.
-        assert!(state.should_quit);
-    }
-
-    // --- Test handler: multiple command + event handlers ---
-
-    define_handler! {
-        /// A handler with multiple message handlers.
-        struct MultiHandler;
-
-        commands {
-            ChatBoxInsertChar: on_insert_char,
-            AppQuit: on_quit,
-        }
-
-        events {
-            EventApplicationReady: on_ready,
-        }
-    }
-
-    impl MultiHandler {
-        fn on_insert_char(
-            cmd: &ChatBoxInsertChar,
-            state: &mut AppState,
-            _out: &mut Out,
-        ) -> CommandAction {
-            state.chat_input.input_buffer.push(cmd.ch);
-            CommandAction::Continue
-        }
-
-        fn on_quit(_cmd: &AppQuit, state: &mut AppState, _out: &mut Out) -> CommandAction {
-            state.should_quit = true;
-            CommandAction::Continue
-        }
-
-        fn on_ready(_evt: &EventApplicationReady, state: &mut AppState, _out: &mut Out) {
-            state.chat_input.input_buffer.push('!');
-        }
-    }
-
-    #[test]
-    fn multiple_handlers_dispatch_correctly() {
-        // Given a MultiHandler with 2 command handlers and 1 event handler.
-        let mut bus = Bus::new();
-        MultiHandler.register(&mut bus);
-
-        // When processing a ChatBoxInsertChar command.
-        bus.submit_command(Command::ChatBoxInsertChar {
-            payload: ChatBoxInsertChar { ch: 'h' },
-        });
-        let mut state = AppState::new();
-        bus.process_commands(&mut state);
-
-        // Then the command handler ran.
-        assert_eq!(state.chat_input.input_buffer, "h");
-        assert!(!state.should_quit);
-
-        // When also processing AppQuit.
-        bus.submit_command(Command::AppQuit);
-        bus.process_commands(&mut state);
-
-        // Then should_quit is now true.
-        assert!(state.should_quit);
-
-        // When processing an EventApplicationReady.
-        bus.submit_event(Event::EventApplicationReady);
-        bus.process_events(&mut state);
-
-        // Then the event handler ran (chat_input.input_buffer has "h!").
-        assert_eq!(state.chat_input.input_buffer, "h!");
-    }
 }

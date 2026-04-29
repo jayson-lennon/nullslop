@@ -6,8 +6,8 @@
 //! - System entries in dark gray with a `  ` prefix
 //! - Extension entries in yellow with a `[ext] {source}: {text}` format
 
+use crate::AppState;
 use nullslop_component_ui::UiElement;
-use nullslop_component_core::AppState;
 use nullslop_protocol::ChatEntryKind;
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -23,7 +23,7 @@ use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 #[derive(Debug)]
 pub struct ChatLogElement;
 
-impl UiElement for ChatLogElement {
+impl UiElement<AppState> for ChatLogElement {
     fn name(&self) -> String {
         "chat-log".to_string()
     }
@@ -62,7 +62,7 @@ mod tests {
     use ratatui::layout::Rect;
 
     use super::*;
-    use nullslop_component_core::AppState;
+    use crate::AppState;
     use nullslop_protocol::ChatEntry;
 
     #[test]

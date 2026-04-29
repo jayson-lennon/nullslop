@@ -11,15 +11,15 @@
 pub mod element;
 pub mod handler;
 
-use nullslop_component_core::Bus;
-use nullslop_component_ui::UiRegistry;
+use crate::AppBus;
+use crate::AppUiRegistry;
 
+pub use crate::ChatInputBoxState;
 pub use element::ChatInputBoxElement;
 pub(crate) use handler::ChatInputBoxHandler;
-pub use nullslop_component_core::ChatInputBoxState;
 
 /// Register the chat input box handler and UI element.
-pub(crate) fn register(bus: &mut Bus, registry: &mut UiRegistry) {
+pub(crate) fn register(bus: &mut AppBus, registry: &mut AppUiRegistry) {
     ChatInputBoxHandler.register(bus);
     registry.register(Box::new(ChatInputBoxElement));
 }

@@ -854,7 +854,7 @@ mod tests {
     /// Creates an `AppCore` with all components registered (including `ShutdownComponent`).
     fn core_with_components() -> AppCore {
         let mut core = AppCore::new();
-        let mut registry = nullslop_component_ui::UiRegistry::new();
+        let mut registry = nullslop_component::AppUiRegistry::new();
         nullslop_component::register_all(&mut core.bus, &mut registry);
         core
     }

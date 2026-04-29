@@ -64,7 +64,7 @@ fn run_headless(app: &mut App, command: Option<HeadlessCommands>) -> Result<(), 
 
     // Create AppCore with all components registered.
     let mut core = AppCore::new();
-    let mut registry = nullslop_component_ui::UiRegistry::new();
+    let mut registry = nullslop_component::AppUiRegistry::new();
     nullslop_component::register_all(&mut core.bus, &mut registry);
 
     // Start extension host (in-memory with nullslop-echo).

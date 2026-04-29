@@ -3,12 +3,13 @@
 //! Subscribes to extension lifecycle events and emits `ProceedWithShutdown`
 //! when all tracked extensions have completed shutdown.
 
+use crate::AppUiRegistry;
+use crate::{AppBus, AppState};
 use npr::command::ProceedWithShutdown;
 use npr::event::{
     EventApplicationShuttingDown, ExtensionShutdownCompleted, ExtensionStarted, ExtensionStarting,
 };
-use nullslop_component_core::{AppState, Bus, Out, define_handler};
-use nullslop_component_ui::UiRegistry;
+use nullslop_component_core::{Out, define_handler};
 use nullslop_protocol as npr;
 
 define_handler! {
@@ -26,7 +27,7 @@ define_handler! {
 }
 
 /// Register the shutdown component.
-pub(crate) fn register(bus: &mut Bus, _registry: &mut UiRegistry) {
+pub(crate) fn register(bus: &mut AppBus, _registry: &mut AppUiRegistry) {
     ShutdownComponent.register(bus);
 }
 
@@ -71,10 +72,10 @@ impl ShutdownComponent {
 
 #[cfg(test)]
 mod tests {
+    use crate::AppState;
     use npr::Command;
     use npr::event::{ExtensionShutdownCompleted, ExtensionStarting};
     use nullslop_component_core::Bus;
-    use nullslop_component_core::AppState;
     use nullslop_protocol::Event;
 
     use super::*;
@@ -82,7 +83,7 @@ mod tests {
     #[test]
     fn shutdown_component_tracks_starting_extension() {
         // Given a bus with ShutdownComponent registered.
-        let mut bus = Bus::new();
+        let mut bus: Bus<AppState> = Bus::new();
         ShutdownComponent.register(&mut bus);
 
         // When an ExtensionStarting event is processed.
@@ -104,7 +105,7 @@ mod tests {
     #[test]
     fn shutdown_component_completes_on_last_shutdown() {
         // Given a bus with ShutdownComponent registered and one tracked extension.
-        let mut bus = Bus::new();
+        let mut bus: Bus<AppState> = Bus::new();
         ShutdownComponent.register(&mut bus);
         let mut state = AppState::new();
         state.shutdown_tracker.track("ext-a");
@@ -132,7 +133,7 @@ mod tests {
     #[test]
     fn shutdown_component_ignores_unknown_completion() {
         // Given a bus with ShutdownComponent, one tracked extension, and shutdown active.
-        let mut bus = Bus::new();
+        let mut bus: Bus<AppState> = Bus::new();
         ShutdownComponent.register(&mut bus);
         let mut state = AppState::new();
         state.shutdown_tracker.track("ext-a");
@@ -157,7 +158,7 @@ mod tests {
     #[test]
     fn shutdown_component_sets_active_on_shutting_down() {
         // Given a bus with ShutdownComponent registered.
-        let mut bus = Bus::new();
+        let mut bus: Bus<AppState> = Bus::new();
         ShutdownComponent.register(&mut bus);
 
         // When an EventApplicationShuttingDown event is processed.
@@ -172,7 +173,7 @@ mod tests {
     #[test]
     fn shutdown_component_not_complete_until_active() {
         // Given a bus with ShutdownComponent registered and one tracked extension.
-        let mut bus = Bus::new();
+        let mut bus: Bus<AppState> = Bus::new();
         ShutdownComponent.register(&mut bus);
         let mut state = AppState::new();
         state.shutdown_tracker.track("ext-a");

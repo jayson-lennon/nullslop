@@ -35,7 +35,6 @@ use nullslop_protocol::{
 
 use crate::handler::{CommandHandler, EventHandler};
 use crate::out::Out;
-use crate::AppState;
 
 /// Type-erased command handler wrapper.
 ///
@@ -43,26 +42,26 @@ use crate::AppState;
 /// captures the concrete handler and command types. The [`TypeId`] key in the
 /// parent `HashMap` already identifies the command type, so no redundant
 /// type id is stored here.
-struct AnyCommandHandler {
+struct AnyCommandHandler<S> {
     handler: Box<dyn Any>,
-    invoke: fn(&dyn Any, &dyn Any, &mut AppState, &mut Out) -> CommandAction,
+    invoke: fn(&dyn Any, &dyn Any, &mut S, &mut Out) -> CommandAction,
 }
 
 /// Type-erased event handler wrapper.
-struct AnyEventHandler {
+struct AnyEventHandler<S> {
     handler: Box<dyn Any>,
-    invoke: fn(&dyn Any, &dyn Any, &mut AppState, &mut Out),
+    invoke: fn(&dyn Any, &dyn Any, &mut S, &mut Out),
 }
 
 /// Monomorphized invoke function for command handlers.
-fn invoke_command<C, H>(
+fn invoke_command<C, H, S>(
     handler: &dyn Any,
     cmd: &dyn Any,
-    state: &mut AppState,
+    state: &mut S,
     out: &mut Out,
 ) -> CommandAction
 where
-    H: CommandHandler<C> + 'static,
+    H: CommandHandler<C, S> + 'static,
     C: 'static,
 {
     let h = handler.downcast_ref::<H>().expect("handler type mismatch");
@@ -71,9 +70,9 @@ where
 }
 
 /// Monomorphized invoke function for event handlers.
-fn invoke_event<E, H>(handler: &dyn Any, evt: &dyn Any, state: &mut AppState, out: &mut Out)
+fn invoke_event<E, H, S>(handler: &dyn Any, evt: &dyn Any, state: &mut S, out: &mut Out)
 where
-    H: EventHandler<E> + 'static,
+    H: EventHandler<E, S> + 'static,
     E: 'static,
 {
     let h = handler.downcast_ref::<H>().expect("handler type mismatch");
@@ -99,9 +98,9 @@ struct QueuedEvent {
 /// Handlers are registered with concrete types and dispatched via [`TypeId`]
 /// lookup. The processing model ensures consistent state snapshots and no
 /// re-entrancy.
-pub struct Bus {
-    command_handlers: HashMap<TypeId, Vec<AnyCommandHandler>>,
-    event_handlers: HashMap<TypeId, Vec<AnyEventHandler>>,
+pub struct Bus<S> {
+    command_handlers: HashMap<TypeId, Vec<AnyCommandHandler<S>>>,
+    event_handlers: HashMap<TypeId, Vec<AnyEventHandler<S>>>,
     command_queue: Vec<QueuedCommand>,
     event_queue: Vec<QueuedEvent>,
     /// Events that were dispatched during the last processing cycle, with source.
@@ -115,7 +114,7 @@ pub struct Bus {
     max_iterations: usize,
 }
 
-impl Bus {
+impl<S> Bus<S> {
     /// Create a new bus with default settings.
     ///
     /// The default `max_iterations` is 100, which prevents infinite loops
@@ -151,10 +150,10 @@ impl Bus {
     pub fn register_command_handler<C, H>(&mut self, handler: H)
     where
         C: 'static,
-        H: CommandHandler<C> + 'static,
+        H: CommandHandler<C, S> + 'static,
     {
         let type_id = TypeId::of::<C>();
-        let invoke = invoke_command::<C, H>;
+        let invoke = invoke_command::<C, H, S>;
         let entry = AnyCommandHandler {
             handler: Box::new(handler),
             invoke,
@@ -172,10 +171,10 @@ impl Bus {
     pub fn register_event_handler<E, H>(&mut self, handler: H)
     where
         E: 'static,
-        H: EventHandler<E> + 'static,
+        H: EventHandler<E, S> + 'static,
     {
         let type_id = TypeId::of::<E>();
-        let invoke = invoke_event::<E, H>;
+        let invoke = invoke_event::<E, H, S>;
         let entry = AnyEventHandler {
             handler: Box::new(handler),
             invoke,
@@ -221,7 +220,7 @@ impl Bus {
     /// Drains the command queue, dispatches each command to its registered
     /// handlers, and repeats if handlers submitted new commands. Stops when
     /// the queue is empty or `max_iterations` is reached.
-    pub fn process_commands(&mut self, state: &mut AppState) {
+    pub fn process_commands(&mut self, state: &mut S) {
         let mut iterations = 0;
         loop {
             let commands = std::mem::take(&mut self.command_queue);
@@ -243,7 +242,7 @@ impl Bus {
     /// Drains the event queue and dispatches each event to its registered
     /// handlers. All handlers always run. Events submitted by handlers during
     /// processing are queued for a future call.
-    pub fn process_events(&mut self, state: &mut AppState) {
+    pub fn process_events(&mut self, state: &mut S) {
         let events = std::mem::take(&mut self.event_queue);
         for queued in events {
             self.dispatch_event(queued.event, queued.source, state);
@@ -275,7 +274,7 @@ impl Bus {
     }
 
     /// Dispatch a single command to its registered handlers.
-    fn dispatch_command(&mut self, cmd: Command, source: Option<String>, state: &mut AppState) {
+    fn dispatch_command(&mut self, cmd: Command, source: Option<String>, state: &mut S) {
         // Record the command before dispatching so consumers can drain it later.
         self.processed_commands.push((cmd.clone(), source));
         let mut out = Out::new();
@@ -330,12 +329,7 @@ impl Bus {
     }
 
     /// Look up and invoke handlers for a concrete command type `C`.
-    fn dispatch_command_to_handlers<C: 'static>(
-        &self,
-        cmd: &C,
-        state: &mut AppState,
-        out: &mut Out,
-    ) {
+    fn dispatch_command_to_handlers<C: 'static>(&self, cmd: &C, state: &mut S, out: &mut Out) {
         let type_id = TypeId::of::<C>();
         if let Some(handlers) = self.command_handlers.get(&type_id) {
             for h in handlers {
@@ -348,7 +342,7 @@ impl Bus {
     }
 
     /// Dispatch a single event to its registered handlers.
-    fn dispatch_event(&mut self, evt: Event, source: Option<String>, state: &mut AppState) {
+    fn dispatch_event(&mut self, evt: Event, source: Option<String>, state: &mut S) {
         // Record the event before dispatching so consumers can drain it later.
         self.processed_events.push((evt.clone(), source));
         let mut out = Out::new();
@@ -393,7 +387,7 @@ impl Bus {
     }
 
     /// Look up and invoke handlers for a concrete event type `E`.
-    fn dispatch_event_to_handlers<E: 'static>(&self, evt: &E, state: &mut AppState, out: &mut Out) {
+    fn dispatch_event_to_handlers<E: 'static>(&self, evt: &E, state: &mut S, out: &mut Out) {
         let type_id = TypeId::of::<E>();
         if let Some(handlers) = self.event_handlers.get(&type_id) {
             for h in handlers {
@@ -419,7 +413,7 @@ impl Bus {
     }
 }
 
-impl Default for Bus {
+impl<S> Default for Bus<S> {
     fn default() -> Self {
         Self::new()
     }
@@ -433,20 +427,24 @@ mod tests {
     use npr::event::{EventApplicationReady, EventKeyDown};
     use nullslop_protocol as npr;
 
+    /// Simple state type for testing bus dispatch.
+    #[derive(Debug, Default)]
+    struct TestState;
+
     // --- Command dispatch tests ---
 
     #[test]
     fn command_dispatch_reaches_handler() {
         // Given a bus with a handler for ChatBoxInsertChar.
-        let (handler, calls) = FakeCommandHandler::<ChatBoxInsertChar>::continuing();
-        let mut bus = Bus::new();
+        let (handler, calls) = FakeCommandHandler::<ChatBoxInsertChar, TestState>::continuing();
+        let mut bus: Bus<TestState> = Bus::new();
         bus.register_command_handler::<ChatBoxInsertChar, _>(handler);
 
         // When submitting and processing the command.
         bus.submit_command(Command::ChatBoxInsertChar {
             payload: ChatBoxInsertChar { ch: 'x' },
         });
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_commands(&mut state);
 
         // Then the handler was called with the correct payload.
@@ -457,15 +455,15 @@ mod tests {
     #[test]
     fn multiple_command_handlers_all_run() {
         // Given a bus with two handlers for the same command type.
-        let (h1, calls1) = FakeCommandHandler::<AppQuit>::continuing();
-        let (h2, calls2) = FakeCommandHandler::<AppQuit>::continuing();
-        let mut bus = Bus::new();
+        let (h1, calls1) = FakeCommandHandler::<AppQuit, TestState>::continuing();
+        let (h2, calls2) = FakeCommandHandler::<AppQuit, TestState>::continuing();
+        let mut bus: Bus<TestState> = Bus::new();
         bus.register_command_handler::<AppQuit, _>(h1);
         bus.register_command_handler::<AppQuit, _>(h2);
 
         // When processing a command.
         bus.submit_command(Command::AppQuit);
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_commands(&mut state);
 
         // Then both handlers were called.
@@ -476,15 +474,15 @@ mod tests {
     #[test]
     fn stop_halts_propagation() {
         // Given a bus where the first handler returns Stop.
-        let (stopper, stopper_calls) = FakeCommandHandler::<AppQuit>::stopping();
-        let (continuer, continuer_calls) = FakeCommandHandler::<AppQuit>::continuing();
-        let mut bus = Bus::new();
+        let (stopper, stopper_calls) = FakeCommandHandler::<AppQuit, TestState>::stopping();
+        let (continuer, continuer_calls) = FakeCommandHandler::<AppQuit, TestState>::continuing();
+        let mut bus: Bus<TestState> = Bus::new();
         bus.register_command_handler::<AppQuit, _>(stopper);
         bus.register_command_handler::<AppQuit, _>(continuer);
 
         // When processing a command.
         bus.submit_command(Command::AppQuit);
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_commands(&mut state);
 
         // Then only the first handler was called.
@@ -495,15 +493,15 @@ mod tests {
     #[test]
     fn continue_allows_propagation() {
         // Given a bus where the first handler returns Continue.
-        let (c1, calls1) = FakeCommandHandler::<AppQuit>::continuing();
-        let (c2, calls2) = FakeCommandHandler::<AppQuit>::continuing();
-        let mut bus = Bus::new();
+        let (c1, calls1) = FakeCommandHandler::<AppQuit, TestState>::continuing();
+        let (c2, calls2) = FakeCommandHandler::<AppQuit, TestState>::continuing();
+        let mut bus: Bus<TestState> = Bus::new();
         bus.register_command_handler::<AppQuit, _>(c1);
         bus.register_command_handler::<AppQuit, _>(c2);
 
         // When processing a command.
         bus.submit_command(Command::AppQuit);
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_commands(&mut state);
 
         // Then both handlers were called.
@@ -514,11 +512,11 @@ mod tests {
     #[test]
     fn unregistered_command_is_ignored() {
         // Given a bus with no handlers.
-        let mut bus = Bus::new();
+        let mut bus: Bus<TestState> = Bus::new();
 
         // When submitting a command.
         bus.submit_command(Command::AppQuit);
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_commands(&mut state);
 
         // Then no panic occurs and the queue is empty.
@@ -528,13 +526,13 @@ mod tests {
     #[test]
     fn unit_command_dispatches_correctly() {
         // Given a bus with a handler for ChatBoxDeleteGrapheme (unit struct).
-        let (handler, calls) = FakeCommandHandler::<ChatBoxDeleteGrapheme>::continuing();
-        let mut bus = Bus::new();
+        let (handler, calls) = FakeCommandHandler::<ChatBoxDeleteGrapheme, TestState>::continuing();
+        let mut bus: Bus<TestState> = Bus::new();
         bus.register_command_handler::<ChatBoxDeleteGrapheme, _>(handler);
 
         // When processing a unit command.
         bus.submit_command(Command::ChatBoxDeleteGrapheme);
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_commands(&mut state);
 
         // Then the handler was called.
@@ -546,8 +544,8 @@ mod tests {
     #[test]
     fn event_dispatch_reaches_handler() {
         // Given a bus with a handler for EventKeyDown.
-        let (handler, calls) = FakeEventHandler::<EventKeyDown>::new();
-        let mut bus = Bus::new();
+        let (handler, calls) = FakeEventHandler::<EventKeyDown, TestState>::new();
+        let mut bus: Bus<TestState> = Bus::new();
         bus.register_event_handler::<EventKeyDown, _>(handler);
 
         // When processing an event.
@@ -558,7 +556,7 @@ mod tests {
         bus.submit_event(Event::EventKeyDown {
             payload: EventKeyDown { key },
         });
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_events(&mut state);
 
         // Then the handler was called.
@@ -568,13 +566,13 @@ mod tests {
     #[test]
     fn unit_event_dispatches_correctly() {
         // Given a bus with a handler for EventApplicationReady (unit struct).
-        let (handler, calls) = FakeEventHandler::<EventApplicationReady>::new();
-        let mut bus = Bus::new();
+        let (handler, calls) = FakeEventHandler::<EventApplicationReady, TestState>::new();
+        let mut bus: Bus<TestState> = Bus::new();
         bus.register_event_handler::<EventApplicationReady, _>(handler);
 
         // When processing a unit event.
         bus.submit_event(Event::EventApplicationReady);
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_events(&mut state);
 
         // Then the handler was called.
@@ -584,15 +582,15 @@ mod tests {
     #[test]
     fn all_event_handlers_run() {
         // Given a bus with two event handlers.
-        let (h1, calls1) = FakeEventHandler::<EventApplicationReady>::new();
-        let (h2, calls2) = FakeEventHandler::<EventApplicationReady>::new();
-        let mut bus = Bus::new();
+        let (h1, calls1) = FakeEventHandler::<EventApplicationReady, TestState>::new();
+        let (h2, calls2) = FakeEventHandler::<EventApplicationReady, TestState>::new();
+        let mut bus: Bus<TestState> = Bus::new();
         bus.register_event_handler::<EventApplicationReady, _>(h1);
         bus.register_event_handler::<EventApplicationReady, _>(h2);
 
         // When processing an event.
         bus.submit_event(Event::EventApplicationReady);
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_events(&mut state);
 
         // Then both handlers were called.
@@ -605,11 +603,11 @@ mod tests {
     /// Handler that submits an `AppQuit` command when it sees `ChatBoxInsertChar`.
     struct CascadeHandler;
 
-    impl CommandHandler<ChatBoxInsertChar> for CascadeHandler {
+    impl CommandHandler<ChatBoxInsertChar, TestState> for CascadeHandler {
         fn handle(
             &self,
             _cmd: &ChatBoxInsertChar,
-            _state: &mut AppState,
+            _state: &mut TestState,
             out: &mut Out,
         ) -> CommandAction {
             out.submit_command(Command::AppQuit);
@@ -620,8 +618,8 @@ mod tests {
     #[test]
     fn cascading_commands_are_processed() {
         // Given a bus where ChatBoxInsertChar handler submits AppQuit.
-        let (quit_handler, quit_calls) = FakeCommandHandler::<AppQuit>::continuing();
-        let mut bus = Bus::new();
+        let (quit_handler, quit_calls) = FakeCommandHandler::<AppQuit, TestState>::continuing();
+        let mut bus: Bus<TestState> = Bus::new();
         bus.register_command_handler::<ChatBoxInsertChar, _>(CascadeHandler);
         bus.register_command_handler::<AppQuit, _>(quit_handler);
 
@@ -629,7 +627,7 @@ mod tests {
         bus.submit_command(Command::ChatBoxInsertChar {
             payload: ChatBoxInsertChar { ch: 'x' },
         });
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_commands(&mut state);
 
         // Then the cascaded AppQuit was also processed.
@@ -639,11 +637,11 @@ mod tests {
     /// Handler that resubmits itself, creating a potential infinite loop.
     struct LoopHandler;
 
-    impl CommandHandler<ChatBoxInsertChar> for LoopHandler {
+    impl CommandHandler<ChatBoxInsertChar, TestState> for LoopHandler {
         fn handle(
             &self,
             _cmd: &ChatBoxInsertChar,
-            _state: &mut AppState,
+            _state: &mut TestState,
             out: &mut Out,
         ) -> CommandAction {
             out.submit_command(Command::ChatBoxInsertChar {
@@ -656,20 +654,17 @@ mod tests {
     #[test]
     fn max_iterations_prevents_infinite_loop() {
         // Given a bus where the handler resubmits itself, with a low max_iterations.
-        let mut bus = Bus::new().with_max_iterations(3);
+        let mut bus: Bus<TestState> = Bus::new().with_max_iterations(3);
         bus.register_command_handler::<ChatBoxInsertChar, _>(LoopHandler);
 
         // When processing commands.
         bus.submit_command(Command::ChatBoxInsertChar {
             payload: ChatBoxInsertChar { ch: 'x' },
         });
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_commands(&mut state);
 
         // Then it terminates without hanging.
-        // After 3 iterations, the loop stops even though commands remain.
-        // We can't easily verify the exact iteration count, but the test
-        // passing means we didn't infinite-loop.
     }
 
     // --- has_pending tests ---
@@ -677,7 +672,7 @@ mod tests {
     #[test]
     fn has_pending_reflects_queue_state() {
         // Given an empty bus.
-        let mut bus = Bus::new();
+        let mut bus: Bus<TestState> = Bus::new();
         assert!(!bus.has_pending());
 
         // When submitting a command.
@@ -685,7 +680,7 @@ mod tests {
         assert!(bus.has_pending());
 
         // When processing commands.
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_commands(&mut state);
         assert!(!bus.has_pending());
     }
@@ -693,7 +688,7 @@ mod tests {
     #[test]
     fn has_pending_with_events() {
         // Given an empty bus.
-        let mut bus = Bus::new();
+        let mut bus: Bus<TestState> = Bus::new();
         assert!(!bus.has_pending());
 
         // When submitting an event.
@@ -701,7 +696,7 @@ mod tests {
         assert!(bus.has_pending());
 
         // When processing events.
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_events(&mut state);
         assert!(!bus.has_pending());
     }
@@ -711,9 +706,11 @@ mod tests {
     #[test]
     fn struct_command_with_payload_dispatches() {
         // Given a bus with handlers for multiple struct commands.
-        let (set_mode_handler, set_mode_calls) = FakeCommandHandler::<AppSetMode>::continuing();
-        let (send_handler, send_calls) = FakeCommandHandler::<ProviderSendMessage>::continuing();
-        let mut bus = Bus::new();
+        let (set_mode_handler, set_mode_calls) =
+            FakeCommandHandler::<AppSetMode, TestState>::continuing();
+        let (send_handler, send_calls) =
+            FakeCommandHandler::<ProviderSendMessage, TestState>::continuing();
+        let mut bus: Bus<TestState> = Bus::new();
         bus.register_command_handler::<AppSetMode, _>(set_mode_handler);
         bus.register_command_handler::<ProviderSendMessage, _>(send_handler);
 
@@ -728,7 +725,7 @@ mod tests {
                 text: "hello".into(),
             },
         });
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_commands(&mut state);
 
         // Then both handlers were called with correct payloads.
@@ -740,8 +737,8 @@ mod tests {
     /// Handler that submits an event when processing a command.
     struct CommandToEventHandler;
 
-    impl CommandHandler<AppQuit> for CommandToEventHandler {
-        fn handle(&self, _cmd: &AppQuit, _state: &mut AppState, out: &mut Out) -> CommandAction {
+    impl CommandHandler<AppQuit, TestState> for CommandToEventHandler {
+        fn handle(&self, _cmd: &AppQuit, _state: &mut TestState, out: &mut Out) -> CommandAction {
             out.submit_event(Event::EventApplicationReady);
             CommandAction::Continue
         }
@@ -750,14 +747,15 @@ mod tests {
     #[test]
     fn command_handler_can_submit_events() {
         // Given a bus where AppQuit handler submits EventApplicationReady.
-        let (event_handler, event_calls) = FakeEventHandler::<EventApplicationReady>::new();
-        let mut bus = Bus::new();
+        let (event_handler, event_calls) =
+            FakeEventHandler::<EventApplicationReady, TestState>::new();
+        let mut bus: Bus<TestState> = Bus::new();
         bus.register_command_handler::<AppQuit, _>(CommandToEventHandler);
         bus.register_event_handler::<EventApplicationReady, _>(event_handler);
 
         // When processing a command that submits an event.
         bus.submit_command(Command::AppQuit);
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_commands(&mut state);
 
         // Then the event is in the event queue (not yet processed).
@@ -775,13 +773,13 @@ mod tests {
     #[test]
     fn drain_processed_events_returns_dispatched_events() {
         // Given a bus with an event handler.
-        let (handler, _calls) = FakeEventHandler::<EventApplicationReady>::new();
-        let mut bus = Bus::new();
+        let (handler, _calls) = FakeEventHandler::<EventApplicationReady, TestState>::new();
+        let mut bus: Bus<TestState> = Bus::new();
         bus.register_event_handler::<EventApplicationReady, _>(handler);
 
         // When processing an event.
         bus.submit_event(Event::EventApplicationReady);
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_events(&mut state);
 
         // Then drain_processed_events returns the dispatched event with no source.
@@ -795,11 +793,11 @@ mod tests {
     #[test]
     fn drain_processed_events_clears_buffer() {
         // Given a bus with a processed event.
-        let (handler, _calls) = FakeEventHandler::<EventApplicationReady>::new();
-        let mut bus = Bus::new();
+        let (handler, _calls) = FakeEventHandler::<EventApplicationReady, TestState>::new();
+        let mut bus: Bus<TestState> = Bus::new();
         bus.register_event_handler::<EventApplicationReady, _>(handler);
         bus.submit_event(Event::EventApplicationReady);
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_events(&mut state);
 
         // When draining twice.
@@ -816,13 +814,13 @@ mod tests {
     #[test]
     fn drain_processed_commands_returns_dispatched_commands() {
         // Given a bus with a command handler.
-        let (handler, _calls) = FakeCommandHandler::<AppQuit>::continuing();
-        let mut bus = Bus::new();
+        let (handler, _calls) = FakeCommandHandler::<AppQuit, TestState>::continuing();
+        let mut bus: Bus<TestState> = Bus::new();
         bus.register_command_handler::<AppQuit, _>(handler);
 
         // When processing a command.
         bus.submit_command(Command::AppQuit);
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_commands(&mut state);
 
         // Then drain_processed_commands returns the dispatched command with no source.
@@ -836,11 +834,11 @@ mod tests {
     #[test]
     fn drain_processed_commands_clears_buffer() {
         // Given a bus with a processed command.
-        let (handler, _calls) = FakeCommandHandler::<AppQuit>::continuing();
-        let mut bus = Bus::new();
+        let (handler, _calls) = FakeCommandHandler::<AppQuit, TestState>::continuing();
+        let mut bus: Bus<TestState> = Bus::new();
         bus.register_command_handler::<AppQuit, _>(handler);
         bus.submit_command(Command::AppQuit);
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_commands(&mut state);
 
         // When draining twice.
@@ -857,13 +855,13 @@ mod tests {
     #[test]
     fn submit_command_from_preserves_source() {
         // Given a bus with a command handler.
-        let (handler, _calls) = FakeCommandHandler::<AppQuit>::continuing();
-        let mut bus = Bus::new();
+        let (handler, _calls) = FakeCommandHandler::<AppQuit, TestState>::continuing();
+        let mut bus: Bus<TestState> = Bus::new();
         bus.register_command_handler::<AppQuit, _>(handler);
 
         // When submitting a command with a source.
         bus.submit_command_from(Command::AppQuit, Some("ext-test".to_string()));
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_commands(&mut state);
 
         // Then the source is preserved through drain.
@@ -875,13 +873,13 @@ mod tests {
     #[test]
     fn submit_event_from_preserves_source() {
         // Given a bus with an event handler.
-        let (handler, _calls) = FakeEventHandler::<EventApplicationReady>::new();
-        let mut bus = Bus::new();
+        let (handler, _calls) = FakeEventHandler::<EventApplicationReady, TestState>::new();
+        let mut bus: Bus<TestState> = Bus::new();
         bus.register_event_handler::<EventApplicationReady, _>(handler);
 
         // When submitting an event with a source.
         bus.submit_event_from(Event::EventApplicationReady, Some("ext-test".to_string()));
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_events(&mut state);
 
         // Then the source is preserved through drain.
@@ -893,13 +891,13 @@ mod tests {
     #[test]
     fn submit_command_without_source_has_none() {
         // Given a bus with a command handler.
-        let (handler, _calls) = FakeCommandHandler::<AppQuit>::continuing();
-        let mut bus = Bus::new();
+        let (handler, _calls) = FakeCommandHandler::<AppQuit, TestState>::continuing();
+        let mut bus: Bus<TestState> = Bus::new();
         bus.register_command_handler::<AppQuit, _>(handler);
 
         // When submitting a command without source.
         bus.submit_command(Command::AppQuit);
-        let mut state = AppState::new();
+        let mut state = TestState;
         bus.process_commands(&mut state);
 
         // Then the source is None.

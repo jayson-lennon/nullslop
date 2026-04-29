@@ -6,7 +6,7 @@
 
 use nullslop_protocol::CommandAction;
 
-use crate::{AppState, Out};
+use crate::Out;
 
 /// Handler for a specific command type `C`.
 ///
@@ -20,7 +20,7 @@ use crate::{AppState, Out};
 ///
 /// `C` must be `'static` so the bus can use [`TypeId::of::<C>()`](TypeId::of)
 /// for dispatch.
-pub trait CommandHandler<C: 'static> {
+pub trait CommandHandler<C: 'static, S> {
     /// Handle a command.
     ///
     /// # Arguments
@@ -33,7 +33,7 @@ pub trait CommandHandler<C: 'static> {
     ///
     /// [`CommandAction::Continue`] to allow further handlers,
     /// or [`CommandAction::Stop`] to halt propagation.
-    fn handle(&self, cmd: &C, state: &mut AppState, out: &mut Out) -> CommandAction;
+    fn handle(&self, cmd: &C, state: &mut S, out: &mut Out) -> CommandAction;
 }
 
 /// Handler for a specific event type `E`.
@@ -46,7 +46,7 @@ pub trait CommandHandler<C: 'static> {
 ///
 /// `E` must be `'static` so the bus can use [`TypeId::of::<E>()`](TypeId::of)
 /// for dispatch.
-pub trait EventHandler<E: 'static> {
+pub trait EventHandler<E: 'static, S> {
     /// Handle an event.
     ///
     /// # Arguments
@@ -54,5 +54,5 @@ pub trait EventHandler<E: 'static> {
     /// * `evt` - The concrete event to handle.
     /// * `state` - Mutable application state.
     /// * `out` - Buffered output for submitting new commands/events.
-    fn handle(&self, evt: &E, state: &mut AppState, out: &mut Out);
+    fn handle(&self, evt: &E, state: &mut S, out: &mut Out);
 }

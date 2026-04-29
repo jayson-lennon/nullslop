@@ -5,8 +5,8 @@
 //! The caller (TUI or headless runner) feeds messages into [`AppCore`] and
 //! drives the processing loop.
 
+use nullslop_component::AppState;
 use nullslop_component_core::Bus;
-use nullslop_component_core::AppState;
 
 use crate::{AppMsg, ExtensionHostService, State};
 
@@ -25,7 +25,7 @@ pub struct TickResult {
 /// via [`Self::sender`] and drives processing with [`Self::tick`].
 pub struct AppCore {
     /// Component command/event bus.
-    pub bus: Bus,
+    pub bus: Bus<AppState>,
     /// Shared application state.
     pub state: State,
     /// Internal message channel sender.
@@ -141,7 +141,7 @@ impl AppCore {
             && let Some(ext) = &self.ext_host
         {
             for (evt, source) in &processed_events {
-                ext.send_event(evt, source.as_deref());
+                ext.send_event(evt, source.as_deref() as Option<&str>);
             }
         }
 
@@ -151,7 +151,7 @@ impl AppCore {
             && let Some(ext) = &self.ext_host
         {
             for (cmd, source) in &processed_commands {
-                ext.send_command(cmd, source.as_deref());
+                ext.send_command(cmd, source.as_deref() as Option<&str>);
             }
         }
 
@@ -193,7 +193,7 @@ mod tests {
     fn submit_command_processes_through_bus() {
         // Given an AppCore with components registered.
         let mut core = AppCore::new();
-        let mut registry = nullslop_component_ui::UiRegistry::new();
+        let mut registry = nullslop_component::AppUiRegistry::new();
         nullslop_component::register_all(&mut core.bus, &mut registry);
 
         // When submitting a quit command and ticking.
@@ -242,7 +242,7 @@ mod tests {
     fn tick_processes_insert_char_command() {
         // Given an AppCore with components registered, in Input mode.
         let mut core = AppCore::new();
-        let mut registry = nullslop_component_ui::UiRegistry::new();
+        let mut registry = nullslop_component::AppUiRegistry::new();
         nullslop_component::register_all(&mut core.bus, &mut registry);
         core.state.write().mode = Mode::Input;
 

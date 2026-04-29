@@ -3,10 +3,11 @@
 //! Handles [`CustomCommand`]s using a match arm on command name.
 //! Unknown commands are logged as warnings.
 
+use crate::AppUiRegistry;
+use crate::{AppBus, AppState};
 use npr::CommandAction;
 use npr::command::CustomCommand;
-use nullslop_component_core::{AppState, Bus, Out, define_handler};
-use nullslop_component_ui::UiRegistry;
+use nullslop_component_core::{Out, define_handler};
 use nullslop_protocol::{self as npr};
 
 define_handler! {
@@ -21,7 +22,7 @@ define_handler! {
 }
 
 /// Register the custom command handler.
-pub(crate) fn register(bus: &mut Bus, _registry: &mut UiRegistry) {
+pub(crate) fn register(bus: &mut AppBus, _registry: &mut AppUiRegistry) {
     CustomCommandHandler.register(bus);
 }
 
@@ -49,6 +50,7 @@ impl CustomCommandHandler {
 
 #[cfg(test)]
 mod tests {
+    use crate::AppState;
     use npr::Command;
     use nullslop_component_core::Bus;
     use nullslop_protocol as npr;
@@ -58,7 +60,7 @@ mod tests {
     #[test]
     fn echo_command_adds_extension_entry() {
         // Given a bus with CustomCommandHandler registered.
-        let mut bus = Bus::new();
+        let mut bus: Bus<AppState> = Bus::new();
         CustomCommandHandler.register(&mut bus);
 
         // When processing a CustomCommand "echo" with source and text.
@@ -85,7 +87,7 @@ mod tests {
     #[test]
     fn echo_command_requires_source() {
         // Given a bus with CustomCommandHandler registered.
-        let mut bus = Bus::new();
+        let mut bus: Bus<AppState> = Bus::new();
         CustomCommandHandler.register(&mut bus);
 
         // When processing a CustomCommand "echo" missing source field.
@@ -105,7 +107,7 @@ mod tests {
     #[test]
     fn unknown_command_logs_warning() {
         // Given a bus with CustomCommandHandler registered.
-        let mut bus = Bus::new();
+        let mut bus: Bus<AppState> = Bus::new();
         CustomCommandHandler.register(&mut bus);
 
         // When processing an unknown CustomCommand.

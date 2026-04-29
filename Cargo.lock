@@ -1040,14 +1040,12 @@ version = "0.1.0"
 dependencies = [
  "nullslop-protocol",
  "rstest",
- "unicode-segmentation",
 ]
 
 [[package]]
 name = "nullslop-component-ui"
 version = "0.1.0"
 dependencies = [
- "nullslop-component-core",
  "nullslop-protocol",
  "ratatui",
  "rstest",
