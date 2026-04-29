@@ -367,7 +367,7 @@ When implementing features:
 4. **Implement real and fake** - Both must satisfy the trait
 5. **Wire into Services** - Add to `Services` struct and `create_test_services()`
 6. **Write tests** - Use Given/When/Then structure with test context and fakes
-7. **Add documentation** - Module docs, type docs, error docs
+7. **Add documentation** - Module docs, type docs, error docs. Documentation should describe the behavior and purpose, not the technical implementation (unless it's relevant to understanding).
 
 ## 8. Tooling
 
