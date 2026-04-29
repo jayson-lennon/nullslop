@@ -7,9 +7,9 @@ edition = "2024"
 nullslop-core = { workspace = true }
 nullslop-protocol = { workspace = true, features = ["which-key"] }
 nullslop-extension = { workspace = true }
-nullslop-plugin = { workspace = true }
-nullslop-plugin-core = { workspace = true }
-nullslop-plugin-ui = { workspace = true }
+nullslop-component = { workspace = true }
+nullslop-component-core = { workspace = true }
+nullslop-component-ui = { workspace = true }
 nullslop-services = { workspace = true }
 nullslop-ext-host = { workspace = true }
 nullslop-echo = { workspace = true }

@@ -1,4 +1,4 @@
-//! Declarative macro for defining plugins that handle messages (commands and events).
+//! Declarative macro for defining components that handle messages (commands and events).
 //!
 //! The [`define_handler!`] macro reduces boilerplate by generating:
 //! - The handler struct definition (unit struct)
@@ -9,9 +9,9 @@
 //! Users provide method implementations in a separate `impl` block for full
 //! IDE support (autocomplete, type checking, inline errors).
 
-/// Define a plugin that handles messages (commands and events).
+/// Define a component that handles messages (commands and events).
 ///
-/// A plugin can be a command/event handler (defined via this macro),
+/// A component can be a command/event handler (defined via this macro),
 /// a UI element (implementing `UiElement`), or both. This macro
 /// generates the handler struct and typed dispatch wiring.
 ///
@@ -99,7 +99,7 @@ macro_rules! define_handler {
 
         // Generate register method
         impl $name {
-            #[doc = concat!("Register all handlers with the bus.\n\n⚠️ This must be called during application startup. Add a `", stringify!($name), ".register(&mut bus);` call in the plugin registration section of `run.rs`.")]
+            #[doc = concat!("Register all handlers with the bus.\n\n⚠️ This must be called during application startup. Add a `", stringify!($name), ".register(&mut bus);` call in the component registration section of `run.rs`.")]
             pub fn register(&self, bus: &mut $crate::Bus) {
                 $(
                     bus.register_command_handler::<$cmd_type, Self>(*self);

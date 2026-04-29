@@ -1,4 +1,4 @@
-//! Event types for the plugin event pipeline.
+//! Event types for the component event pipeline.
 //!
 //! Each event is a separate struct with an `Event` prefix.
 //! The [`Event`] wrapper enum provides a single type for

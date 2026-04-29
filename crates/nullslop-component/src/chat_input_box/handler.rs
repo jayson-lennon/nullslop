@@ -1,13 +1,13 @@
 //! Handler for chat input and mode-switching commands.
 //!
-//! Consolidates all chat input command handling from the old `InputModePlugin`
-//! and `NormalModePlugin` into a single [`ChatInputBoxHandler`].
+//! Consolidates all chat input command handling from the old `InputModeComponent`
+//! and `NormalModeComponent` into a single [`ChatInputBoxHandler`].
 
 use npr::CommandAction;
 use npr::command::{
     AppSetMode, ChatBoxClear, ChatBoxDeleteGrapheme, ChatBoxInsertChar, ChatBoxSubmitMessage,
 };
-use nullslop_plugin_core::{Out, define_handler};
+use nullslop_component_core::{Out, define_handler};
 use nullslop_protocol as npr;
 
 define_handler! {
@@ -77,7 +77,7 @@ impl ChatInputBoxHandler {
 mod tests {
     use npr::Command;
     use npr::command::{AppSetMode, ChatBoxInsertChar, ChatBoxSubmitMessage};
-    use nullslop_plugin_core::Bus;
+    use nullslop_component_core::Bus;
     use nullslop_protocol as npr;
 
     use super::*;

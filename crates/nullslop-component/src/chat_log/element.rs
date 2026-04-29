@@ -6,7 +6,7 @@
 //! - System entries in dark gray with a `  ` prefix
 //! - Extension entries in yellow with a `[ext] {source}: {text}` format
 
-use nullslop_plugin_ui::UiElement;
+use nullslop_component_ui::UiElement;
 use nullslop_protocol::{AppState, ChatEntryKind};
 use ratatui::Frame;
 use ratatui::layout::Rect;

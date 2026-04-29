@@ -3,7 +3,7 @@
 //! [`CharCounterElement`] implements [`UiElement`] to render the total
 //! number of grapheme clusters in the chat input buffer.
 
-use nullslop_plugin_ui::UiElement;
+use nullslop_component_ui::UiElement;
 use nullslop_protocol::AppState;
 use ratatui::Frame;
 use ratatui::layout::Rect;

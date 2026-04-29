@@ -1,6 +1,6 @@
-//! nullslop-plugin-core: handler traits, bus dispatch, and buffered output.
+//! nullslop-component-core: handler traits, bus dispatch, and buffered output.
 //!
-//! This crate provides the runtime dispatch infrastructure for the plugin system:
+//! This crate provides the runtime dispatch infrastructure for the component system:
 //! - [`CommandHandler`] and [`EventHandler`] traits for typed handling
 //! - [`Out`] for buffered command/event submission
 //! - [`Bus`] for [`TypeId`]-keyed dispatch with processing loops

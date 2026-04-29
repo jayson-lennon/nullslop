@@ -1,12 +1,12 @@
-//! Plugin for the quit command.
+//! Component for the quit command.
 //!
 //! Handles the `AppQuit` command by setting the `should_quit` flag
 //! and stopping command propagation.
 
 use npr::CommandAction;
 use npr::command::AppQuit;
-use nullslop_plugin_core::{Bus, Out, define_handler};
-use nullslop_plugin_ui::UiRegistry;
+use nullslop_component_core::{Bus, Out, define_handler};
+use nullslop_component_ui::UiRegistry;
 use nullslop_protocol::{self as npr, AppState};
 
 define_handler! {
@@ -20,7 +20,7 @@ define_handler! {
     events {}
 }
 
-/// Register the quit handler plugin.
+/// Register the quit handler component.
 pub(crate) fn register(bus: &mut Bus, _: &mut UiRegistry) {
     QuitHandler.register(bus);
 }
@@ -35,7 +35,7 @@ impl QuitHandler {
 #[cfg(test)]
 mod tests {
     use npr::Command;
-    use nullslop_plugin_core::Bus;
+    use nullslop_component_core::Bus;
     use nullslop_protocol as npr;
 
     use super::*;

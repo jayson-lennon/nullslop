@@ -1,4 +1,4 @@
-//! [`UiElement`] trait for renderable UI plugins.
+//! [`UiElement`] trait for renderable UI components.
 //!
 //! Elements draw within an allocated area on the ratatui frame. They are
 //! separate from command/event handlers and communicate through

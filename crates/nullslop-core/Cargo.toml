@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 nullslop-protocol = { workspace = true }
-nullslop-plugin-core = { workspace = true }
+nullslop-component-core = { workspace = true }
 kanal = { workspace = true }
 wherror = { workspace = true }
 error-stack = { workspace = true }
@@ -17,8 +17,8 @@ derive_more = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-nullslop-plugin = { workspace = true }
-nullslop-plugin-ui = { workspace = true }
+nullslop-component = { workspace = true }
+nullslop-component-ui = { workspace = true }
 rstest = { workspace = true }
 
 [lints]

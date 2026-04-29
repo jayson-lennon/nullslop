@@ -8,8 +8,8 @@ use unicode_segmentation::UnicodeSegmentation;
 /// Encapsulated state for the chat input box.
 ///
 /// Holds the input buffer and provides methods for manipulating it.
-/// Colocated with the chat input box plugin via re-export from
-/// `nullslop_plugin::chat_input_box`.
+/// Colocated with the chat input box component via re-export from
+/// `nullslop_component::chat_input_box`.
 #[derive(Debug)]
 pub struct ChatInputBoxState {
     /// The current text in the input box.

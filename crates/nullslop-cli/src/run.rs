@@ -51,7 +51,7 @@ fn run_tui(app: &mut App) -> Result<(), Report<CliError>> {
 
 /// Runs in headless mode.
 ///
-/// Creates an `AppCore`, registers plugins, starts the extension host,
+/// Creates an `AppCore`, registers components, starts the extension host,
 /// processes the given commands, and runs until the system settles
 /// (no work done for [`IDLE_TICKS_TO_SETTLE`] consecutive ticks)
 /// or [`HEADLESS_TIMEOUT`] is exceeded.
@@ -62,10 +62,10 @@ fn run_tui(app: &mut App) -> Result<(), Report<CliError>> {
 fn run_headless(app: &mut App, command: Option<HeadlessCommands>) -> Result<(), Report<CliError>> {
     let handle = app.handle();
 
-    // Create AppCore with all plugins registered.
+    // Create AppCore with all components registered.
     let mut core = AppCore::new();
-    let mut registry = nullslop_plugin_ui::UiRegistry::new();
-    nullslop_plugin::register_all(&mut core.bus, &mut registry);
+    let mut registry = nullslop_component_ui::UiRegistry::new();
+    nullslop_component::register_all(&mut core.bus, &mut registry);
 
     // Start extension host (in-memory with nullslop-echo).
     let sender = HeadlessExtSender::new(core.sender());
@@ -123,7 +123,7 @@ fn run_headless(app: &mut App, command: Option<HeadlessCommands>) -> Result<(), 
     Ok(())
 }
 
-/// Runs a keystroke script through the keymap → command → bus → plugin pipeline.
+/// Runs a keystroke script through the keymap → command → bus → component pipeline.
 ///
 /// Each non-empty, non-comment line in the script file is parsed as a key
 /// sequence using `ratatui_which_key::parse_key_sequence`. Keys are fed to

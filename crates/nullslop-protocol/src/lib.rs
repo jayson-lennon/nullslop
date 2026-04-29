@@ -1,8 +1,8 @@
-//! nullslop-protocol: shared types for the nullslop plugin system.
+//! nullslop-protocol: shared types for the nullslop component system.
 //!
 //! This crate contains all command types, event types, wrapper enums,
 //! [`Mode`], [`CommandAction`], and [`AppState`]. It is the single import
-//! point for everything the plugin system needs. Both the TUI host and
+//! point for everything the component system needs. Both the TUI host and
 //! extensions depend on this crate for wire-protocol types.
 
 pub mod action;

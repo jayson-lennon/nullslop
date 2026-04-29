@@ -5,8 +5,8 @@
 
 pub mod element;
 
-use nullslop_plugin_core::Bus;
-use nullslop_plugin_ui::UiRegistry;
+use nullslop_component_core::Bus;
+use nullslop_component_ui::UiRegistry;
 
 pub use element::ChatLogElement;
 

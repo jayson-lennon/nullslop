@@ -1,8 +1,8 @@
 //! Main application state and per-frame rendering.
 
 use derive_more::Debug;
+use nullslop_component_ui::UiRegistry;
 use nullslop_core::{AppCore, AppMsg};
-use nullslop_plugin_ui::UiRegistry;
 use nullslop_protocol::{Command, Mode};
 use ratatui::Frame;
 use ratatui_which_key::WhichKeyState;
@@ -47,7 +47,7 @@ impl TuiApp {
     pub fn new() -> Self {
         let mut core = AppCore::new();
         let mut ui_registry = UiRegistry::new();
-        nullslop_plugin::register_all(&mut core.bus, &mut ui_registry);
+        nullslop_component::register_all(&mut core.bus, &mut ui_registry);
         let keymap = keymap::init();
         let which_key = WhichKeyInstance::new(keymap, Scope::Normal);
 
@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn app_custom_command_routes_through_bus() {
-        // Given an App with plugins registered.
+        // Given an App with components registered.
         let mut app = TuiApp::new();
 
         // When routing a CustomCommand (echo).

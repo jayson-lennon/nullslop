@@ -1,4 +1,4 @@
-//! Command types for the plugin command pipeline.
+//! Command types for the component command pipeline.
 //!
 //! Each command is a separate struct with a component prefix (`ChatBox*`,
 //! `App*`, `Provider*`). The [`Command`] wrapper enum provides a single

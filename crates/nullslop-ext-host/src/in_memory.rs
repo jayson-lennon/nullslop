@@ -688,7 +688,7 @@ mod tests {
         let host = InMemoryExtensionHost::start(sender.clone(), vec![ext], runtime.handle());
         let mut core = AppCore::new();
 
-        // Manually set up tracker state (simulates what ShutdownPlugin would do).
+        // Manually set up tracker state (simulates what ShutdownComponent would do).
         core.state.write().shutdown_tracker.track("in-memory-0");
         core.state.write().shutdown_tracker.shutdown_active = true;
         // Simulate extension completing.
@@ -800,7 +800,7 @@ mod tests {
     /// Sender that forwards extension events/commands into `AppCore`'s message channel.
     ///
     /// Used in full round-trip tests where extension events must flow through the
-    /// bus (e.g., `ExtensionShutdownCompleted` → `ShutdownPlugin` → `ShutdownTracker`).
+    /// bus (e.g., `ExtensionShutdownCompleted` → `ShutdownComponent` → `ShutdownTracker`).
     struct CoreBridgeSender {
         sender: kanal::Sender<nullslop_core::AppMsg>,
         extension_events: Mutex<Vec<Event>>,
@@ -851,11 +851,11 @@ mod tests {
         }
     }
 
-    /// Creates an `AppCore` with all plugins registered (including `ShutdownPlugin`).
-    fn core_with_plugins() -> AppCore {
+    /// Creates an `AppCore` with all components registered (including `ShutdownComponent`).
+    fn core_with_components() -> AppCore {
         let mut core = AppCore::new();
-        let mut registry = nullslop_plugin_ui::UiRegistry::new();
-        nullslop_plugin::register_all(&mut core.bus, &mut registry);
+        let mut registry = nullslop_component_ui::UiRegistry::new();
+        nullslop_component::register_all(&mut core.bus, &mut registry);
         core
     }
 
@@ -1049,9 +1049,9 @@ mod tests {
 
     #[test]
     fn shutdown_lifecycle_completes() {
-        // Given an AppCore with ShutdownPlugin + CoreBridgeSender.
+        // Given an AppCore with ShutdownComponent + CoreBridgeSender.
         let runtime = rt();
-        let mut core = core_with_plugins();
+        let mut core = core_with_components();
         let bridge = Arc::new(CoreBridgeSender::new(core.sender()));
 
         // And a RecordingExtension that sends ExtensionShutdownCompleted on ApplicationShuttingDown.
@@ -1082,15 +1082,15 @@ mod tests {
         // When calling shutdown_with_timeout.
         let result = host.shutdown_with_timeout(&mut core, Duration::from_millis(500));
 
-        // Then shutdown returns Ok (full round-trip: shutdown → extension → ExtensionShutdownCompleted → ShutdownPlugin → is_complete).
+        // Then shutdown returns Ok (full round-trip: shutdown → extension → ExtensionShutdownCompleted → ShutdownComponent → is_complete).
         assert!(result.is_ok());
     }
 
     #[test]
     fn shutdown_timeout_on_unresponsive_extension() {
-        // Given an AppCore with ShutdownPlugin + CoreBridgeSender.
+        // Given an AppCore with ShutdownComponent + CoreBridgeSender.
         let runtime = rt();
-        let mut core = core_with_plugins();
+        let mut core = core_with_components();
         let bridge = Arc::new(CoreBridgeSender::new(core.sender()));
 
         // And a RecordingExtension that ignores ApplicationShuttingDown (no callback).

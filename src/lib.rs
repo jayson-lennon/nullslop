@@ -1,1 +1,1 @@
-//! nullslop: a TUI agent harness with a plugin/extension system.
+//! nullslop: a TUI agent harness with a component/extension system.

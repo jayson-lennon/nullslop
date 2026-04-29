@@ -25,10 +25,10 @@ pub type RenderCall = (ratatui::layout::Rect, String);
 /// Fake UI element that records render calls.
 ///
 /// Follows the same `Rc<RefCell<>>` pattern as [`FakeCommandHandler`]
-/// in `nullslop-plugin-core` — the test retains access to the call log
+/// in `nullslop-component-core` — the test retains access to the call log
 /// after the element is moved into the registry.
 ///
-/// [`FakeCommandHandler`]: nullslop_plugin_core::fake::FakeCommandHandler
+/// [`FakeCommandHandler`]: nullslop_component_core::fake::FakeCommandHandler
 #[derive(Debug)]
 pub struct FakeUiElement {
     name: String,

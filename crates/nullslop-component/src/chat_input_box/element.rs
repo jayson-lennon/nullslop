@@ -6,7 +6,7 @@
 //! they use default styling. A cursor is positioned at the current insertion
 //! point when in Input mode.
 
-use nullslop_plugin_ui::UiElement;
+use nullslop_component_ui::UiElement;
 use nullslop_protocol::{AppState, Mode};
 use ratatui::Frame;
 use ratatui::layout::Rect;

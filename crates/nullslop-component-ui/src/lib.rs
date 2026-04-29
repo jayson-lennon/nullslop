@@ -1,16 +1,16 @@
-//! nullslop-plugin-ui: renderable UI elements for the plugin system.
+//! nullslop-component-ui: renderable UI elements for the component system.
 //!
 //! This crate provides the [`UiElement`] trait and [`UiRegistry`] for composable,
-//! plugin-driven rendering. It bridges `nullslop-plugin-core` and `ratatui`,
-//! allowing plugins to register UI elements that the TUI render loop draws.
+//! component-driven rendering. It bridges `nullslop-component-core` and `ratatui`,
+//! allowing components to register UI elements that the TUI render loop draws.
 //!
 //! # Two-struct pattern
 //!
 //! Handlers and elements are separate structs that communicate through
 //! [`AppState`]:
 //!
-//! - **Handlers** implement [`CommandHandler`](nullslop_plugin_core::CommandHandler)
-//!   or [`EventHandler`](nullslop_plugin_core::EventHandler) and mutate state
+//! - **Handlers** implement [`CommandHandler`](nullslop_component_core::CommandHandler)
+//!   or [`EventHandler`](nullslop_component_core::EventHandler) and mutate state
 //!   during command/event processing.
 //! - **Elements** implement [`UiElement`] and read state during rendering.
 //!
@@ -20,13 +20,13 @@
 //! # Architecture
 //!
 //! ```text
-//! nullslop-plugin-core     (bus, Handler traits)
+//! nullslop-component-core     (bus, Handler traits)
 //!       │
 //!       ▼
-//! nullslop-plugin-ui       (UiElement trait + UiRegistry)
+//! nullslop-component-ui       (UiElement trait + UiRegistry)
 //!       │
 //!       ▼
-//! nullslop-plugin          (built-in plugins implement UiElement)
+//! nullslop-component          (built-in components implement UiElement)
 //!       │
 //!       ▼
 //! nullslop-tui             (discovers UiElements via registry, renders them)

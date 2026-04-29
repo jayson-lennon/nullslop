@@ -74,7 +74,7 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
         element.render(frame, layout.input, &state);
     }
 
-    // Which-key popup overlay (app-level, not a plugin element)
+    // Which-key popup overlay (app-level, not a component element)
     render_which_key(frame, &mut app.which_key);
 }
 

@@ -5,7 +5,7 @@
 //! The caller (TUI or headless runner) feeds messages into [`AppCore`] and
 //! drives the processing loop.
 
-use nullslop_plugin_core::Bus;
+use nullslop_component_core::Bus;
 use nullslop_protocol::AppState;
 
 use crate::{AppMsg, ExtensionHostService, State};
@@ -24,7 +24,7 @@ pub struct TickResult {
 /// Owns the processing pipeline. The caller feeds [`AppMsg`] values
 /// via [`Self::sender`] and drives processing with [`Self::tick`].
 pub struct AppCore {
-    /// Plugin command/event bus.
+    /// Component command/event bus.
     pub bus: Bus,
     /// Shared application state.
     pub state: State,
@@ -48,7 +48,7 @@ impl std::fmt::Debug for AppCore {
 impl AppCore {
     /// Creates a new `AppCore` with default state and empty bus.
     ///
-    /// The caller registers plugins on the returned bus via
+    /// The caller registers components on the returned bus via
     /// [`Bus::register_command_handler`] / [`Bus::register_event_handler`],
     /// and optionally sets the extension host via [`Self::set_ext_host`].
     #[must_use]
@@ -191,10 +191,10 @@ mod tests {
 
     #[test]
     fn submit_command_processes_through_bus() {
-        // Given an AppCore with plugins registered.
+        // Given an AppCore with components registered.
         let mut core = AppCore::new();
-        let mut registry = nullslop_plugin_ui::UiRegistry::new();
-        nullslop_plugin::register_all(&mut core.bus, &mut registry);
+        let mut registry = nullslop_component_ui::UiRegistry::new();
+        nullslop_component::register_all(&mut core.bus, &mut registry);
 
         // When submitting a quit command and ticking.
         core.submit_command(nullslop_protocol::Command::AppQuit);
@@ -240,10 +240,10 @@ mod tests {
 
     #[test]
     fn tick_processes_insert_char_command() {
-        // Given an AppCore with plugins registered, in Input mode.
+        // Given an AppCore with components registered, in Input mode.
         let mut core = AppCore::new();
-        let mut registry = nullslop_plugin_ui::UiRegistry::new();
-        nullslop_plugin::register_all(&mut core.bus, &mut registry);
+        let mut registry = nullslop_component_ui::UiRegistry::new();
+        nullslop_component::register_all(&mut core.bus, &mut registry);
         core.state.write().mode = Mode::Input;
 
         // When submitting ChatBoxInsertChar and ticking.

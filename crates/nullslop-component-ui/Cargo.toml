@@ -1,10 +1,12 @@
 [package]
-name = "nullslop-plugin-core"
+name = "nullslop-component-ui"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 nullslop-protocol = { workspace = true }
+nullslop-component-core = { workspace = true }
+ratatui = { workspace = true }
 
 [dev-dependencies]
 rstest = { workspace = true }

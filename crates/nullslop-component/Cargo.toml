@@ -1,12 +1,12 @@
 [package]
-name = "nullslop-plugin"
+name = "nullslop-component"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 nullslop-protocol = { workspace = true }
-nullslop-plugin-core = { workspace = true }
-nullslop-plugin-ui = { workspace = true }
+nullslop-component-core = { workspace = true }
+nullslop-component-ui = { workspace = true }
 ratatui = { workspace = true }
 tracing = { workspace = true }
 unicode-segmentation = { workspace = true }

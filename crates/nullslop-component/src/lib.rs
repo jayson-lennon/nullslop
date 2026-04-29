@@ -1,8 +1,8 @@
-//! nullslop-plugin: built-in plugin implementations.
+//! nullslop-component: built-in component implementations.
 //!
-//! Contains all plugins that handle commands and events for the nullslop
-//! application. All plugins use the [`define_handler!`](nullslop_plugin_core::define_handler)
-//! macro from `nullslop-plugin-core`.
+//! Contains all components that handle commands and events for the nullslop
+//! application. All components use the [`define_handler!`](nullslop_component_core::define_handler)
+//! macro from `nullslop-component-core`.
 
 pub mod char_counter;
 pub mod chat_input_box;
@@ -11,10 +11,10 @@ pub mod custom_command;
 pub mod quit_handler;
 pub mod shutdown;
 
-use nullslop_plugin_core::Bus;
-use nullslop_plugin_ui::UiRegistry;
+use nullslop_component_core::Bus;
+use nullslop_component_ui::UiRegistry;
 
-/// Register all built-in plugins with the bus and UI registry.
+/// Register all built-in components with the bus and UI registry.
 ///
 /// Called once during application startup.
 pub fn register_all(bus: &mut Bus, registry: &mut UiRegistry) {

@@ -1,12 +1,12 @@
-//! Plugin for custom commands received from extensions.
+//! Component for custom commands received from extensions.
 //!
 //! Handles [`CustomCommand`]s using a match arm on command name.
 //! Unknown commands are logged as warnings.
 
 use npr::CommandAction;
 use npr::command::CustomCommand;
-use nullslop_plugin_core::{Bus, Out, define_handler};
-use nullslop_plugin_ui::UiRegistry;
+use nullslop_component_core::{Bus, Out, define_handler};
+use nullslop_component_ui::UiRegistry;
 use nullslop_protocol::{self as npr, AppState};
 
 define_handler! {
@@ -50,7 +50,7 @@ impl CustomCommandHandler {
 #[cfg(test)]
 mod tests {
     use npr::Command;
-    use nullslop_plugin_core::Bus;
+    use nullslop_component_core::Bus;
     use nullslop_protocol as npr;
 
     use super::*;

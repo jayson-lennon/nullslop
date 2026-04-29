@@ -1,6 +1,6 @@
 //! Handler traits for commands and events.
 //!
-//! [`CommandHandler<C>`] and [`EventHandler<E>`] are generic traits that plugins
+//! [`CommandHandler<C>`] and [`EventHandler<E>`] are generic traits that components
 //! implement for specific command or event types. The [`Bus`](crate::Bus) dispatches
 //! to handlers via [`TypeId`], so each handler receives the concrete type.
 

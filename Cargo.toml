@@ -23,9 +23,9 @@ nullslop-protocol = { path = "crates/nullslop-protocol" }
 nullslop-core = { path = "crates/nullslop-core" }
 nullslop-tui = { path = "crates/nullslop-tui" }
 nullslop-extension = { path = "crates/nullslop-extension" }
-nullslop-plugin-core = { path = "crates/nullslop-plugin-core" }
-nullslop-plugin-ui = { path = "crates/nullslop-plugin-ui" }
-nullslop-plugin = { path = "crates/nullslop-plugin" }
+nullslop-component-core = { path = "crates/nullslop-component-core" }
+nullslop-component-ui = { path = "crates/nullslop-component-ui" }
+nullslop-component = { path = "crates/nullslop-component" }
 nullslop-ext-host = { path = "crates/nullslop-ext-host" }
 nullslop-cli = { path = "crates/nullslop-cli" }
 nullslop-services = { path = "crates/nullslop-services" }

@@ -2,7 +2,7 @@
 
 use clap::{Parser, Subcommand};
 
-/// nullslop — a TUI agent harness with a plugin/extension system.
+/// nullslop — a TUI agent harness with a component/extension system.
 #[derive(Debug, Parser)]
 #[command(name = "nullslop", version, about)]
 pub struct Cli {

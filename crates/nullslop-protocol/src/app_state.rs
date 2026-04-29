@@ -1,6 +1,6 @@
 //! Application state container.
 //!
-//! [`AppState`] is the shared state that plugins read and write.
+//! [`AppState`] is the shared state that components read and write.
 //! It contains chat history, input mode, and
 //! the chat input box state. Host-side concerns like extension tracking
 //! are managed separately in `nullslop-core`.
