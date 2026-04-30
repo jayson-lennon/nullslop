@@ -304,58 +304,58 @@ impl<S> Bus<S> {
                 self.dispatch_command_to_handlers(&payload, state, &mut out);
             }
             Command::ChatBoxDeleteGrapheme => {
-                let unit = ChatBoxDeleteGrapheme;
-                self.dispatch_command_to_handlers(&unit, state, &mut out);
+                let cmd = ChatBoxDeleteGrapheme;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
             Command::ChatBoxSubmitMessage { payload } => {
                 self.dispatch_command_to_handlers(&payload, state, &mut out);
             }
             Command::ChatBoxClear => {
-                let unit = ChatBoxClear;
-                self.dispatch_command_to_handlers(&unit, state, &mut out);
+                let cmd = ChatBoxClear;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
             Command::ChatBoxMoveCursorLeft => {
-                let unit = ChatBoxMoveCursorLeft;
-                self.dispatch_command_to_handlers(&unit, state, &mut out);
+                let cmd = ChatBoxMoveCursorLeft;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
             Command::ChatBoxMoveCursorRight => {
-                let unit = ChatBoxMoveCursorRight;
-                self.dispatch_command_to_handlers(&unit, state, &mut out);
+                let cmd = ChatBoxMoveCursorRight;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
             Command::ChatBoxMoveCursorToStart => {
-                let unit = ChatBoxMoveCursorToStart;
-                self.dispatch_command_to_handlers(&unit, state, &mut out);
+                let cmd = ChatBoxMoveCursorToStart;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
             Command::ChatBoxMoveCursorToEnd => {
-                let unit = ChatBoxMoveCursorToEnd;
-                self.dispatch_command_to_handlers(&unit, state, &mut out);
+                let cmd = ChatBoxMoveCursorToEnd;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
             Command::ChatBoxDeleteGraphemeForward => {
-                let unit = ChatBoxDeleteGraphemeForward;
-                self.dispatch_command_to_handlers(&unit, state, &mut out);
+                let cmd = ChatBoxDeleteGraphemeForward;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
             Command::ChatBoxMoveCursorWordLeft => {
-                let unit = ChatBoxMoveCursorWordLeft;
-                self.dispatch_command_to_handlers(&unit, state, &mut out);
+                let cmd = ChatBoxMoveCursorWordLeft;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
             Command::ChatBoxMoveCursorWordRight => {
-                let unit = ChatBoxMoveCursorWordRight;
-                self.dispatch_command_to_handlers(&unit, state, &mut out);
+                let cmd = ChatBoxMoveCursorWordRight;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
             Command::AppSetMode { payload } => {
                 self.dispatch_command_to_handlers(&payload, state, &mut out);
             }
             Command::AppQuit => {
-                let unit = AppQuit;
-                self.dispatch_command_to_handlers(&unit, state, &mut out);
+                let cmd = AppQuit;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
             Command::AppEditInput => {
-                let unit = AppEditInput;
-                self.dispatch_command_to_handlers(&unit, state, &mut out);
+                let cmd = AppEditInput;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
             Command::AppToggleWhichKey => {
-                let unit = AppToggleWhichKey;
-                self.dispatch_command_to_handlers(&unit, state, &mut out);
+                let cmd = AppToggleWhichKey;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
             Command::AppSwitchTab { payload } => {
                 self.dispatch_command_to_handlers(&payload, state, &mut out);
@@ -364,8 +364,8 @@ impl<S> Bus<S> {
                 self.dispatch_command_to_handlers(&payload, state, &mut out);
             }
             Command::ProviderCancelStream => {
-                let unit = ProviderCancelStream;
-                self.dispatch_command_to_handlers(&unit, state, &mut out);
+                let cmd = ProviderCancelStream;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
             Command::CustomCommand { payload } => {
                 self.dispatch_command_to_handlers(&payload, state, &mut out);
@@ -412,8 +412,8 @@ impl<S> Bus<S> {
                 self.dispatch_event_to_handlers(&payload, state, &mut out);
             }
             Event::EventApplicationReady => {
-                let unit = EventApplicationReady;
-                self.dispatch_event_to_handlers(&unit, state, &mut out);
+                let cmd = EventApplicationReady;
+                self.dispatch_event_to_handlers(&cmd, state, &mut out);
             }
             Event::EventCustom { payload } => {
                 self.dispatch_event_to_handlers(&payload, state, &mut out);
@@ -428,8 +428,8 @@ impl<S> Bus<S> {
                 self.dispatch_event_to_handlers(&payload, state, &mut out);
             }
             Event::EventApplicationShuttingDown => {
-                let unit = EventApplicationShuttingDown;
-                self.dispatch_event_to_handlers(&unit, state, &mut out);
+                let cmd = EventApplicationShuttingDown;
+                self.dispatch_event_to_handlers(&cmd, state, &mut out);
             }
             // #[non_exhaustive] requires a wildcard arm. Unknown event types
             // are silently dropped — handlers for future variants must be added here.
