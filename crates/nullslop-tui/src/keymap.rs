@@ -25,6 +25,7 @@ pub enum KeyCategory {
 
 /// Builds and returns the full keymap with all scope bindings.
 #[must_use]
+#[rustfmt::skip]
 #[allow(clippy::too_many_lines)]
 pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
     let mut keymap = Keymap::new();
@@ -32,87 +33,27 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
     keymap
         // Normal scope: navigation and commands
         .scope(Scope::Normal, |b| {
-            b.bind(
-                "i",
-                Command::AppSetMode {
-                    payload: AppSetMode { mode: Mode::Input },
-                },
-                KeyCategory::General,
-            )
+            b.bind("i", Command::AppSetMode { payload: AppSetMode { mode: Mode::Input } }, KeyCategory::General)
             .bind("q", Command::AppQuit, KeyCategory::General)
             .bind("?", Command::AppToggleWhichKey, KeyCategory::General)
             .bind("<c-e>", Command::AppEditInput, KeyCategory::Input)
-            .bind(
-                "<c-h>",
-                Command::AppSwitchTab {
-                    payload: AppSwitchTab {
-                        direction: TabDirection::Prev,
-                    },
-                },
-                KeyCategory::General,
-            )
-            .bind(
-                "<c-l>",
-                Command::AppSwitchTab {
-                    payload: AppSwitchTab {
-                        direction: TabDirection::Next,
-                    },
-                },
-                KeyCategory::General,
-            );
+            .bind("<c-h>", Command::AppSwitchTab { payload: AppSwitchTab { direction: TabDirection::Prev } }, KeyCategory::General)
+            .bind("<c-l>", Command::AppSwitchTab { payload: AppSwitchTab { direction: TabDirection::Next } }, KeyCategory::General);
         })
         // Input scope: typing into the input buffer
         .scope(Scope::Input, |b| {
-            b.bind(
-                "<enter>",
-                Command::ChatBoxSubmitMessage {
-                    payload: ChatBoxSubmitMessage {
-                        text: String::new(),
-                    },
-                },
-                KeyCategory::Input,
-            )
-            .bind(
-                "<esc>",
-                Command::AppSetMode {
-                    payload: AppSetMode { mode: Mode::Normal },
-                },
-                KeyCategory::General,
-            )
+            b.bind("<enter>", Command::ChatBoxSubmitMessage { payload: ChatBoxSubmitMessage { text: String::new() } }, KeyCategory::Input)
+            .bind("<esc>", Command::AppSetMode { payload: AppSetMode { mode: Mode::Normal } }, KeyCategory::General)
             .bind("<c-e>", Command::AppEditInput, KeyCategory::Input)
             .bind("<f1>", Command::AppToggleWhichKey, KeyCategory::General)
-            .bind(
-                "<backspace>",
-                Command::ChatBoxDeleteGrapheme,
-                KeyCategory::Input,
-            )
+            .bind("<backspace>", Command::ChatBoxDeleteGrapheme, KeyCategory::Input)
             .bind("<left>", Command::ChatBoxMoveCursorLeft, KeyCategory::Input)
-            .bind(
-                "<right>",
-                Command::ChatBoxMoveCursorRight,
-                KeyCategory::Input,
-            )
-            .bind(
-                "<home>",
-                Command::ChatBoxMoveCursorToStart,
-                KeyCategory::Input,
-            )
+            .bind("<right>", Command::ChatBoxMoveCursorRight, KeyCategory::Input)
+            .bind("<home>", Command::ChatBoxMoveCursorToStart, KeyCategory::Input)
             .bind("<end>", Command::ChatBoxMoveCursorToEnd, KeyCategory::Input)
-            .bind(
-                "<delete>",
-                Command::ChatBoxDeleteGraphemeForward,
-                KeyCategory::Input,
-            )
-            .bind(
-                "<c-left>",
-                Command::ChatBoxMoveCursorWordLeft,
-                KeyCategory::Input,
-            )
-            .bind(
-                "<c-right>",
-                Command::ChatBoxMoveCursorWordRight,
-                KeyCategory::Input,
-            )
+            .bind("<delete>", Command::ChatBoxDeleteGraphemeForward, KeyCategory::Input)
+            .bind("<c-left>", Command::ChatBoxMoveCursorWordLeft, KeyCategory::Input)
+            .bind("<c-right>", Command::ChatBoxMoveCursorWordRight, KeyCategory::Input)
             .catch_all(|key: KeyEvent| {
                 if let Key::Char(c) = key.key {
                     Some(Command::ChatBoxInsertChar {
