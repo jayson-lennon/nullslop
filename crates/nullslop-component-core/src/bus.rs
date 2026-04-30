@@ -327,6 +327,9 @@ impl<S> Bus<S> {
                 let unit = AppToggleWhichKey;
                 self.dispatch_command_to_handlers(&unit, state, &mut out);
             }
+            Command::AppSwitchTab { payload } => {
+                self.dispatch_command_to_handlers(&payload, state, &mut out);
+            }
             Command::ProviderSendMessage { payload } => {
                 self.dispatch_command_to_handlers(&payload, state, &mut out);
             }

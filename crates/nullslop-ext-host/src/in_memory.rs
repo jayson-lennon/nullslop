@@ -13,7 +13,7 @@ use nullslop_extension::{
     ChannelExtensionSink, ContextKind, ExtensionContext, ExtensionOutput, ExtensionSink,
     InMemoryExtension,
 };
-use nullslop_protocol::shutdown::ExtensionStarting;
+use nullslop_protocol::shutdown::{ExtensionStarted, ExtensionStarting};
 use nullslop_protocol::{Command, Event, ExtensionName};
 
 /// Joins a thread with a timeout. Returns `true` if the thread exited within the timeout.
@@ -176,6 +176,14 @@ impl InMemoryExtensionHost {
             sender.send_extension_event(
                 Event::EventExtensionStarting {
                     payload: ExtensionStarting { name: name.clone() },
+                },
+                None as Option<ExtensionName>,
+            );
+
+            // Emit ExtensionStarted — registration is complete for this extension.
+            sender.send_extension_event(
+                Event::EventExtensionStarted {
+                    payload: ExtensionStarted { name: name.clone() },
                 },
                 None as Option<ExtensionName>,
             );
@@ -623,12 +631,16 @@ mod tests {
         let _host = InMemoryExtensionHost::start(sender.clone(), vec![ext], runtime.handle());
 
         // When start() completes.
-        // Then an ExtensionStarting event was sent via ExtHostSender.
+        // Then ExtensionStarting and ExtensionStarted events were sent.
         let events = sender.extension_events();
-        assert_eq!(events.len(), 1);
+        assert_eq!(events.len(), 2);
         assert!(matches!(
             &events[0],
             Event::EventExtensionStarting { payload } if payload.name == "in-memory-0"
+        ));
+        assert!(matches!(
+            &events[1],
+            Event::EventExtensionStarted { payload } if payload.name == "in-memory-0"
         ));
     }
 
@@ -645,17 +657,28 @@ mod tests {
             InMemoryExtensionHost::start(sender.clone(), vec![ext1, ext2, ext3], runtime.handle());
 
         // When start() completes.
-        // Then ExtensionStarting events were sent for each extension.
+        // Then ExtensionStarting and ExtensionStarted events were sent for each.
         let events = sender.extension_events();
-        assert_eq!(events.len(), 3);
-        let names: Vec<&str> = events
+        assert_eq!(events.len(), 6);
+        let names: Vec<(&str, &str)> = events
             .iter()
             .map(|e| match e {
-                Event::EventExtensionStarting { payload } => payload.name.as_str(),
-                _ => "unexpected",
+                Event::EventExtensionStarting { payload } => (payload.name.as_str(), "starting"),
+                Event::EventExtensionStarted { payload } => (payload.name.as_str(), "started"),
+                _ => ("unexpected", ""),
             })
             .collect();
-        assert_eq!(names, vec!["in-memory-0", "in-memory-1", "in-memory-2"]);
+        assert_eq!(
+            names,
+            vec![
+                ("in-memory-0", "starting"),
+                ("in-memory-0", "started"),
+                ("in-memory-1", "starting"),
+                ("in-memory-1", "started"),
+                ("in-memory-2", "starting"),
+                ("in-memory-2", "started")
+            ]
+        );
     }
 
     #[test]

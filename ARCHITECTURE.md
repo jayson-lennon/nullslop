@@ -37,11 +37,13 @@ A **component** is a directory under `crates/nullslop-component/src/` having var
 | File         | Purpose                                                      |
 | ------------ | ------------------------------------------------------------ |
 | `mod.rs`     | Registration — wires the component into the bus and registry |
-| `handler.rs` | Bus access — reacts to commands/events, mutates `AppState`   |
+| `handler.rs` | Bus access — reacts to commands/events, mutates `AppState`. When adding a handler for a **new** command or event, also add the variant to the `Command`/`Event` enum in `nullslop-protocol`. |
 | `element.rs` | Rendering — implements `UiElement`, draws to a `Frame`       |
 | `state.rs`   | State — component-specific data held in `AppState`           |
 
 For example, a chat input box needs all four since it handles input, rendering, and state. A clock display would only need `mod.rs` and `element.rs` since it just renders to the screen.
+
+> **Reminder:** Every command or event struct in a domain module must have a corresponding variant on the `Command` or `Event` enum in `nullslop-protocol`. The bus dispatches by enum variant — a struct without a variant is invisible.
 
 ### Handler pattern
 

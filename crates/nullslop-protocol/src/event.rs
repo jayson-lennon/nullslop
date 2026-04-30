@@ -5,6 +5,12 @@
 //!
 //! Individual event structs live in domain modules ([`chat_input`], [`system`],
 //! [`custom`], [`shutdown`]). This module re-exports them for convenience.
+//!
+//! # When adding a new event
+//!
+//! Every new event struct **must** be added as a variant on the [`Event`] enum
+//! below. Creating the struct alone is not enough — the bus broadcasts based on
+//! enum variants, so a missing variant means the event is invisible to the system.
 
 use serde::{Deserialize, Serialize};
 
@@ -20,6 +26,10 @@ pub use crate::system::{EventApplicationReady, EventKeyDown, EventKeyUp, EventMo
 ///
 /// Extensions subscribe to relevant variants; the host also
 /// uses them internally to drive UI updates.
+///
+/// **When adding a new event struct**, you must add a corresponding variant to
+/// this enum. An event struct defined in a domain module without an enum variant
+/// here will not be broadcast by the bus.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]

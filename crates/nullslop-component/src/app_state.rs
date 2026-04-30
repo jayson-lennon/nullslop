@@ -4,9 +4,10 @@
 //! application is currently behaving. Every component reads from and writes to this
 //! shared state.
 
-use nullslop_protocol::{ChatEntry, Mode};
+use nullslop_protocol::{ActiveTab, ChatEntry, Mode};
 
 use crate::chat_input_box::ChatInputBoxState;
+use crate::dashboard::DashboardState;
 use crate::shutdown_tracker::ShutdownTrackerState;
 
 /// A snapshot of everything the application is doing right now.
@@ -24,6 +25,12 @@ pub struct AppState {
     /// Bookkeeping for which extensions are still running during shutdown.
     pub shutdown_tracker: ShutdownTrackerState,
 
+    /// Extension dashboard — tracks registered extensions and their status.
+    pub dashboard: DashboardState,
+
+    /// The currently active tab.
+    pub active_tab: ActiveTab,
+
     /// Set to `true` when the user has requested to quit.
     pub should_quit: bool,
 }
@@ -37,6 +44,8 @@ impl AppState {
             mode: Mode::Normal,
             chat_input: ChatInputBoxState::new(),
             shutdown_tracker: ShutdownTrackerState::new(),
+            dashboard: DashboardState::new(),
+            active_tab: ActiveTab::Chat,
             should_quit: false,
         }
     }

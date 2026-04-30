@@ -22,13 +22,15 @@ pub mod key;
 pub mod mode;
 pub mod shutdown;
 pub mod system;
+pub mod tab;
 
 // Re-export primary types
 pub use action::CommandAction;
 pub use chat::{ChatEntry, ChatEntryKind};
-pub use command::Command;
+pub use command::{Command, TabDirection};
 pub use custom::{CommandMsg, EchoCommand, EventMsg};
 pub use event::Event;
 pub use extension_name::ExtensionName;
 pub use key::{Key, KeyEvent, Modifiers};
 pub use mode::Mode;
+pub use tab::ActiveTab;

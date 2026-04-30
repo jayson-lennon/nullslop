@@ -122,7 +122,7 @@ extensions/
 ```
 chat_input_box/
 ├── mod.rs      # register(bus, registry) wiring
-├── handler.rs  # Bus handler via define_handler! macro
+├── handler.rs  # Bus handler via define_handler! macro (if using a NEW command/event, add the enum variant in nullslop-protocol too)
 ├── element.rs  # UiElement<AppState> rendering
 └── state.rs    # Component-specific state (e.g., ChatInputBoxState)
 ```
@@ -305,7 +305,7 @@ When implementing features:
 
 1. **Search for related patterns** — Find similar components in `nullslop-component/src/`
 2. **Identify impacted types** — Check if new commands, events, or state fields are needed
-3. **Add protocol types first** — Define new `Command`/`Event` variants in `nullslop-protocol`
+3. **Add protocol types first** — Define new command/event structs in their domain module **and** add the corresponding variant to the `Command` or `Event` enum in `nullslop-protocol/src/command.rs` or `event.rs`. Forgetting the enum variant is the most common oversight — the struct alone is not enough.
 4. **Create the component directory** — Add `handler.rs`, `element.rs`, `state.rs` as needed
 5. **Register** — Wire into `register_all()` in `nullslop-component/src/lib.rs`
 6. **Write tests** — Use Given/When/Then structure, test via the bus

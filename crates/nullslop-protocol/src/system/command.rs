@@ -33,3 +33,19 @@ pub struct ProviderSendMessage {
 /// Cancel the active provider stream.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProviderCancelStream;
+
+/// Switch to a different tab.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppSwitchTab {
+    /// The direction to cycle tabs.
+    pub direction: TabDirection,
+}
+
+/// Direction for tab cycling.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TabDirection {
+    /// Move to the next tab (wrapping).
+    Next,
+    /// Move to the previous tab (wrapping).
+    Prev,
+}

@@ -17,6 +17,7 @@ use wherror::Error;
 
 use crate::TuiApp;
 use crate::app::scope_for_mode;
+use nullslop_protocol::ActiveTab;
 
 /// Error type for TUI run operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
@@ -100,6 +101,9 @@ fn run_main_loop(
         let scope = scope_for_mode(app.core.state.read().mode);
         app.which_key.set_scope(scope);
 
+        // Sync tab manager active tab from AppState.active_tab.
+        sync_tab_manager(app);
+
         // Check for pending suspend after event batch processing.
         if let Some(action) = app.suspend.take_action() {
             handle_suspend_action(terminal, app, action, handle)?;
@@ -175,4 +179,19 @@ fn handle_suspend_action(
     }
 
     Ok(())
+}
+
+/// Sync the tab manager's active tab index to match `AppState.active_tab`.
+fn sync_tab_manager(app: &mut TuiApp) {
+    let active_tab = app.core.state.read().active_tab;
+    let target_idx = match active_tab {
+        ActiveTab::Chat => 0,
+        ActiveTab::Dashboard => 1,
+    };
+    if let Some(current) = app.tab_manager.active_id()
+        && app.tab_manager.index_of(current) != Some(target_idx)
+        && let Some(tab) = app.tab_manager.tabs().get(target_idx)
+    {
+        app.tab_manager.switch_to(tab.id);
+    }
 }

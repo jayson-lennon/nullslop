@@ -5,8 +5,8 @@
 //! [`nullslop_protocol::KeyEvent`] so the keymap works in both TUI and headless modes.
 
 use derive_more::Display;
-use nullslop_protocol::command::{AppSetMode, ChatBoxInsertChar, ChatBoxSubmitMessage};
-use nullslop_protocol::{Command, Mode};
+use nullslop_protocol::command::{AppSetMode, AppSwitchTab, ChatBoxInsertChar, ChatBoxSubmitMessage};
+use nullslop_protocol::{Command, Mode, TabDirection};
 use nullslop_protocol::{Key, KeyEvent};
 use ratatui_which_key::Keymap;
 
@@ -38,7 +38,25 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
             )
             .bind("q", Command::AppQuit, KeyCategory::General)
             .bind("?", Command::AppToggleWhichKey, KeyCategory::General)
-            .bind("<c-e>", Command::AppEditInput, KeyCategory::Input);
+            .bind("<c-e>", Command::AppEditInput, KeyCategory::Input)
+            .bind(
+                "<c-h>",
+                Command::AppSwitchTab {
+                    payload: AppSwitchTab {
+                        direction: TabDirection::Prev,
+                    },
+                },
+                KeyCategory::General,
+            )
+            .bind(
+                "<c-l>",
+                Command::AppSwitchTab {
+                    payload: AppSwitchTab {
+                        direction: TabDirection::Next,
+                    },
+                },
+                KeyCategory::General,
+            );
         })
         // Input scope: typing into the input buffer
         .scope(Scope::Input, |b| {

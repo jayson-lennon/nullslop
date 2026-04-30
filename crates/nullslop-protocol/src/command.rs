@@ -5,6 +5,12 @@
 //!
 //! Individual command structs live in domain modules ([`chat_input`], [`system`],
 //! [`custom`], [`shutdown`]). This module re-exports them for convenience.
+//!
+//! # When adding a new command
+//!
+//! Every new command struct **must** be added as a variant on the [`Command`] enum
+//! below. Creating the struct alone is not enough — the bus dispatches based on
+//! enum variants, so a missing variant means the command is invisible to the system.
 
 use serde::{Deserialize, Serialize};
 
@@ -15,13 +21,18 @@ pub use crate::chat_input::{
 pub use crate::custom::{CommandMsg, CustomCommand, EchoCommand};
 pub use crate::shutdown::ProceedWithShutdown;
 pub use crate::system::{
-    AppEditInput, AppQuit, AppSetMode, AppToggleWhichKey, ProviderCancelStream, ProviderSendMessage,
+    AppEditInput, AppQuit, AppSetMode, AppSwitchTab, AppToggleWhichKey, ProviderCancelStream,
+    ProviderSendMessage, TabDirection,
 };
 
 /// Every command the host can receive.
 ///
 /// Extensions and internal handlers produce these; the host dispatches
 /// them to the appropriate domain handler.
+///
+/// **When adding a new command struct**, you must add a corresponding variant to
+/// this enum. A command struct defined in a domain module without an enum variant
+/// here will not be dispatched by the bus.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 #[serde(tag = "type")]
@@ -62,6 +73,13 @@ pub enum Command {
     /// Toggle the which-key popup.
     #[serde(rename = "app_toggle_which_key")]
     AppToggleWhichKey,
+    /// Switch to a different tab.
+    #[serde(rename = "app_switch_tab")]
+    AppSwitchTab {
+        /// The tab to switch to.
+        #[serde(flatten)]
+        payload: AppSwitchTab,
+    },
     /// Send a message to the AI provider.
     #[serde(rename = "provider_send_message")]
     ProviderSendMessage {
@@ -99,6 +117,7 @@ impl std::fmt::Display for Command {
             Command::AppQuit => write!(f, "quit"),
             Command::AppEditInput => write!(f, "edit in $EDITOR"),
             Command::AppToggleWhichKey => write!(f, "toggle which-key"),
+            Command::AppSwitchTab { payload } => write!(f, "switch tab {:?}", payload.direction),
             Command::ProviderSendMessage { .. } => write!(f, "send message"),
             Command::ProviderCancelStream => write!(f, "cancel stream"),
             Command::CustomCommand { payload } => write!(f, "{}", payload.name),
@@ -176,6 +195,7 @@ mod tests {
     #[case::quit(Command::AppQuit)]
     #[case::edit_input(Command::AppEditInput)]
     #[case::toggle_which_key(Command::AppToggleWhichKey)]
+    #[case::switch_tab(Command::AppSwitchTab { payload: AppSwitchTab { direction: crate::TabDirection::Next } })]
     #[case::send_message(Command::ProviderSendMessage { payload: ProviderSendMessage { text: "hi".into() } })]
     #[case::cancel_stream(Command::ProviderCancelStream)]
     #[case::custom(Command::CustomCommand { payload: CustomCommand { name: "echo".into(), args: serde_json::json!({}) } })]

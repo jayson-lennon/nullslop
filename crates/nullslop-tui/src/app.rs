@@ -6,6 +6,7 @@ use nullslop_core::{AppCore, AppMsg};
 use nullslop_protocol::{Command, Mode};
 use ratatui::Frame;
 use ratatui_which_key::WhichKeyState;
+use ratatui_tabs::TabManager;
 
 use crate::keymap;
 use crate::msg::Msg;
@@ -39,6 +40,8 @@ pub struct TuiApp {
     pub services: nullslop_services::Services,
     /// Current application lifecycle status.
     pub status: AppStatus,
+    /// Tab manager for rendering the tab bar.
+    pub tab_manager: TabManager,
 }
 
 impl TuiApp {
@@ -60,6 +63,7 @@ impl TuiApp {
             event_task: None,
             services,
             status: AppStatus::Starting,
+            tab_manager: crate::render::init_tab_manager(),
         }
     }
 
@@ -86,6 +90,7 @@ impl TuiApp {
             event_task: None,
             services,
             status: AppStatus::Starting,
+            tab_manager: crate::render::init_tab_manager(),
         }
     }
 

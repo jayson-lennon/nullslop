@@ -21,10 +21,13 @@ pub mod char_counter;
 pub mod chat_input_box;
 pub mod chat_log;
 pub mod custom_command;
+pub mod dashboard;
 pub mod shutdown_tracker;
+pub mod tab_nav;
 
 pub use app_state::AppState;
 pub use chat_input_box::ChatInputBoxState;
+pub use dashboard::DashboardState;
 pub use shutdown_tracker::ShutdownTrackerState;
 
 use nullslop_component_core::Bus;
@@ -46,6 +49,8 @@ pub fn register_all(bus: &mut AppBus, registry: &mut AppUiRegistry) {
     chat_input_box::register(bus, registry);
     chat_log::register(bus, registry);
     char_counter::register(bus, registry);
+    dashboard::register(bus, registry);
+    tab_nav::register(bus, registry);
 }
 
 /// Register only TUI elements (no bus handlers).
@@ -57,6 +62,7 @@ pub fn register_tui_elements(registry: &mut AppUiRegistry) {
     registry.register(Box::new(chat_input_box::ChatInputBoxElement));
     registry.register(Box::new(chat_log::ChatLogElement));
     registry.register(Box::new(char_counter::CharCounterElement));
+    registry.register(Box::new(dashboard::DashboardElement));
 }
 
 #[cfg(test)]

@@ -4,6 +4,7 @@ mod command;
 mod event;
 
 pub use command::{
-    AppEditInput, AppQuit, AppSetMode, AppToggleWhichKey, ProviderCancelStream, ProviderSendMessage,
+    AppEditInput, AppQuit, AppSetMode, AppSwitchTab, AppToggleWhichKey, ProviderCancelStream,
+    ProviderSendMessage, TabDirection,
 };
 pub use event::{EventApplicationReady, EventKeyDown, EventKeyUp, EventModeChanged};
