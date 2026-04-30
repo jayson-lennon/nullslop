@@ -431,7 +431,6 @@ impl<S> Bus<S> {
                 let cmd = EventApplicationShuttingDown;
                 self.dispatch_event_to_handlers(&cmd, state, &mut out);
             }
-            _ => {}
         }
         self.flush_out(out);
     }
