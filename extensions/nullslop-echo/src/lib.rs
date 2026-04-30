@@ -38,7 +38,7 @@ impl Extension for EchoExtension {
             Event::EventApplicationShuttingDown => {
                 if let Some(name) = ctx.name()
                     && let Err(e) = ctx.send_event(Event::EventExtensionShutdownCompleted {
-                        payload: npr::shutdown::ExtensionShutdownCompleted {
+                        payload: npr::extension::ExtensionShutdownCompleted {
                             name: name.to_string(),
                         },
                     })
@@ -49,7 +49,7 @@ impl Extension for EchoExtension {
             Event::EventApplicationReady => {
                 if let Some(name) = ctx.name()
                     && let Err(e) = ctx.send_event(Event::EventExtensionStarted {
-                        payload: npr::shutdown::ExtensionStarted {
+                        payload: npr::extension::ExtensionStarted {
                             name: name.to_string(),
                         },
                     })

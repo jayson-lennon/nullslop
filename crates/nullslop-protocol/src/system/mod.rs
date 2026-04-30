@@ -1,10 +1,7 @@
-//! System domain: application-level commands and events.
+//! System domain: application-level commands, events, and built-in extension commands.
 
 mod command;
 mod event;
 
-pub use command::{
-    AppEditInput, AppQuit, AppSetMode, AppSwitchTab, AppToggleWhichKey, ProviderCancelStream,
-    ProviderSendMessage, TabDirection,
-};
-pub use event::{EventApplicationReady, EventKeyDown, EventKeyUp, EventModeChanged};
+pub use command::{AppEditInput, AppQuit, AppSetMode, AppToggleWhichKey, EchoCommand};
+pub use event::{EventApplicationReady, EventApplicationShuttingDown, EventKeyDown, EventKeyUp, EventModeChanged};

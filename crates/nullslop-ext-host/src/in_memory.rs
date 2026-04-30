@@ -13,7 +13,7 @@ use nullslop_extension::{
     ChannelExtensionSink, ContextKind, ExtensionContext, ExtensionOutput, ExtensionSink,
     InMemoryExtension,
 };
-use nullslop_protocol::shutdown::{ExtensionStarted, ExtensionStarting};
+use nullslop_protocol::extension::{ExtensionStarted, ExtensionStarting};
 use nullslop_protocol::{Command, Event, ExtensionName};
 
 /// Joins a thread with a timeout. Returns `true` if the thread exited within the timeout.

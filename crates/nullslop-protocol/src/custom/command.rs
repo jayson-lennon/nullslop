@@ -1,4 +1,4 @@
-//! Extension command routing and built-in commands.
+//! Extension command routing infrastructure.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -19,11 +19,4 @@ pub struct CustomCommand {
     pub name: String,
     /// The command arguments.
     pub args: Value,
-}
-
-/// The echo command.
-pub struct EchoCommand;
-
-impl CommandMsg for EchoCommand {
-    const NAME: &'static str = "echo";
 }

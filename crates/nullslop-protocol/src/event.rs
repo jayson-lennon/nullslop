@@ -4,7 +4,7 @@
 //! inform internal handlers and extensions about state changes and input.
 //!
 //! Individual event structs live in domain modules ([`chat_input`], [`system`],
-//! [`custom`], [`shutdown`]). This module re-exports them for convenience.
+//! [`custom`], [`extension`]). This module re-exports them for convenience.
 //!
 //! # When adding a new event
 //!
@@ -17,10 +17,10 @@ use serde::{Deserialize, Serialize};
 // Re-export event structs and trait from domain modules.
 pub use crate::chat_input::EventChatMessageSubmitted;
 pub use crate::custom::{EventCustom, EventMsg};
-pub use crate::shutdown::{
-    EventApplicationShuttingDown, ExtensionShutdownCompleted, ExtensionStarted, ExtensionStarting,
+pub use crate::extension::{
+    ExtensionShutdownCompleted, ExtensionStarted, ExtensionStarting,
 };
-pub use crate::system::{EventApplicationReady, EventKeyDown, EventKeyUp, EventModeChanged};
+pub use crate::system::{EventApplicationReady, EventApplicationShuttingDown, EventKeyDown, EventKeyUp, EventModeChanged};
 
 /// Every event the host can broadcast.
 ///

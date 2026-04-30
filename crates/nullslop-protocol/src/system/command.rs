@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::Mode;
+use crate::custom::CommandMsg;
 
 /// Set the application interaction mode.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,29 +24,9 @@ pub struct AppEditInput;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppToggleWhichKey;
 
-/// Send a message to the AI provider.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProviderSendMessage {
-    /// The message text.
-    pub text: String,
-}
+/// The echo command.
+pub struct EchoCommand;
 
-/// Cancel the active provider stream.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProviderCancelStream;
-
-/// Switch to a different tab.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppSwitchTab {
-    /// The direction to cycle tabs.
-    pub direction: TabDirection,
-}
-
-/// Direction for tab cycling.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TabDirection {
-    /// Move to the next tab (wrapping).
-    Next,
-    /// Move to the previous tab (wrapping).
-    Prev,
+impl CommandMsg for EchoCommand {
+    const NAME: &'static str = "echo";
 }

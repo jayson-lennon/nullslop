@@ -1,4 +1,4 @@
-//! Shutdown and extension lifecycle events.
+//! Extension lifecycle events.
 
 use serde::{Deserialize, Serialize};
 
@@ -25,10 +25,6 @@ pub struct ExtensionShutdownCompleted {
     pub name: String,
 }
 
-/// The application is shutting down.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventApplicationShuttingDown;
-
 impl EventMsg for ExtensionStarting {
     const TYPE_NAME: &'static str = "EventExtensionStarting";
 }
@@ -39,8 +35,4 @@ impl EventMsg for ExtensionStarted {
 
 impl EventMsg for ExtensionShutdownCompleted {
     const TYPE_NAME: &'static str = "EventExtensionShutdownCompleted";
-}
-
-impl EventMsg for EventApplicationShuttingDown {
-    const TYPE_NAME: &'static str = "EventApplicationShuttingDown";
 }

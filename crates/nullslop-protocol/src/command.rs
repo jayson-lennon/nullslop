@@ -4,7 +4,7 @@
 //! dispatch instructions from both internal handlers and extensions.
 //!
 //! Individual command structs live in domain modules ([`chat_input`], [`system`],
-//! [`custom`], [`shutdown`]). This module re-exports them for convenience.
+//! [`custom`], [`extension`], [`provider`], [`tab`]). This module re-exports them for convenience.
 //!
 //! # When adding a new command
 //!
@@ -21,12 +21,12 @@ pub use crate::chat_input::{
     ChatBoxMoveCursorToStart, ChatBoxMoveCursorWordLeft, ChatBoxMoveCursorWordRight,
     ChatBoxSubmitMessage,
 };
-pub use crate::custom::{CommandMsg, CustomCommand, EchoCommand};
-pub use crate::shutdown::ProceedWithShutdown;
-pub use crate::system::{
-    AppEditInput, AppQuit, AppSetMode, AppSwitchTab, AppToggleWhichKey, ProviderCancelStream,
-    ProviderSendMessage, TabDirection,
-};
+pub use crate::custom::{CommandMsg, CustomCommand};
+pub use crate::system::EchoCommand;
+pub use crate::extension::ProceedWithShutdown;
+pub use crate::provider::{ProviderCancelStream, ProviderSendMessage};
+pub use crate::system::{AppEditInput, AppQuit, AppSetMode, AppToggleWhichKey};
+pub use crate::tab::{AppSwitchTab, TabDirection};
 
 /// Every command the host can receive.
 ///

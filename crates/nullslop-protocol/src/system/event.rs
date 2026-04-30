@@ -33,6 +33,14 @@ pub struct EventModeChanged {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EventApplicationReady;
 
+/// The application is shutting down.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EventApplicationShuttingDown;
+
 impl EventMsg for EventApplicationReady {
     const TYPE_NAME: &'static str = "EventApplicationReady";
+}
+
+impl EventMsg for EventApplicationShuttingDown {
+    const TYPE_NAME: &'static str = "EventApplicationShuttingDown";
 }
