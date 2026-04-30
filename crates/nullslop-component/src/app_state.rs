@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn default_chat_input_is_empty() {
         let data = AppState::new();
-        assert!(data.chat_input.input_buffer.is_empty());
+        assert!(data.chat_input.is_empty());
     }
 
     #[test]

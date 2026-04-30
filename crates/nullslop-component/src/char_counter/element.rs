@@ -8,7 +8,6 @@ use nullslop_component_ui::UiElement;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::Paragraph;
-use unicode_segmentation::UnicodeSegmentation;
 
 /// A display element that shows how many characters are in the input buffer.
 #[derive(Debug)]
@@ -20,7 +19,7 @@ impl UiElement<AppState> for CharCounterElement {
     }
 
     fn render(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppState) {
-        let count = state.chat_input.input_buffer.graphemes(true).count();
+        let count = state.chat_input.grapheme_count();
         let text = format!("chars: {count}");
         let widget = Paragraph::new(text);
         frame.render_widget(widget, area);
@@ -79,7 +78,9 @@ mod tests {
         let mut element = CharCounterElement;
         let state = {
             let mut s = AppState::new();
-            s.chat_input.input_buffer = "hello".to_string();
+            for ch in "hello".chars() {
+                s.chat_input.insert_grapheme_at_cursor(ch);
+            }
             s
         };
 
@@ -107,7 +108,9 @@ mod tests {
         let mut element = CharCounterElement;
         let state = {
             let mut s = AppState::new();
-            s.chat_input.input_buffer = "écafé".to_string();
+            for ch in "écafé".chars() {
+                s.chat_input.insert_grapheme_at_cursor(ch);
+            }
             s
         };
 

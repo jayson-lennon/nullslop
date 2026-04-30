@@ -6,5 +6,10 @@
 mod command;
 mod event;
 
-pub use command::{ChatBoxClear, ChatBoxDeleteGrapheme, ChatBoxInsertChar, ChatBoxSubmitMessage};
+pub use command::{
+    ChatBoxClear, ChatBoxDeleteGrapheme, ChatBoxDeleteGraphemeForward, ChatBoxInsertChar,
+    ChatBoxMoveCursorLeft, ChatBoxMoveCursorRight, ChatBoxMoveCursorToEnd,
+    ChatBoxMoveCursorToStart, ChatBoxMoveCursorWordLeft, ChatBoxMoveCursorWordRight,
+    ChatBoxSubmitMessage,
+};
 pub use event::EventChatMessageSubmitted;

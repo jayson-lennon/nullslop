@@ -25,6 +25,7 @@ pub fn from_crossterm(event: crossterm::event::KeyEvent) -> Option<KeyEvent> {
         crossterm::event::KeyCode::End => Key::End,
         crossterm::event::KeyCode::PageUp => Key::PageUp,
         crossterm::event::KeyCode::PageDown => Key::PageDown,
+        crossterm::event::KeyCode::Delete => Key::Delete,
         crossterm::event::KeyCode::F(n) => Key::F(n),
         _ => return None,
     };

@@ -94,7 +94,7 @@ mod macro_tests {
             state: &mut AppState,
             _out: &mut Out,
         ) -> CommandAction {
-            state.chat_input.input_buffer.push(cmd.ch);
+            state.chat_input.insert_grapheme_at_cursor(cmd.ch);
             CommandAction::Continue
         }
     }
@@ -113,7 +113,7 @@ mod macro_tests {
         bus.process_commands(&mut state);
 
         // Then the handler ran and mutated state.
-        assert_eq!(state.chat_input.input_buffer, "x");
+        assert_eq!(state.chat_input.text(), "x");
     }
 
     // --- Test handler: command handler returning Stop ---
@@ -208,7 +208,7 @@ mod macro_tests {
             state: &mut AppState,
             _out: &mut Out,
         ) -> CommandAction {
-            state.chat_input.input_buffer.push(cmd.ch);
+            state.chat_input.insert_grapheme_at_cursor(cmd.ch);
             CommandAction::Continue
         }
 
@@ -218,7 +218,7 @@ mod macro_tests {
         }
 
         fn on_ready(_evt: &EventApplicationReady, state: &mut AppState, _out: &mut Out) {
-            state.chat_input.input_buffer.push('!');
+            state.chat_input.insert_grapheme_at_cursor('!');
         }
     }
 
@@ -236,7 +236,7 @@ mod macro_tests {
         bus.process_commands(&mut state);
 
         // Then the command handler ran.
-        assert_eq!(state.chat_input.input_buffer, "h");
+        assert_eq!(state.chat_input.text(), "h");
         assert!(!state.should_quit);
 
         // When also processing AppQuit.
@@ -250,7 +250,7 @@ mod macro_tests {
         bus.submit_event(Event::EventApplicationReady);
         bus.process_events(&mut state);
 
-        // Then the event handler ran (chat_input.input_buffer has "h!").
-        assert_eq!(state.chat_input.input_buffer, "h!");
+        // Then the event handler ran (chat_input.text() has "h!").
+        assert_eq!(state.chat_input.text(), "h!");
     }
 }

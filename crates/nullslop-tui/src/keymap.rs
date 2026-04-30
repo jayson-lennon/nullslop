@@ -83,6 +83,41 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
                 Command::ChatBoxDeleteGrapheme,
                 KeyCategory::Input,
             )
+            .bind(
+                "<left>",
+                Command::ChatBoxMoveCursorLeft,
+                KeyCategory::Input,
+            )
+            .bind(
+                "<right>",
+                Command::ChatBoxMoveCursorRight,
+                KeyCategory::Input,
+            )
+            .bind(
+                "<home>",
+                Command::ChatBoxMoveCursorToStart,
+                KeyCategory::Input,
+            )
+            .bind(
+                "<end>",
+                Command::ChatBoxMoveCursorToEnd,
+                KeyCategory::Input,
+            )
+            .bind(
+                "<delete>",
+                Command::ChatBoxDeleteGraphemeForward,
+                KeyCategory::Input,
+            )
+            .bind(
+                "<c-left>",
+                Command::ChatBoxMoveCursorWordLeft,
+                KeyCategory::Input,
+            )
+            .bind(
+                "<c-right>",
+                Command::ChatBoxMoveCursorWordRight,
+                KeyCategory::Input,
+            )
             .catch_all(|key: KeyEvent| {
                 if let Key::Char(c) = key.key {
                     Some(Command::ChatBoxInsertChar {

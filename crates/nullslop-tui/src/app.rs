@@ -129,7 +129,7 @@ impl TuiApp {
                 self.which_key.toggle();
             }
             Command::AppEditInput => {
-                let initial_content = self.core.state.read().chat_input.input_buffer.clone();
+                let initial_content = self.core.state.read().chat_input.text().to_string();
                 self.suspend.request(SuspendAction::Edit {
                     initial_content,
                     on_result: Box::new(|result| result),
@@ -224,7 +224,7 @@ mod tests {
         // Given an App in Input scope with "hello" in buffer.
         let mut app = create_test_app();
         app.which_key.set_scope(Scope::Input);
-        app.core.state.write().chat_input.input_buffer = "hello".to_string();
+        app.core.state.write().chat_input.replace_all("hello".to_string());
 
         // When pressing Enter.
         app.handle_msg(Msg::Input(key_event(KeyCode::Enter)));
@@ -237,7 +237,7 @@ mod tests {
             guard.chat_history[0].kind,
             npr::ChatEntryKind::User("hello".to_string())
         );
-        assert!(guard.chat_input.input_buffer.is_empty());
+        assert!(guard.chat_input.is_empty());
     }
 
     #[test]
@@ -265,7 +265,7 @@ mod tests {
 
         // Then process core and verify.
         app.core.tick();
-        assert_eq!(app.core.state.read().chat_input.input_buffer, "x");
+        assert_eq!(app.core.state.read().chat_input.text(), "x");
     }
 
     #[test]
@@ -273,14 +273,15 @@ mod tests {
         // Given an App in Input scope with "ab" in buffer.
         let mut app = create_test_app();
         app.which_key.set_scope(Scope::Input);
-        app.core.state.write().chat_input.input_buffer = "ab".to_string();
+        app.core.state.write().chat_input.replace_all("ab".to_string());
 
         // When pressing Backspace.
         app.handle_msg(Msg::Input(key_event(KeyCode::Backspace)));
 
         // Then process core and verify.
         app.core.tick();
-        assert_eq!(app.core.state.read().chat_input.input_buffer, "a");
+        assert_eq!(app.core.state.read().chat_input.text(), "a");
+        assert_eq!(app.core.state.read().chat_input.cursor_pos(), 1);
     }
 
     #[test]

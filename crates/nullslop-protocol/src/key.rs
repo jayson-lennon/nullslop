@@ -35,6 +35,8 @@ pub enum Key {
     PageUp,
     /// Page down key.
     PageDown,
+    /// Delete key (forward delete).
+    Delete,
     /// Function key (F1–F12).
     F(u8),
 }
@@ -63,6 +65,7 @@ impl ratatui_which_key::Key for KeyEvent {
             Key::End => "End".to_string(),
             Key::PageUp => "PageUp".to_string(),
             Key::PageDown => "PageDown".to_string(),
+            Key::Delete => "Delete".to_string(),
             Key::F(n) => format!("F{n}"),
         }
     }
@@ -123,6 +126,7 @@ impl ratatui_which_key::Key for KeyEvent {
             "end" => Key::End,
             "pgup" | "pageup" => Key::PageUp,
             "pgdn" | "pagedown" => Key::PageDown,
+            "delete" | "del" => Key::Delete,
             "space" => Key::Char(' '),
             "lt" => Key::Char('<'),
             "gt" => Key::Char('>'),
@@ -245,6 +249,7 @@ mod tests {
     #[case::page_down(Key::PageDown)]
     #[case::f1(Key::F(1))]
     #[case::f12(Key::F(12))]
+    #[case::delete(Key::Delete)]
     fn key_serialization_roundtrip(#[case] key: Key) {
         // Given a key variant.
         let json = serde_json::to_string(&key).expect("serialize key");

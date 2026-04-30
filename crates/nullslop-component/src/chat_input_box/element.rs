@@ -2,8 +2,8 @@
 //!
 //! Shows the user's in-progress message below a `>` prompt. When the user is
 //! actively typing (input mode), the prompt and border are highlighted in yellow and
-//! the cursor appears at the end of the text. When browsing (normal mode), the
-//! prompt is shown without highlighting and no cursor is displayed.
+//! the cursor appears at the current cursor position within the text. When browsing
+//! (normal mode), the prompt is shown without highlighting and no cursor is displayed.
 
 use crate::AppState;
 use nullslop_component_ui::UiElement;
@@ -13,7 +13,6 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
-use unicode_segmentation::UnicodeSegmentation;
 
 /// Display element for the user's message composition area.
 #[derive(Debug)]
@@ -43,7 +42,7 @@ impl UiElement<AppState> for ChatInputBoxElement {
 
         let line = Line::from(vec![
             Span::styled("> ", prompt_style),
-            Span::styled(&state.chat_input.input_buffer, Style::default()),
+            Span::styled(state.chat_input.text(), Style::default()),
         ]);
 
         let block = Block::default()
@@ -57,8 +56,7 @@ impl UiElement<AppState> for ChatInputBoxElement {
         // Position cursor at the end of the prompt + text when in input mode.
         if input_mode {
             let prompt_width: usize = 2; // "> " = 2 columns
-            let text_width: usize = state.chat_input.input_buffer.graphemes(true).count();
-            let cursor_x = inner.x + (prompt_width + text_width) as u16;
+            let cursor_x = inner.x + (prompt_width + state.chat_input.cursor_pos()) as u16;
             let cursor_y = inner.y;
             frame.set_cursor_position((cursor_x, cursor_y));
         }
@@ -91,7 +89,9 @@ mod tests {
         let mut element = ChatInputBoxElement;
         let state = {
             let mut s = AppState::new();
-            s.chat_input.input_buffer = "hello".to_string();
+            for ch in "hello".chars() {
+                s.chat_input.insert_grapheme_at_cursor(ch);
+            }
             s
         };
 
@@ -142,7 +142,9 @@ mod tests {
         let state = {
             let mut s = AppState::new();
             s.mode = Mode::Input;
-            s.chat_input.input_buffer = "hi".to_string();
+            for ch in "hi".chars() {
+                s.chat_input.insert_grapheme_at_cursor(ch);
+            }
             s
         };
 
@@ -198,7 +200,9 @@ mod tests {
         let state = {
             let mut s = AppState::new();
             s.mode = Mode::Input;
-            s.chat_input.input_buffer = "abc".to_string();
+            for ch in "abc".chars() {
+                s.chat_input.insert_grapheme_at_cursor(ch);
+            }
             s
         };
 
@@ -239,5 +243,99 @@ mod tests {
         // Then cursor position was not set (remains at default 0,0 with cursor hidden).
         let pos = terminal.backend_mut().get_cursor_position().unwrap();
         assert_eq!(pos, Position { x: 0, y: 0 });
+    }
+
+    #[test]
+    fn render_cursor_at_mid_buffer() {
+        // Given a ChatInputBoxElement in Input mode with "abc" and cursor at position 1.
+        let mut element = ChatInputBoxElement;
+        let state = {
+            let mut s = AppState::new();
+            s.mode = Mode::Input;
+            for ch in "abc".chars() {
+                s.chat_input.insert_grapheme_at_cursor(ch);
+            }
+            s.chat_input.move_cursor_to_start();
+            s.chat_input.move_cursor_right(); // cursor at 1 (between 'a' and 'b')
+            s
+        };
+
+        let backend = TestBackend::new(40, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 40, 3);
+
+        // When rendering.
+        terminal
+            .draw(|frame| {
+                element.render(frame, area, &state);
+            })
+            .unwrap();
+
+        // Then cursor is at position (3, 1): inner.x=0 + "> "=2 + cursor_pos=1.
+        terminal
+            .backend_mut()
+            .assert_cursor_position(Position { x: 3, y: 1 });
+    }
+
+    #[test]
+    fn render_cursor_at_home() {
+        // Given a ChatInputBoxElement in Input mode with "hi" and cursor moved to start.
+        let mut element = ChatInputBoxElement;
+        let state = {
+            let mut s = AppState::new();
+            s.mode = Mode::Input;
+            for ch in "hi".chars() {
+                s.chat_input.insert_grapheme_at_cursor(ch);
+            }
+            s.chat_input.move_cursor_to_start();
+            s
+        };
+
+        let backend = TestBackend::new(40, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 40, 3);
+
+        // When rendering.
+        terminal
+            .draw(|frame| {
+                element.render(frame, area, &state);
+            })
+            .unwrap();
+
+        // Then cursor is at position (2, 1): inner.x=0 + "> "=2 + cursor_pos=0.
+        terminal
+            .backend_mut()
+            .assert_cursor_position(Position { x: 2, y: 1 });
+    }
+
+    #[test]
+    fn render_cursor_at_end() {
+        // Given a ChatInputBoxElement in Input mode with "hi" and cursor at end.
+        let mut element = ChatInputBoxElement;
+        let state = {
+            let mut s = AppState::new();
+            s.mode = Mode::Input;
+            for ch in "hi".chars() {
+                s.chat_input.insert_grapheme_at_cursor(ch);
+            }
+            // cursor already at end (2) after inserts
+            s
+        };
+
+        let backend = TestBackend::new(40, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 40, 3);
+
+        // When rendering.
+        terminal
+            .draw(|frame| {
+                element.render(frame, area, &state);
+            })
+            .unwrap();
+
+        // Then cursor is at position (4, 1): inner.x=0 + "> "=2 + "hi"=2.
+        terminal
+            .backend_mut()
+            .assert_cursor_position(Position { x: 4, y: 1 });
     }
 }

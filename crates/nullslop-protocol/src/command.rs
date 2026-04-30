@@ -16,7 +16,10 @@ use serde::{Deserialize, Serialize};
 
 // Re-export command structs and trait from domain modules.
 pub use crate::chat_input::{
-    ChatBoxClear, ChatBoxDeleteGrapheme, ChatBoxInsertChar, ChatBoxSubmitMessage,
+    ChatBoxClear, ChatBoxDeleteGrapheme, ChatBoxDeleteGraphemeForward, ChatBoxInsertChar,
+    ChatBoxMoveCursorLeft, ChatBoxMoveCursorRight, ChatBoxMoveCursorToEnd,
+    ChatBoxMoveCursorToStart, ChatBoxMoveCursorWordLeft, ChatBoxMoveCursorWordRight,
+    ChatBoxSubmitMessage,
 };
 pub use crate::custom::{CommandMsg, CustomCommand, EchoCommand};
 pub use crate::shutdown::ProceedWithShutdown;
@@ -57,6 +60,27 @@ pub enum Command {
     /// Clear the chat input buffer.
     #[serde(rename = "chat_box_clear")]
     ChatBoxClear,
+    /// Move the cursor one grapheme to the left.
+    #[serde(rename = "chat_box_move_cursor_left")]
+    ChatBoxMoveCursorLeft,
+    /// Move the cursor one grapheme to the right.
+    #[serde(rename = "chat_box_move_cursor_right")]
+    ChatBoxMoveCursorRight,
+    /// Move the cursor to the beginning of the input buffer.
+    #[serde(rename = "chat_box_move_cursor_to_start")]
+    ChatBoxMoveCursorToStart,
+    /// Move the cursor to the end of the input buffer.
+    #[serde(rename = "chat_box_move_cursor_to_end")]
+    ChatBoxMoveCursorToEnd,
+    /// Delete the grapheme after the cursor (forward delete).
+    #[serde(rename = "chat_box_delete_grapheme_forward")]
+    ChatBoxDeleteGraphemeForward,
+    /// Move the cursor one word to the left.
+    #[serde(rename = "chat_box_move_cursor_word_left")]
+    ChatBoxMoveCursorWordLeft,
+    /// Move the cursor one word to the right.
+    #[serde(rename = "chat_box_move_cursor_word_right")]
+    ChatBoxMoveCursorWordRight,
     /// Set the application interaction mode.
     #[serde(rename = "app_set_mode")]
     AppSetMode {
@@ -113,6 +137,13 @@ impl std::fmt::Display for Command {
             Command::ChatBoxDeleteGrapheme => write!(f, "delete"),
             Command::ChatBoxSubmitMessage { .. } => write!(f, "submit chat"),
             Command::ChatBoxClear => write!(f, "clear"),
+            Command::ChatBoxMoveCursorLeft => write!(f, "cursor left"),
+            Command::ChatBoxMoveCursorRight => write!(f, "cursor right"),
+            Command::ChatBoxMoveCursorToStart => write!(f, "cursor home"),
+            Command::ChatBoxMoveCursorToEnd => write!(f, "cursor end"),
+            Command::ChatBoxDeleteGraphemeForward => write!(f, "forward delete"),
+            Command::ChatBoxMoveCursorWordLeft => write!(f, "cursor word left"),
+            Command::ChatBoxMoveCursorWordRight => write!(f, "cursor word right"),
             Command::AppSetMode { payload } => write!(f, "set mode {:?}", payload.mode),
             Command::AppQuit => write!(f, "quit"),
             Command::AppEditInput => write!(f, "edit in $EDITOR"),
@@ -200,6 +231,13 @@ mod tests {
     #[case::cancel_stream(Command::ProviderCancelStream)]
     #[case::custom(Command::CustomCommand { payload: CustomCommand { name: "echo".into(), args: serde_json::json!({}) } })]
     #[case::proceed_with_shutdown(Command::ProceedWithShutdown { payload: ProceedWithShutdown { completed: vec!["ext-a".into()], timed_out: vec!["ext-b".into()] } })]
+    #[case::move_cursor_left(Command::ChatBoxMoveCursorLeft)]
+    #[case::move_cursor_right(Command::ChatBoxMoveCursorRight)]
+    #[case::move_cursor_to_start(Command::ChatBoxMoveCursorToStart)]
+    #[case::move_cursor_to_end(Command::ChatBoxMoveCursorToEnd)]
+    #[case::delete_forward(Command::ChatBoxDeleteGraphemeForward)]
+    #[case::move_cursor_word_left(Command::ChatBoxMoveCursorWordLeft)]
+    #[case::move_cursor_word_right(Command::ChatBoxMoveCursorWordRight)]
     fn command_roundtrip_all_variants(#[case] cmd: Command) {
         // Given a command variant.
         let json = serde_json::to_string(&cmd).expect("serialize");

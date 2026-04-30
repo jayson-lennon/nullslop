@@ -41,7 +41,9 @@ use nullslop_protocol::{
     Command, CommandAction, Event, ExtensionName,
     command::{
         AppEditInput, AppQuit, AppToggleWhichKey, ChatBoxClear, ChatBoxDeleteGrapheme,
-        ProviderCancelStream,
+        ChatBoxDeleteGraphemeForward, ChatBoxMoveCursorLeft, ChatBoxMoveCursorRight,
+        ChatBoxMoveCursorToEnd, ChatBoxMoveCursorToStart, ChatBoxMoveCursorWordLeft,
+        ChatBoxMoveCursorWordRight, ProviderCancelStream,
     },
     event::{EventApplicationReady, EventApplicationShuttingDown},
 };
@@ -310,6 +312,34 @@ impl<S> Bus<S> {
             }
             Command::ChatBoxClear => {
                 let unit = ChatBoxClear;
+                self.dispatch_command_to_handlers(&unit, state, &mut out);
+            }
+            Command::ChatBoxMoveCursorLeft => {
+                let unit = ChatBoxMoveCursorLeft;
+                self.dispatch_command_to_handlers(&unit, state, &mut out);
+            }
+            Command::ChatBoxMoveCursorRight => {
+                let unit = ChatBoxMoveCursorRight;
+                self.dispatch_command_to_handlers(&unit, state, &mut out);
+            }
+            Command::ChatBoxMoveCursorToStart => {
+                let unit = ChatBoxMoveCursorToStart;
+                self.dispatch_command_to_handlers(&unit, state, &mut out);
+            }
+            Command::ChatBoxMoveCursorToEnd => {
+                let unit = ChatBoxMoveCursorToEnd;
+                self.dispatch_command_to_handlers(&unit, state, &mut out);
+            }
+            Command::ChatBoxDeleteGraphemeForward => {
+                let unit = ChatBoxDeleteGraphemeForward;
+                self.dispatch_command_to_handlers(&unit, state, &mut out);
+            }
+            Command::ChatBoxMoveCursorWordLeft => {
+                let unit = ChatBoxMoveCursorWordLeft;
+                self.dispatch_command_to_handlers(&unit, state, &mut out);
+            }
+            Command::ChatBoxMoveCursorWordRight => {
+                let unit = ChatBoxMoveCursorWordRight;
                 self.dispatch_command_to_handlers(&unit, state, &mut out);
             }
             Command::AppSetMode { payload } => {

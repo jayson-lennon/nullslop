@@ -26,3 +26,31 @@ pub struct ChatBoxSubmitMessage {
 /// Clear the chat input buffer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatBoxClear;
+
+/// Move the cursor one grapheme to the left.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatBoxMoveCursorLeft;
+
+/// Move the cursor one grapheme to the right.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatBoxMoveCursorRight;
+
+/// Move the cursor to the beginning of the input buffer.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatBoxMoveCursorToStart;
+
+/// Move the cursor to the end of the input buffer.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatBoxMoveCursorToEnd;
+
+/// Delete the grapheme after the cursor (forward delete).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatBoxDeleteGraphemeForward;
+
+/// Move the cursor one word to the left.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatBoxMoveCursorWordLeft;
+
+/// Move the cursor one word to the right.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatBoxMoveCursorWordRight;
