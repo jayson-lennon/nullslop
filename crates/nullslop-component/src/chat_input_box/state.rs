@@ -58,8 +58,7 @@ impl ChatInputBoxState {
             .input_buffer
             .grapheme_indices(true)
             .nth(self.cursor_pos)
-            .map(|(i, _)| i)
-            .unwrap_or(self.input_buffer.len());
+            .map_or(self.input_buffer.len(), |(i, _)| i);
         self.input_buffer.insert(byte_offset, ch);
         self.cursor_pos += 1;
     }
