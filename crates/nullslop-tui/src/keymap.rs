@@ -5,7 +5,9 @@
 //! [`nullslop_protocol::KeyEvent`] so the keymap works in both TUI and headless modes.
 
 use derive_more::Display;
-use nullslop_protocol::command::{AppSetMode, AppSwitchTab, ChatBoxInsertChar, ChatBoxSubmitMessage};
+use nullslop_protocol::command::{
+    AppSetMode, AppSwitchTab, ChatBoxInsertChar, ChatBoxSubmitMessage,
+};
 use nullslop_protocol::{Command, Mode, TabDirection};
 use nullslop_protocol::{Key, KeyEvent};
 use ratatui_which_key::Keymap;
@@ -23,6 +25,7 @@ pub enum KeyCategory {
 
 /// Builds and returns the full keymap with all scope bindings.
 #[must_use]
+#[allow(clippy::too_many_lines)]
 pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
     let mut keymap = Keymap::new();
 
@@ -83,11 +86,7 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
                 Command::ChatBoxDeleteGrapheme,
                 KeyCategory::Input,
             )
-            .bind(
-                "<left>",
-                Command::ChatBoxMoveCursorLeft,
-                KeyCategory::Input,
-            )
+            .bind("<left>", Command::ChatBoxMoveCursorLeft, KeyCategory::Input)
             .bind(
                 "<right>",
                 Command::ChatBoxMoveCursorRight,
@@ -98,11 +97,7 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
                 Command::ChatBoxMoveCursorToStart,
                 KeyCategory::Input,
             )
-            .bind(
-                "<end>",
-                Command::ChatBoxMoveCursorToEnd,
-                KeyCategory::Input,
-            )
+            .bind("<end>", Command::ChatBoxMoveCursorToEnd, KeyCategory::Input)
             .bind(
                 "<delete>",
                 Command::ChatBoxDeleteGraphemeForward,
