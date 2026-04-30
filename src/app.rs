@@ -75,7 +75,10 @@ impl App {
                         headless.send_chat(&message).change_context(AppError)?;
                     }
                     Some(HeadlessCommands::Script { path }) => {
-                        headless.run_script(&path).change_context(AppError)?;
+                        let file = std::fs::File::open(&path)
+                            .change_context(AppError)
+                            .attach("failed to open script file")?;
+                        headless.run_script(file).change_context(AppError)?;
                     }
                     None => {}
                 }
@@ -111,4 +114,53 @@ fn create_core_with_ext_host(
     core.set_ext_host(ExtensionHostService::new(ext_arc.clone()));
 
     (core, ext_arc)
+}
+
+#[cfg(test)]
+mod tests {
+    use nullslop_cli::cli::{Cli, Commands, HeadlessCommands};
+
+    use super::*;
+
+    #[test]
+    fn dispatch_headless_script_completes_successfully() {
+        // Given a script file containing "q".
+        let dir = tempfile::tempdir().expect("temp dir");
+        let script_path = dir.path().join("test.script");
+        std::fs::write(&script_path, "q").expect("write script");
+
+        let mut app = App::new().expect("create app");
+        let cli = Cli {
+            command: Some(Commands::Headless {
+                command: Some(HeadlessCommands::Script {
+                    path: script_path.to_str().expect("path to str").to_string(),
+                }),
+            }),
+        };
+
+        // When dispatching the headless script command.
+        let result = app.dispatch(cli);
+
+        // Then it completes without error.
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn dispatch_headless_script_returns_error_for_missing_file() {
+        // Given a nonexistent script path.
+        let mut app = App::new().expect("create app");
+        let cli = Cli {
+            command: Some(Commands::Headless {
+                command: Some(HeadlessCommands::Script {
+                    path: "/no/such/file.script".to_string(),
+                }),
+            }),
+        };
+
+        // When dispatching the headless script command.
+        let result = app.dispatch(cli);
+
+        // Then an error is returned.
+        assert!(result.is_err());
+    }
 }

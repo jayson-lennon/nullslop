@@ -1004,6 +1004,7 @@ dependencies = [
  "nullslop-services",
  "nullslop-tui",
  "ratatui-which-key",
+ "tempfile",
  "tokio",
  "tracing",
  "tracing-subscriber",

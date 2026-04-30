@@ -28,6 +28,7 @@ tracing-subscriber = { workspace = true }
 clap = { workspace = true }
 ratatui-which-key = { workspace = true }
 nullslop-protocol = { workspace = true, features = ["which-key"] }
+tempfile = { workspace = true }
 
 [workspace.dependencies]
 # Internal

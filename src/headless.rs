@@ -67,16 +67,19 @@ impl HeadlessApp {
 
     /// Runs a keystroke script through the keymap → command → bus → component pipeline.
     ///
-    /// Each non-empty, non-comment line in the script file is parsed as a key
-    /// sequence. Keys are fed to the which-key state machine, which resolves
-    /// them to commands. Commands are submitted to `AppCore` and the processing
-    /// loop runs after each line.
+    /// Each non-empty, non-comment line read from `reader` is parsed as a key
+    /// sequence by [`parse_script`]. Keys are fed to the which-key state machine,
+    /// which resolves them to commands. Commands are submitted to `AppCore` and
+    /// the processing loop runs after each line.
     ///
     /// # Errors
     ///
-    /// Returns an error if the script file cannot be read or a command cannot
+    /// Returns an error if the script content cannot be read or a command cannot
     /// be sent.
-    pub fn run_script(&mut self, path: &str) -> Result<(), Report<HeadlessError>> {
+    pub fn run_script<R>(&mut self, mut reader: R) -> Result<(), Report<HeadlessError>>
+    where
+        R: std::io::Read,
+    {
         let keymap = nullslop_tui::keymap::init();
         let mut which_key =
             nullslop_tui::app::WhichKeyInstance::new(keymap, nullslop_tui::Scope::Normal);
@@ -85,16 +88,15 @@ impl HeadlessApp {
             modifiers: nullslop_protocol::Modifiers::none(),
         };
 
-        let content = std::fs::read_to_string(path)
+        let mut content = String::new();
+        reader
+            .read_to_string(&mut content)
             .change_context(HeadlessError)
-            .attach("failed to read script file")?;
+            .attach("failed to read script content")?;
 
-        for line in content.lines() {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with('#') {
-                continue;
-            }
-            let keys = ratatui_which_key::parse_key_sequence(line, &leader);
+        let lines = parse_script(&content, &leader);
+
+        for keys in lines {
             for key in keys {
                 let scope = nullslop_tui::app::scope_for_mode(self.core.state.read().mode);
                 which_key.set_scope(scope);
@@ -165,5 +167,176 @@ impl HeadlessApp {
         if let Err(e) = ext.shutdown(&mut self.core) {
             tracing::error!(err = ?e, "extension host shutdown error");
         }
+    }
+}
+
+/// Parses a script's content into a list of key sequences.
+///
+/// Each non-empty, non-comment line is parsed into a `Vec<KeyEvent>` via
+/// [`ratatui_which_key::parse_key_sequence`]. Blank lines and lines starting
+/// with `#` are skipped. Returns one `Vec<KeyEvent>` per non-skipped line.
+pub fn parse_script(
+    content: &str,
+    leader: &nullslop_protocol::KeyEvent,
+) -> Vec<Vec<nullslop_protocol::KeyEvent>> {
+    content
+        .lines()
+        .map(|line| line.trim())
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .map(|line| ratatui_which_key::parse_key_sequence(line, leader))
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+    use std::sync::Arc;
+
+    use nullslop_protocol::{Key, KeyEvent, Modifiers};
+
+    use super::*;
+
+    fn leader() -> KeyEvent {
+        KeyEvent {
+            key: Key::Char('\\'),
+            modifiers: Modifiers::none(),
+        }
+    }
+
+    // --- parse_script unit tests ---
+
+    #[test]
+    fn parse_script_skips_comment_lines() {
+        // Given a script with comment lines.
+        let content = "# This is a comment\nq\n# Another comment";
+
+        // When parsing.
+        let lines = parse_script(content, &leader());
+
+        // Then only the non-comment line produces a sequence.
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].len(), 1);
+        assert_eq!(lines[0][0].key, Key::Char('q'));
+    }
+
+    #[test]
+    fn parse_script_skips_blank_lines() {
+        // Given a script with blank and whitespace-only lines.
+        let content = "\n   \nq\n\n";
+
+        // When parsing.
+        let lines = parse_script(content, &leader());
+
+        // Then only the non-blank line produces a sequence.
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0][0].key, Key::Char('q'));
+    }
+
+    #[test]
+    fn parse_script_parses_single_key() {
+        // Given a script with a single key.
+        let content = "q";
+
+        // When parsing.
+        let lines = parse_script(content, &leader());
+
+        // Then one line with one key is produced.
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].len(), 1);
+        assert_eq!(lines[0][0].key, Key::Char('q'));
+    }
+
+    #[test]
+    fn parse_script_parses_special_key() {
+        // Given a script with a special key name.
+        let content = "<enter>";
+
+        // When parsing.
+        let lines = parse_script(content, &leader());
+
+        // Then one line with one Enter key is produced.
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].len(), 1);
+        assert_eq!(lines[0][0].key, Key::Enter);
+    }
+
+    #[test]
+    fn parse_script_parses_multi_key_sequence() {
+        // Given a script with a multi-key sequence.
+        let content = "ihello<enter>";
+
+        // When parsing.
+        let lines = parse_script(content, &leader());
+
+        // Then 7 keys are produced: i, h, e, l, l, o, enter.
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].len(), 7);
+        assert_eq!(lines[0][0].key, Key::Char('i'));
+        assert_eq!(lines[0][1].key, Key::Char('h'));
+        assert_eq!(lines[0][2].key, Key::Char('e'));
+        assert_eq!(lines[0][3].key, Key::Char('l'));
+        assert_eq!(lines[0][4].key, Key::Char('l'));
+        assert_eq!(lines[0][5].key, Key::Char('o'));
+        assert_eq!(lines[0][6].key, Key::Enter);
+    }
+
+    #[test]
+    fn parse_script_handles_multiple_lines() {
+        // Given a multi-line script.
+        let content = "i\nhello<enter>\nq";
+
+        // When parsing.
+        let lines = parse_script(content, &leader());
+
+        // Then three sequences are produced.
+        assert_eq!(lines.len(), 3);
+        assert_eq!(lines[0].len(), 1); // i
+        assert_eq!(lines[1].len(), 6); // h, e, l, l, o, enter
+        assert_eq!(lines[2].len(), 1); // q
+    }
+
+    // --- Integration tests for run_script ---
+
+    fn create_test_headless() -> HeadlessApp {
+        let rt = Box::leak(Box::new(
+            tokio::runtime::Runtime::new().expect("test runtime"),
+        ));
+        let handle = rt.handle().clone();
+        let mut core = AppCore::new();
+        let mut registry = nullslop_component::AppUiRegistry::new();
+        nullslop_component::register_all(&mut core.bus, &mut registry);
+
+        let ext_host: Arc<dyn nullslop_core::ExtensionHost> =
+            Arc::new(nullslop_ext_host::fake::FakeExtensionHost::new());
+        core.set_ext_host(nullslop_core::ExtensionHostService::new(ext_host.clone()));
+
+        let services = nullslop_services::Services::new(handle, ext_host);
+        HeadlessApp::new(core, services)
+    }
+
+    #[test]
+    fn run_script_sets_should_quit() {
+        // Given a headless app and a script containing "q".
+        let mut headless = create_test_headless();
+
+        // When running the script.
+        headless.run_script(Cursor::new("q")).expect("run_script");
+
+        // Then should_quit is true.
+        assert!(headless.core.state.read().should_quit);
+    }
+
+    #[test]
+    fn run_script_is_noop_for_empty_content() {
+        // Given a headless app and an empty script.
+        let mut headless = create_test_headless();
+
+        // When running the script.
+        headless.run_script(Cursor::new("")).expect("run_script");
+
+        // Then no state changes occurred.
+        let state = headless.core.state.read();
+        assert!(!state.should_quit);
+        assert!(state.chat_history.is_empty());
     }
 }
