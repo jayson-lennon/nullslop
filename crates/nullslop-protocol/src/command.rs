@@ -37,7 +37,6 @@ pub use crate::system::{
 /// this enum. A command struct defined in a domain module without an enum variant
 /// here will not be dispatched by the bus.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum Command {
     /// Insert a character into the chat input buffer.

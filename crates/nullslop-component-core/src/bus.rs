@@ -373,9 +373,6 @@ impl<S> Bus<S> {
             Command::ProceedWithShutdown { payload } => {
                 self.dispatch_command_to_handlers(&payload, state, &mut out);
             }
-            // #[non_exhaustive] requires a wildcard arm. Unknown command types
-            // are silently dropped — handlers for future variants must be added here.
-            _ => {}
         }
         self.flush_out(out);
     }
