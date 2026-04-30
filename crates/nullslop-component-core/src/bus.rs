@@ -431,8 +431,6 @@ impl<S> Bus<S> {
                 let cmd = EventApplicationShuttingDown;
                 self.dispatch_event_to_handlers(&cmd, state, &mut out);
             }
-            // #[non_exhaustive] requires a wildcard arm. Unknown event types
-            // are silently dropped — handlers for future variants must be added here.
             _ => {}
         }
         self.flush_out(out);
