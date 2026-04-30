@@ -185,11 +185,15 @@ async fn read_extension_stdout(
 }
 
 /// Routes an event to all extensions subscribed to its type.
+///
+/// Serializes the event as JSON+newline and writes it to each subscriber's stdin.
+/// Extensions whose subscriptions don't include this event type are skipped entirely.
 async fn route_event(extensions: &mut [ManagedExtension], event: &Event) {
     let Some(event_type) = event.type_name() else {
-        return; // Skip key events etc.
+        return; // Not a routable event (e.g. key events have no type name).
     };
 
+    // Pre-serialize once — all subscribers receive the same bytes.
     let msg = nullslop_extension::codec::InboundMessage::Event {
         event: event.clone(),
     };

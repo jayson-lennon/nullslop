@@ -284,9 +284,10 @@ impl ExtensionHost for InMemoryExtensionHost {
     }
 
     fn send_event(&self, event: &Event, source: Option<&ExtensionName>) {
-        // Special-case: ApplicationShuttingDown goes to ALL extensions.
+        // ApplicationShuttingDown is broadcast to every extension, not just those subscribed.
         if matches!(event, Event::EventApplicationShuttingDown) {
             for (ext_name, sender) in &self.routing.all_senders {
+                // Skip the originating extension to prevent echo loops.
                 if source.is_some_and(|s| &**s == ext_name.as_str()) {
                     continue;
                 }
@@ -295,11 +296,13 @@ impl ExtensionHost for InMemoryExtensionHost {
             return;
         }
 
+        // Look up subscribed extensions by event type name (e.g. "EventChatMessageSubmitted").
         let Some(event_type) = event.type_name() else {
-            return;
+            return; // Not a routable event (e.g. key events have no type name).
         };
         if let Some(senders) = self.routing.event_routes.get(event_type) {
             for (ext_name, sender) in senders {
+                // Skip the originating extension to prevent echo loops.
                 if source.is_some_and(|s| &**s == ext_name.as_str()) {
                     continue;
                 }
