@@ -18,11 +18,27 @@
 //! submitted by handlers are only queued after all handlers for the current item
 //! have finished, ensuring a consistent state snapshot per dispatch.
 
+/// A processed event ready for forwarding, with its source extension.
+pub struct ProcessedEvent {
+    /// The dispatched event.
+    pub event: Event,
+    /// The extension that originated this event, if any.
+    pub source: Option<ExtensionName>,
+}
+
+/// A processed command ready for forwarding, with its source extension.
+pub struct ProcessedCommand {
+    /// The dispatched command.
+    pub command: Command,
+    /// The extension that originated this command, if any.
+    pub source: Option<ExtensionName>,
+}
+
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
 use nullslop_protocol::{
-    Command, CommandAction, Event,
+    Command, CommandAction, Event, ExtensionName,
     command::{
         AppEditInput, AppQuit, AppToggleWhichKey, ChatBoxClear, ChatBoxDeleteGrapheme,
         ProviderCancelStream,
@@ -75,13 +91,13 @@ where
 /// A queued command together with its origin.
 struct QueuedCommand {
     command: Command,
-    source: Option<String>,
+    source: Option<ExtensionName>,
 }
 
 /// A queued event together with its origin.
 struct QueuedEvent {
     event: Event,
-    source: Option<String>,
+    source: Option<ExtensionName>,
 }
 
 /// Central message router that dispatches commands and events to registered handlers.
@@ -96,10 +112,10 @@ pub struct Bus<S> {
     event_queue: Vec<QueuedEvent>,
     /// Events dispatched during the last processing cycle, with source.
     /// Available via [`drain_processed_events`](Self::drain_processed_events).
-    processed_events: Vec<(Event, Option<String>)>,
+    processed_events: Vec<ProcessedEvent>,
     /// Commands dispatched during the last processing cycle, with source.
     /// Available via [`drain_processed_commands`](Self::drain_processed_commands).
-    processed_commands: Vec<(Command, Option<String>)>,
+    processed_commands: Vec<ProcessedCommand>,
     max_iterations: usize,
 }
 
@@ -182,7 +198,7 @@ impl<S> Bus<S> {
     /// Submit a command to the bus queue with an optional source extension name.
     ///
     /// The command will be dispatched when [`process_commands`](Self::process_commands) is called.
-    pub fn submit_command_from(&mut self, cmd: Command, source: Option<String>) {
+    pub fn submit_command_from(&mut self, cmd: Command, source: Option<ExtensionName>) {
         self.command_queue.push(QueuedCommand {
             command: cmd,
             source,
@@ -200,7 +216,7 @@ impl<S> Bus<S> {
     /// Submit an event to the bus queue with an optional source extension name.
     ///
     /// The event will be dispatched when [`process_events`](Self::process_events) is called.
-    pub fn submit_event_from(&mut self, evt: Event, source: Option<String>) {
+    pub fn submit_event_from(&mut self, evt: Event, source: Option<ExtensionName>) {
         self.event_queue.push(QueuedEvent { event: evt, source });
     }
 
@@ -249,7 +265,7 @@ impl<S> Bus<S> {
     /// Returns tuples of `(event, source)` and clears the internal buffer.
     /// Useful for forwarding processed events to external systems
     /// (e.g., extension host) after bus processing completes.
-    pub fn drain_processed_events(&mut self) -> Vec<(Event, Option<String>)> {
+    pub fn drain_processed_events(&mut self) -> Vec<ProcessedEvent> {
         std::mem::take(&mut self.processed_events)
     }
 
@@ -258,14 +274,28 @@ impl<S> Bus<S> {
     /// Returns tuples of `(command, source)` and clears the internal buffer.
     /// Useful for forwarding processed commands to external systems
     /// (e.g., extension host) after bus processing.
-    pub fn drain_processed_commands(&mut self) -> Vec<(Command, Option<String>)> {
+    pub fn drain_processed_commands(&mut self) -> Vec<ProcessedCommand> {
         std::mem::take(&mut self.processed_commands)
     }
 
+    /// Drain all processed events and commands.
+    ///
+    /// Convenience method that returns both
+    /// [`drain_processed_events`](Self::drain_processed_events) and
+    /// [`drain_processed_commands`](Self::drain_processed_commands) as a tuple.
+    pub fn drain_all(&mut self) -> (Vec<ProcessedEvent>, Vec<ProcessedCommand>) {
+        let events = self.drain_processed_events();
+        let commands = self.drain_processed_commands();
+        (events, commands)
+    }
+
     /// Dispatch a single command to its registered handlers.
-    fn dispatch_command(&mut self, cmd: Command, source: Option<String>, state: &mut S) {
+    fn dispatch_command(&mut self, cmd: Command, source: Option<ExtensionName>, state: &mut S) {
         // Record the command before dispatching so consumers can drain it later.
-        self.processed_commands.push((cmd.clone(), source));
+        self.processed_commands.push(ProcessedCommand {
+            command: cmd.clone(),
+            source,
+        });
         let mut out = Out::new();
         match cmd {
             Command::ChatBoxInsertChar { payload } => {
@@ -331,9 +361,12 @@ impl<S> Bus<S> {
     }
 
     /// Dispatch a single event to its registered handlers.
-    fn dispatch_event(&mut self, evt: Event, source: Option<String>, state: &mut S) {
+    fn dispatch_event(&mut self, evt: Event, source: Option<ExtensionName>, state: &mut S) {
         // Record the event before dispatching so consumers can drain it later.
-        self.processed_events.push((evt.clone(), source));
+        self.processed_events.push(ProcessedEvent {
+            event: evt.clone(),
+            source,
+        });
         let mut out = Out::new();
         match evt {
             Event::EventKeyDown { payload } => {
@@ -774,9 +807,8 @@ mod tests {
         // Then drain_processed_events returns the dispatched event with no source.
         let processed = bus.drain_processed_events();
         assert_eq!(processed.len(), 1);
-        let (evt, source) = &processed[0];
-        assert!(matches!(evt, Event::EventApplicationReady));
-        assert!(source.is_none());
+        assert!(matches!(processed[0].event, Event::EventApplicationReady));
+        assert!(processed[0].source.is_none());
     }
 
     #[test]
@@ -815,9 +847,8 @@ mod tests {
         // Then drain_processed_commands returns the dispatched command with no source.
         let processed = bus.drain_processed_commands();
         assert_eq!(processed.len(), 1);
-        let (cmd, source) = &processed[0];
-        assert!(matches!(cmd, Command::AppQuit));
-        assert!(source.is_none());
+        assert!(matches!(processed[0].command, Command::AppQuit));
+        assert!(processed[0].source.is_none());
     }
 
     #[test]
@@ -849,14 +880,14 @@ mod tests {
         bus.register_command_handler::<AppQuit, _>(handler);
 
         // When submitting a command with a source.
-        bus.submit_command_from(Command::AppQuit, Some("ext-test".to_string()));
+        bus.submit_command_from(Command::AppQuit, Some(ExtensionName::new("ext-test")));
         let mut state = TestState;
         bus.process_commands(&mut state);
 
         // Then the source is preserved through drain.
         let processed = bus.drain_processed_commands();
         assert_eq!(processed.len(), 1);
-        assert_eq!(processed[0].1, Some("ext-test".to_string()));
+        assert_eq!(processed[0].source.as_deref(), Some("ext-test"));
     }
 
     #[test]
@@ -867,14 +898,17 @@ mod tests {
         bus.register_event_handler::<EventApplicationReady, _>(handler);
 
         // When submitting an event with a source.
-        bus.submit_event_from(Event::EventApplicationReady, Some("ext-test".to_string()));
+        bus.submit_event_from(
+            Event::EventApplicationReady,
+            Some(ExtensionName::new("ext-test")),
+        );
         let mut state = TestState;
         bus.process_events(&mut state);
 
         // Then the source is preserved through drain.
         let processed = bus.drain_processed_events();
         assert_eq!(processed.len(), 1);
-        assert_eq!(processed[0].1, Some("ext-test".to_string()));
+        assert_eq!(processed[0].source.as_deref(), Some("ext-test"));
     }
 
     #[test]
@@ -891,6 +925,6 @@ mod tests {
 
         // Then the source is None.
         let processed = bus.drain_processed_commands();
-        assert_eq!(processed[0].1, None);
+        assert!(processed[0].source.is_none());
     }
 }

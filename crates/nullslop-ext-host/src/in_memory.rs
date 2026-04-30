@@ -14,7 +14,7 @@ use nullslop_extension::{
     InMemoryExtension,
 };
 use nullslop_protocol::shutdown::ExtensionStarting;
-use nullslop_protocol::{Command, Event};
+use nullslop_protocol::{Command, Event, ExtensionName};
 
 /// Joins a thread with a timeout. Returns `true` if the thread exited within the timeout.
 fn join_with_timeout(handle: std::thread::JoinHandle<()>, timeout: Duration) -> bool {
@@ -139,16 +139,16 @@ impl InMemoryExtensionHost {
 
             // Spawn async task to forward output from extension to host.
             let out_sender = sender.clone();
-            let reader_name = name.clone();
+            let reader_name = ExtensionName::new(name.clone());
             handle.spawn(async move {
                 let async_rx = out_rx.as_async();
                 while let Ok(output) = async_rx.recv().await {
                     match output {
                         ExtensionOutput::Command(cmd) => {
-                            out_sender.send_command(cmd, Some(&reader_name));
+                            out_sender.send_command(cmd, Some(reader_name.clone()));
                         }
                         ExtensionOutput::Event(evt) => {
-                            out_sender.send_extension_event(evt, Some(&reader_name));
+                            out_sender.send_extension_event(evt, Some(reader_name.clone()));
                         }
                     }
                 }
@@ -177,7 +177,7 @@ impl InMemoryExtensionHost {
                 Event::EventExtensionStarting {
                     payload: ExtensionStarting { name: name.clone() },
                 },
-                None,
+                None as Option<ExtensionName>,
             );
 
             registrations.push(RegisteredExtension {
@@ -275,11 +275,11 @@ impl ExtensionHost for InMemoryExtensionHost {
         "InMemoryExtensionHost"
     }
 
-    fn send_event(&self, event: &Event, source: Option<&str>) {
+    fn send_event(&self, event: &Event, source: Option<&ExtensionName>) {
         // Special-case: ApplicationShuttingDown goes to ALL extensions.
         if matches!(event, Event::EventApplicationShuttingDown) {
             for (ext_name, sender) in &self.routing.all_senders {
-                if source == Some(ext_name.as_str()) {
+                if source.is_some_and(|s| &**s == ext_name.as_str()) {
                     continue;
                 }
                 let _ = sender.send(ExtensionMessage::Event(event.clone()));
@@ -292,7 +292,7 @@ impl ExtensionHost for InMemoryExtensionHost {
         };
         if let Some(senders) = self.routing.event_routes.get(event_type) {
             for (ext_name, sender) in senders {
-                if source == Some(ext_name.as_str()) {
+                if source.is_some_and(|s| &**s == ext_name.as_str()) {
                     continue;
                 }
                 let _ = sender.send(ExtensionMessage::Event(event.clone()));
@@ -300,14 +300,14 @@ impl ExtensionHost for InMemoryExtensionHost {
         }
     }
 
-    fn send_command(&self, command: &Command, source: Option<&str>) {
+    fn send_command(&self, command: &Command, source: Option<&ExtensionName>) {
         let name = match command {
             Command::CustomCommand { payload } => &payload.name,
             _ => return,
         };
         if let Some(senders) = self.routing.command_routes.get(name) {
             for (ext_name, sender) in senders {
-                if source == Some(ext_name.as_str()) {
+                if source.is_some_and(|s| &**s == ext_name.as_str()) {
                     continue;
                 }
                 let _ = sender.send(ExtensionMessage::Command(command.clone()));
@@ -355,11 +355,11 @@ mod tests {
             *self.registrations.lock().unwrap() = registrations;
         }
 
-        fn send_command(&self, command: Command, _source: Option<&str>) {
+        fn send_command(&self, command: Command, _source: Option<ExtensionName>) {
             self.commands.lock().unwrap().push(command);
         }
 
-        fn send_extension_event(&self, event: Event, _source: Option<&str>) {
+        fn send_extension_event(&self, event: Event, _source: Option<ExtensionName>) {
             self.extension_events.lock().unwrap().push(event);
         }
     }
@@ -833,20 +833,18 @@ mod tests {
                 .send(nullslop_core::AppMsg::ExtensionsReady(registrations));
         }
 
-        fn send_command(&self, command: Command, source: Option<&str>) {
+        fn send_command(&self, command: Command, source: Option<ExtensionName>) {
             self.commands.lock().unwrap().push(command.clone());
-            let _ = self.sender.send(nullslop_core::AppMsg::Command {
-                command,
-                source: source.map(String::from),
-            });
+            let _ = self
+                .sender
+                .send(nullslop_core::AppMsg::Command { command, source });
         }
 
-        fn send_extension_event(&self, event: Event, source: Option<&str>) {
+        fn send_extension_event(&self, event: Event, source: Option<ExtensionName>) {
             self.extension_events.lock().unwrap().push(event.clone());
-            let _ = self.sender.send(nullslop_core::AppMsg::Event {
-                event,
-                source: source.map(String::from),
-            });
+            let _ = self
+                .sender
+                .send(nullslop_core::AppMsg::Event { event, source });
         }
     }
 
@@ -1161,7 +1159,7 @@ mod tests {
                 args: serde_json::json!({}),
             },
         };
-        host.send_command(&echo_cmd, Some("in-memory-0"));
+        host.send_command(&echo_cmd, Some(&ExtensionName::new("in-memory-0")));
 
         // Then no panic (source filtering works — the extension does not
         // receive its own command back, preventing an echo loop).
@@ -1185,7 +1183,7 @@ mod tests {
                 args: serde_json::json!({}),
             },
         };
-        host.send_command(&cmd, Some("in-memory-0"));
+        host.send_command(&cmd, Some(&ExtensionName::new("in-memory-0")));
 
         // Then extension B (in-memory-1) still receives it, but A does not.
         // (Verified by clean shutdown — no echo loop from A receiving its own command.)
@@ -1208,7 +1206,7 @@ mod tests {
                 entry: nullslop_protocol::ChatEntry::user("hello"),
             },
         };
-        host.send_event(&event, Some("in-memory-0"));
+        host.send_event(&event, Some(&ExtensionName::new("in-memory-0")));
 
         // Then in-memory-1 receives it, but in-memory-0 is skipped.
         // (Verified by clean shutdown.)

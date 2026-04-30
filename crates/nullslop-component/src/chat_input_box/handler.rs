@@ -198,8 +198,8 @@ mod tests {
         let processed = bus.drain_processed_events();
         assert_eq!(processed.len(), 1);
         assert!(matches!(
-            &processed[0],
-            (npr::Event::EventChatMessageSubmitted { .. }, _)
+            &processed[0].event,
+            npr::Event::EventChatMessageSubmitted { .. }
         ));
     }
 

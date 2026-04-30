@@ -26,14 +26,18 @@ impl ExtHostSender for CoreExtSender {
         let _ = self.0.send(AppMsg::ExtensionsReady(registrations));
     }
 
-    fn send_command(&self, command: Command, _source: Option<&str>) {
+    fn send_command(&self, command: Command, _source: Option<nullslop_protocol::ExtensionName>) {
         let _ = self.0.send(AppMsg::Command {
             command,
             source: None,
         });
     }
 
-    fn send_extension_event(&self, event: Event, _source: Option<&str>) {
+    fn send_extension_event(
+        &self,
+        event: Event,
+        _source: Option<nullslop_protocol::ExtensionName>,
+    ) {
         let _ = self.0.send(AppMsg::Event {
             event,
             source: None,
@@ -72,7 +76,10 @@ mod tests {
         let sender = CoreExtSender::new(tx);
 
         // When sending a command.
-        sender.send_command(Command::AppQuit, None);
+        sender.send_command(
+            Command::AppQuit,
+            None as Option<nullslop_protocol::ExtensionName>,
+        );
 
         // Then the message is received.
         let msg = rx.try_recv().unwrap();
@@ -86,7 +93,10 @@ mod tests {
         let sender = CoreExtSender::new(tx);
 
         // When sending an event.
-        sender.send_extension_event(Event::EventApplicationReady, None);
+        sender.send_extension_event(
+            Event::EventApplicationReady,
+            None as Option<nullslop_protocol::ExtensionName>,
+        );
 
         // Then the message is received.
         let msg = rx.try_recv().unwrap();

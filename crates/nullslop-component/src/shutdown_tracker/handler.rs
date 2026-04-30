@@ -119,8 +119,8 @@ mod tests {
         let commands = bus.drain_processed_commands();
         assert_eq!(commands.len(), 1);
         assert!(matches!(
-            commands[0],
-            (Command::ProceedWithShutdown { .. }, _)
+            &commands[0].command,
+            Command::ProceedWithShutdown { .. }
         ));
     }
 

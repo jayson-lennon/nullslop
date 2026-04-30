@@ -134,25 +134,10 @@ impl AppCore {
             self.bus.process_events(&mut guard);
         }
 
-        // Forward processed events to extension host.
-        let processed_events = self.bus.drain_processed_events();
-        if !processed_events.is_empty()
-            && let Some(ext) = &self.ext_host
-        {
-            for (evt, source) in &processed_events {
-                ext.send_event(evt, source.as_deref() as Option<&str>);
-            }
-        }
-
-        // Forward processed commands to extension host for routing to extensions.
-        let processed_commands = self.bus.drain_processed_commands();
-        if !processed_commands.is_empty()
-            && let Some(ext) = &self.ext_host
-        {
-            for (cmd, source) in &processed_commands {
-                ext.send_command(cmd, source.as_deref() as Option<&str>);
-            }
-        }
+        // Forward processed items to extension host.
+        let (events, commands) = self.bus.drain_all();
+        self.forward_events_to_ext_host(&events);
+        self.forward_commands_to_ext_host(&commands);
 
         TickResult {
             should_quit: self.state.read().should_quit,
@@ -160,8 +145,40 @@ impl AppCore {
         }
     }
 
+    /// Forwards drained bus items to the extension host via `forward`.
+    ///
+    /// No-op when no extension host is set or `items` is empty.
+    /// Forwards drained events to the extension host.
+    ///
+    /// No-op when no extension host is set.
+    fn forward_events_to_ext_host(&self, items: &[nullslop_component_core::bus::ProcessedEvent]) {
+        if let Some(ext) = &self.ext_host {
+            for item in items {
+                ext.send_event(&item.event, item.source.as_ref());
+            }
+        }
+    }
+
+    /// Forwards drained commands to the extension host.
+    ///
+    /// No-op when no extension host is set.
+    fn forward_commands_to_ext_host(
+        &self,
+        items: &[nullslop_component_core::bus::ProcessedCommand],
+    ) {
+        if let Some(ext) = &self.ext_host {
+            for item in items {
+                ext.send_command(&item.command, item.source.as_ref());
+            }
+        }
+    }
+
     /// Routes a command through the bus.
-    fn route_command(&mut self, cmd: nullslop_protocol::Command, source: Option<String>) {
+    fn route_command(
+        &mut self,
+        cmd: nullslop_protocol::Command,
+        source: Option<nullslop_protocol::ExtensionName>,
+    ) {
         self.bus.submit_command_from(cmd, source);
     }
 }

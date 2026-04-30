@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use nullslop_core::{ExtHostSender, ExtensionManifest, RegisteredExtension};
 use nullslop_extension::codec::OutboundMessage;
-use nullslop_protocol::Event;
+use nullslop_protocol::{Event, ExtensionName};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 
 use crate::discovery;
@@ -158,15 +158,16 @@ async fn read_extension_stdout(
     name: String,
     reader: tokio::io::BufReader<tokio::process::ChildStdout>,
 ) {
+    let ext_name = ExtensionName::new(&name);
     let mut lines = reader.lines();
     loop {
         if let Ok(Some(line)) = lines.next_line().await {
             match serde_json::from_str::<OutboundMessage>(&line) {
                 Ok(OutboundMessage::Command { command }) => {
-                    sender.send_command(command, Some(&name));
+                    sender.send_command(command, Some(ext_name.clone()));
                 }
                 Ok(OutboundMessage::Event { event }) => {
-                    sender.send_extension_event(event, Some(&name));
+                    sender.send_extension_event(event, Some(ext_name.clone()));
                 }
                 Ok(OutboundMessage::Register { .. }) => {
                     // Unexpected after init — ignore.

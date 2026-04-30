@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 
 use error_stack::Report;
 use nullslop_core::{AppCore, ExtHostSender, ExtensionError, ExtensionHost};
-use nullslop_protocol::{Command, Event};
+use nullslop_protocol::{Command, Event, ExtensionName};
 
 /// Extension host that runs extensions as child processes.
 ///
@@ -48,11 +48,11 @@ impl ExtensionHost for ProcessExtensionHost {
         "ProcessExtensionHost"
     }
 
-    fn send_event(&self, event: &Event, _source: Option<&str>) {
+    fn send_event(&self, event: &Event, _source: Option<&ExtensionName>) {
         let _ = self.event_sender.send(event.clone());
     }
 
-    fn send_command(&self, _command: &Command, _source: Option<&str>) {
+    fn send_command(&self, _command: &Command, _source: Option<&ExtensionName>) {
         // Process-mode command routing is not yet implemented.
         // The process host receives commands from extensions via stdout
         // and routes events to extensions via stdin. Bidirectional command

@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use error_stack::Report;
 use nullslop_core::{AppCore, ExtensionError, ExtensionHost};
-use nullslop_protocol::Event;
+use nullslop_protocol::{Event, ExtensionName};
 
 /// Fake extension host for testing.
 pub struct FakeExtensionHost {
@@ -65,11 +65,11 @@ impl ExtensionHost for FakeExtensionHost {
         "FakeExtensionHost"
     }
 
-    fn send_event(&self, event: &Event, _source: Option<&str>) {
+    fn send_event(&self, event: &Event, _source: Option<&ExtensionName>) {
         self.events_sent.lock().unwrap().push(event.clone());
     }
 
-    fn send_command(&self, command: &nullslop_protocol::Command, _source: Option<&str>) {
+    fn send_command(&self, command: &nullslop_protocol::Command, _source: Option<&ExtensionName>) {
         self.commands_sent.lock().unwrap().push(command.clone());
     }
 

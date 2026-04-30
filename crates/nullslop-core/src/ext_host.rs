@@ -25,10 +25,14 @@ pub trait ExtensionHost: Send + Sync + 'static {
     fn name(&self) -> &'static str;
 
     /// Broadcasts an event to all subscribed extensions, skipping the source.
-    fn send_event(&self, event: &nullslop_protocol::Event, source: Option<&str>);
+    fn send_event(
+        &self,
+        event: &nullslop_protocol::Event,
+        source: Option<&nullslop_protocol::ExtensionName>,
+    );
 
     /// Routes a command to extensions that registered for it, skipping the source.
-    fn send_command(&self, command: &Command, source: Option<&str>);
+    fn send_command(&self, command: &Command, source: Option<&nullslop_protocol::ExtensionName>);
 
     /// Shuts down all extension processes gracefully.
     ///
@@ -62,12 +66,20 @@ impl ExtensionHostService {
     }
 
     /// Delegates to [`ExtensionHost::send_event`].
-    pub fn send_event(&self, event: &nullslop_protocol::Event, source: Option<&str>) {
+    pub fn send_event(
+        &self,
+        event: &nullslop_protocol::Event,
+        source: Option<&nullslop_protocol::ExtensionName>,
+    ) {
         self.svc.send_event(event, source);
     }
 
     /// Delegates to [`ExtensionHost::send_command`].
-    pub fn send_command(&self, command: &Command, source: Option<&str>) {
+    pub fn send_command(
+        &self,
+        command: &Command,
+        source: Option<&nullslop_protocol::ExtensionName>,
+    ) {
         self.svc.send_command(command, source);
     }
 
@@ -90,9 +102,13 @@ pub trait ExtHostSender: Send + Sync + 'static {
     /// Called when extensions have completed discovery and registration.
     fn send_extensions_ready(&self, registrations: Vec<RegisteredExtension>);
     /// Called when an extension sends a command.
-    fn send_command(&self, command: Command, source: Option<&str>);
+    fn send_command(&self, command: Command, source: Option<nullslop_protocol::ExtensionName>);
     /// Called when an extension sends an event to the host.
-    fn send_extension_event(&self, event: nullslop_protocol::Event, source: Option<&str>);
+    fn send_extension_event(
+        &self,
+        event: nullslop_protocol::Event,
+        source: Option<nullslop_protocol::ExtensionName>,
+    );
 }
 
 #[cfg(test)]
