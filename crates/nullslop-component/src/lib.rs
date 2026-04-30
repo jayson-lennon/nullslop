@@ -48,6 +48,17 @@ pub fn register_all(bus: &mut AppBus, registry: &mut AppUiRegistry) {
     char_counter::register(bus, registry);
 }
 
+/// Register only TUI elements (no bus handlers).
+///
+/// Use when bus handlers have already been registered elsewhere
+/// (e.g., by [`register_all`] during core creation) and only
+/// the UI element registry needs to be populated.
+pub fn register_tui_elements(registry: &mut AppUiRegistry) {
+    registry.register(Box::new(chat_input_box::ChatInputBoxElement));
+    registry.register(Box::new(chat_log::ChatLogElement));
+    registry.register(Box::new(char_counter::CharCounterElement));
+}
+
 #[cfg(test)]
 mod macro_tests {
     use npr::command::{AppQuit, ChatBoxInsertChar};

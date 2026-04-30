@@ -70,10 +70,10 @@ impl TuiApp {
     #[must_use]
     pub fn new_with_core(
         services: nullslop_services::Services,
-        mut core: nullslop_core::AppCore,
+        core: nullslop_core::AppCore,
     ) -> Self {
         let mut ui_registry = AppUiRegistry::new();
-        nullslop_component::register_all(&mut core.bus, &mut ui_registry);
+        nullslop_component::register_tui_elements(&mut ui_registry);
         let keymap = keymap::init();
         let which_key = WhichKeyInstance::new(keymap, Scope::Normal);
 
