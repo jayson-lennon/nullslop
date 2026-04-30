@@ -7,21 +7,25 @@
 use nullslop_protocol::{ChatEntry, Mode};
 
 use crate::chat_input_box::ChatInputBoxState;
-use crate::shutdown_tracker::ShutdownTracker;
+use crate::shutdown_tracker::ShutdownTrackerState;
 
 /// A snapshot of everything the application is doing right now.
 #[derive(Debug)]
 pub struct AppState {
     /// All messages in the current conversation.
     pub chat_history: Vec<ChatEntry>,
+
     /// Whether the user is browsing or actively typing.
     pub mode: Mode,
+
     /// The user's in-progress message and input buffer.
     pub chat_input: ChatInputBoxState,
+
+    /// Bookkeeping for which extensions are still running during shutdown.
+    pub shutdown_tracker: ShutdownTrackerState,
+
     /// Set to `true` when the user has requested to quit.
     pub should_quit: bool,
-    /// Bookkeeping for which extensions are still running during shutdown.
-    pub shutdown_tracker: ShutdownTracker,
 }
 
 impl AppState {
@@ -32,8 +36,8 @@ impl AppState {
             chat_history: Vec::new(),
             mode: Mode::Normal,
             chat_input: ChatInputBoxState::new(),
+            shutdown_tracker: ShutdownTrackerState::new(),
             should_quit: false,
-            shutdown_tracker: ShutdownTracker::new(),
         }
     }
 

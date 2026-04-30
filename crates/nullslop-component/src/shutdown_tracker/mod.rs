@@ -12,7 +12,7 @@ use crate::AppBus;
 use crate::AppUiRegistry;
 
 pub(crate) use handler::ShutdownTrackerHandler;
-pub use state::ShutdownTracker;
+pub use state::ShutdownTrackerState;
 
 /// Register the shutdown tracker handler.
 pub(crate) fn register(bus: &mut AppBus, _registry: &mut AppUiRegistry) {

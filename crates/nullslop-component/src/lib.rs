@@ -25,7 +25,7 @@ pub mod shutdown_tracker;
 
 pub use app_state::AppState;
 pub use chat_input_box::ChatInputBoxState;
-pub use shutdown_tracker::ShutdownTracker;
+pub use shutdown_tracker::ShutdownTrackerState;
 
 use nullslop_component_core::Bus;
 use nullslop_component_ui::UiRegistry;

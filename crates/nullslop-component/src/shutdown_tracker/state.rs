@@ -7,14 +7,14 @@ use std::collections::HashSet;
 
 /// Tracks which extensions are still active during a shutdown.
 #[derive(Debug, Clone, Default)]
-pub struct ShutdownTracker {
+pub struct ShutdownTrackerState {
     /// Extensions that are currently running.
     pending: HashSet<String>,
     /// Whether the application has begun shutting down.
     pub shutdown_active: bool,
 }
 
-impl ShutdownTracker {
+impl ShutdownTrackerState {
     /// Create a tracker with no extensions and shutdown inactive.
     #[must_use]
     pub fn new() -> Self {
@@ -48,18 +48,18 @@ impl ShutdownTracker {
 
 #[cfg(test)]
 mod tests {
-    use super::ShutdownTracker;
+    use super::ShutdownTrackerState;
 
     #[test]
     fn track_adds_to_pending() {
-        let mut tracker = ShutdownTracker::new();
+        let mut tracker = ShutdownTrackerState::new();
         tracker.track("ext-a");
         assert_eq!(tracker.pending_names(), vec!["ext-a".to_string()]);
     }
 
     #[test]
     fn complete_removes_from_pending() {
-        let mut tracker = ShutdownTracker::new();
+        let mut tracker = ShutdownTrackerState::new();
         tracker.track("ext-a");
         let was_tracked = tracker.complete("ext-a");
         assert!(was_tracked);
@@ -68,13 +68,13 @@ mod tests {
 
     #[test]
     fn is_complete_false_when_not_active() {
-        let tracker = ShutdownTracker::new();
+        let tracker = ShutdownTrackerState::new();
         assert!(!tracker.is_complete());
     }
 
     #[test]
     fn is_complete_false_when_pending() {
-        let mut tracker = ShutdownTracker::new();
+        let mut tracker = ShutdownTrackerState::new();
         tracker.track("ext-a");
         tracker.shutdown_active = true;
         assert!(!tracker.is_complete());
@@ -82,14 +82,14 @@ mod tests {
 
     #[test]
     fn is_complete_true_when_active_and_empty() {
-        let mut tracker = ShutdownTracker::new();
+        let mut tracker = ShutdownTrackerState::new();
         tracker.shutdown_active = true;
         assert!(tracker.is_complete());
     }
 
     #[test]
     fn pending_names_returns_pending() {
-        let mut tracker = ShutdownTracker::new();
+        let mut tracker = ShutdownTrackerState::new();
         tracker.track("ext-a");
         tracker.track("ext-b");
         tracker.track("ext-c");
