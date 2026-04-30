@@ -16,6 +16,21 @@ path = "src/lib.rs"
 
 [dependencies]
 nullslop-cli = { workspace = true }
+nullslop-tui = { workspace = true }
+nullslop-core = { workspace = true }
+nullslop-services = { workspace = true }
+nullslop-component = { workspace = true }
+nullslop-ext-host = { workspace = true }
+nullslop-extension = { workspace = true }
+nullslop-echo = { workspace = true }
+tokio = { workspace = true }
+wherror = { workspace = true }
+error-stack = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+clap = { workspace = true }
+ratatui-which-key = { workspace = true }
+nullslop-protocol = { workspace = true, features = ["which-key"] }
 
 [workspace.dependencies]
 # Internal

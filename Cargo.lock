@@ -994,18 +994,10 @@ dependencies = [
 name = "nullslop"
 version = "0.1.0"
 dependencies = [
- "nullslop-cli",
-]
-
-[[package]]
-name = "nullslop-cli"
-version = "0.1.0"
-dependencies = [
  "clap",
  "error-stack",
- "kanal",
+ "nullslop-cli",
  "nullslop-component",
- "nullslop-component-ui",
  "nullslop-core",
  "nullslop-echo",
  "nullslop-ext-host",
@@ -1018,6 +1010,13 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "wherror",
+]
+
+[[package]]
+name = "nullslop-cli"
+version = "0.1.0"
+dependencies = [
+ "clap",
 ]
 
 [[package]]
@@ -1152,9 +1151,7 @@ dependencies = [
  "nullslop-component-core",
  "nullslop-component-ui",
  "nullslop-core",
- "nullslop-echo",
  "nullslop-ext-host",
- "nullslop-extension",
  "nullslop-protocol",
  "nullslop-services",
  "parking_lot",

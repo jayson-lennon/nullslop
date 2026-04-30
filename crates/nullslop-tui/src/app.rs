@@ -35,16 +35,16 @@ pub struct TuiApp {
     /// Background event stream. Set by [`run`](crate::run::run).
     #[debug(skip)]
     pub event_task: Option<tokio::task::JoinHandle<()>>,
-    /// Runtime services. Set during startup.
-    pub services: Option<nullslop_services::Services>,
+    /// Runtime services.
+    pub services: nullslop_services::Services,
     /// Current application lifecycle status.
     pub status: AppStatus,
 }
 
 impl TuiApp {
-    /// Creates a new application with default state.
+    /// Creates a new application with the given services.
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(services: nullslop_services::Services) -> Self {
         let mut core = AppCore::new();
         let mut ui_registry = AppUiRegistry::new();
         nullslop_component::register_all(&mut core.bus, &mut ui_registry);
@@ -58,7 +58,33 @@ impl TuiApp {
             which_key,
             suspend: Suspend::new(),
             event_task: None,
-            services: None,
+            services,
+            status: AppStatus::Starting,
+        }
+    }
+
+    /// Creates a new application with pre-built core and services.
+    ///
+    /// Use this when the caller has already registered components
+    /// and set up the extension host on the core.
+    #[must_use]
+    pub fn new_with_core(
+        services: nullslop_services::Services,
+        mut core: nullslop_core::AppCore,
+    ) -> Self {
+        let mut ui_registry = AppUiRegistry::new();
+        nullslop_component::register_all(&mut core.bus, &mut ui_registry);
+        let keymap = keymap::init();
+        let which_key = WhichKeyInstance::new(keymap, Scope::Normal);
+
+        Self {
+            core,
+            ui_registry,
+            events: MsgHandler::new(),
+            which_key,
+            suspend: Suspend::new(),
+            event_task: None,
+            services,
             status: AppStatus::Starting,
         }
     }
@@ -119,12 +145,6 @@ impl TuiApp {
     }
 }
 
-impl Default for TuiApp {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 /// Returns the scope corresponding to the given mode.
 pub fn scope_for_mode(mode: Mode) -> Scope {
     match mode {
@@ -135,7 +155,10 @@ pub fn scope_for_mode(mode: Mode) -> Scope {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use nullslop_ext_host::fake::FakeExtensionHost;
     use nullslop_protocol as npr;
 
     use super::*;
@@ -144,10 +167,21 @@ mod tests {
         crossterm::event::Event::Key(KeyEvent::new(code, KeyModifiers::NONE))
     }
 
+    fn create_test_app() -> TuiApp {
+        // Leaking the runtime is acceptable for tests — each test gets its own.
+        let rt = Box::leak(Box::new(
+            tokio::runtime::Runtime::new().expect("test runtime"),
+        ));
+        let handle = rt.handle().clone();
+        let ext_host: Arc<dyn nullslop_core::ExtensionHost> = Arc::new(FakeExtensionHost::new());
+        let services = nullslop_services::Services::new(handle, ext_host);
+        TuiApp::new(services)
+    }
+
     #[test]
     fn app_new_starts_in_normal_scope() {
         // Given a new App.
-        let app = TuiApp::new();
+        let app = create_test_app();
 
         // Then which_key scope is Normal.
         assert_eq!(*app.which_key.scope(), Scope::Normal);
@@ -156,7 +190,7 @@ mod tests {
     #[test]
     fn app_normal_enter_enters_input() {
         // Given an App in Normal scope.
-        let mut app = TuiApp::new();
+        let mut app = create_test_app();
         assert_eq!(*app.which_key.scope(), Scope::Normal);
 
         // When pressing 'i'.
@@ -170,7 +204,7 @@ mod tests {
     #[test]
     fn app_normal_esc_quits() {
         // Given an App in Normal scope.
-        let mut app = TuiApp::new();
+        let mut app = create_test_app();
 
         // When pressing 'q'.
         app.handle_msg(Msg::Input(key_event(KeyCode::Char('q'))));
@@ -183,7 +217,7 @@ mod tests {
     #[test]
     fn app_input_enter_submits() {
         // Given an App in Input scope with "hello" in buffer.
-        let mut app = TuiApp::new();
+        let mut app = create_test_app();
         app.which_key.set_scope(Scope::Input);
         app.core.state.write().chat_input.input_buffer = "hello".to_string();
 
@@ -204,7 +238,7 @@ mod tests {
     #[test]
     fn app_input_esc_back_to_normal() {
         // Given an App in Input scope.
-        let mut app = TuiApp::new();
+        let mut app = create_test_app();
         app.which_key.set_scope(Scope::Input);
 
         // When pressing Esc.
@@ -218,7 +252,7 @@ mod tests {
     #[test]
     fn app_input_char_appends() {
         // Given an App in Input scope.
-        let mut app = TuiApp::new();
+        let mut app = create_test_app();
         app.which_key.set_scope(Scope::Input);
 
         // When pressing 'x'.
@@ -232,7 +266,7 @@ mod tests {
     #[test]
     fn app_input_backspace_deletes() {
         // Given an App in Input scope with "ab" in buffer.
-        let mut app = TuiApp::new();
+        let mut app = create_test_app();
         app.which_key.set_scope(Scope::Input);
         app.core.state.write().chat_input.input_buffer = "ab".to_string();
 
@@ -247,7 +281,7 @@ mod tests {
     #[test]
     fn app_toggle_which_key_handled_directly() {
         // Given an App with inactive which_key.
-        let mut app = TuiApp::new();
+        let mut app = create_test_app();
         assert!(!app.which_key.active);
 
         // When routing AppToggleWhichKey directly.
@@ -260,7 +294,7 @@ mod tests {
     #[test]
     fn app_custom_command_routes_through_bus() {
         // Given an App with components registered.
-        let mut app = TuiApp::new();
+        let mut app = create_test_app();
 
         // When routing a CustomCommand (echo).
         app.route_command(Command::CustomCommand {

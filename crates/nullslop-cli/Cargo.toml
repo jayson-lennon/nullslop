@@ -4,23 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-nullslop-tui = { workspace = true }
-nullslop-core = { workspace = true }
-nullslop-services = { workspace = true }
-nullslop-component = { workspace = true }
-nullslop-component-ui = { workspace = true }
-nullslop-ext-host = { workspace = true }
-nullslop-echo = { workspace = true }
-nullslop-extension = { workspace = true }
-ratatui-which-key = { workspace = true }
 clap = { version = "4", features = ["derive"] }
-tokio = { workspace = true }
-wherror = { workspace = true }
-error-stack = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
-kanal = { workspace = true }
-nullslop-protocol = { workspace = true, features = ["which-key"] }
 
 [lints]
 workspace = true

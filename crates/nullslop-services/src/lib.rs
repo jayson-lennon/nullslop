@@ -17,17 +17,18 @@ use tokio::runtime::Handle;
 pub struct Services {
     /// Async runtime handle for spawning background tasks.
     handle: Handle,
-    /// Extension host service (optional — set during startup).
-    ext_host: Option<ExtensionHostService>,
+    /// Extension host service.
+    ext_host: ExtensionHostService,
 }
 
 impl Services {
-    /// Creates a new `Services` with the given async runtime handle.
+    /// Creates a new `Services` with the given async runtime handle
+    /// and extension host.
     #[must_use]
-    pub fn new(handle: Handle) -> Self {
+    pub fn new(handle: Handle, ext_host: Arc<dyn nullslop_core::ExtensionHost>) -> Self {
         Self {
             handle,
-            ext_host: None,
+            ext_host: ExtensionHostService::new(ext_host),
         }
     }
 
@@ -37,14 +38,9 @@ impl Services {
         &self.handle
     }
 
-    /// Returns a reference to the extension host, if set.
+    /// Returns a reference to the extension host service.
     #[must_use]
-    pub fn ext_host(&self) -> Option<&ExtensionHostService> {
-        self.ext_host.as_ref()
-    }
-
-    /// Registers the extension host service.
-    pub fn register_extension_host(&mut self, svc: Arc<dyn nullslop_core::ExtensionHost>) {
-        self.ext_host = Some(ExtensionHostService::new(svc));
+    pub fn ext_host(&self) -> &ExtensionHostService {
+        &self.ext_host
     }
 }

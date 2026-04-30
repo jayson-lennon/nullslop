@@ -11,6 +11,7 @@
 
 pub mod app_core;
 pub mod app_msg;
+pub mod core_ext_sender;
 pub mod ext_host;
 pub mod extension;
 pub mod state;
@@ -18,6 +19,7 @@ pub mod state;
 // Re-export primary types owned by this crate
 pub use app_core::{AppCore, TickResult};
 pub use app_msg::AppMsg;
+pub use core_ext_sender::CoreExtSender;
 pub use ext_host::{ExtHostSender, ExtensionError, ExtensionHost, ExtensionHostService};
 pub use extension::{ExtensionManifest, ExtensionRegistry, RegisteredExtension};
 pub use state::{State, StateReadGuard, StateWriteGuard};

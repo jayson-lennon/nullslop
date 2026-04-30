@@ -6,49 +6,17 @@
 //! terminal suspension and restarting it afterward.
 
 use std::io::{self, Stdout};
-use std::sync::Arc;
 
 use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use error_stack::{Report, ResultExt};
-use nullslop_core::{AppMsg, ExtHostSender, RegisteredExtension};
-use nullslop_protocol::{Command, Event};
 use ratatui::{Terminal, backend::CrosstermBackend};
-use tokio::runtime::Handle;
 use wherror::Error;
 
 use crate::TuiApp;
 use crate::app::scope_for_mode;
-
-/// Wrapper that adapts a `kanal::Sender<AppMsg>` to the
-/// [`ExtHostSender`] trait.
-///
-/// Required because Rust's orphan rules prevent implementing
-/// `ExtHostSender` (from `nullslop_core`) on `kanal::Sender<AppMsg>`
-/// directly.
-struct TuiExtSender(kanal::Sender<AppMsg>);
-
-impl ExtHostSender for TuiExtSender {
-    fn send_extensions_ready(&self, registrations: Vec<RegisteredExtension>) {
-        let _ = self.0.send(AppMsg::ExtensionsReady(registrations));
-    }
-
-    fn send_command(&self, command: Command, _source: Option<&str>) {
-        let _ = self.0.send(AppMsg::Command {
-            command,
-            source: None,
-        });
-    }
-
-    fn send_extension_event(&self, event: Event, _source: Option<&str>) {
-        let _ = self.0.send(AppMsg::Event {
-            event,
-            source: None,
-        });
-    }
-}
 
 /// Error type for TUI run operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
@@ -58,12 +26,13 @@ pub struct TuiRunError;
 /// Runs the TUI application.
 ///
 /// Sets up the terminal, runs the main event loop, and restores
-/// the terminal on exit.
+/// the terminal on exit. The caller must provide a fully-initialized
+/// [`TuiApp`] with services already set.
 ///
 /// # Errors
 ///
 /// Returns an error if terminal setup, the event loop, or teardown fails.
-pub fn run(mut app: TuiApp, handle: &Handle) -> Result<(), Report<TuiRunError>> {
+pub fn run(mut app: TuiApp) -> Result<(), Report<TuiRunError>> {
     let mut stdout = io::stdout();
     enable_raw_mode()
         .change_context(TuiRunError)
@@ -78,25 +47,10 @@ pub fn run(mut app: TuiApp, handle: &Handle) -> Result<(), Report<TuiRunError>> 
         .attach("failed to create terminal")?;
 
     // Start the event stream task.
-    app.event_task = Some(app.events.event_task(handle));
+    let handle = app.services.handle().clone();
+    app.event_task = Some(app.events.event_task(&handle));
 
-    // Start extension host (in-memory with nullslop-echo).
-    let sender = TuiExtSender(app.core.sender());
-    let echo_ext: Box<dyn nullslop_extension::InMemoryExtension> =
-        Box::new(nullslop_echo::EchoExtension);
-    let ext_host =
-        nullslop_ext_host::InMemoryExtensionHost::start(Arc::new(sender), vec![echo_ext], handle);
-    let ext_arc: Arc<dyn nullslop_core::ExtensionHost> = Arc::new(ext_host);
-
-    // Share the extension host between AppCore and Services.
-    app.core
-        .set_ext_host(nullslop_core::ExtensionHostService::new(ext_arc.clone()));
-
-    let mut services = nullslop_services::Services::new(handle.clone());
-    services.register_extension_host(ext_arc);
-    app.services = Some(services);
-
-    let result = run_main_loop(&mut terminal, &mut app, handle);
+    let result = run_main_loop(&mut terminal, &mut app, &handle);
 
     // Clean up event task.
     if let Some(task) = app.event_task.take() {
@@ -104,10 +58,7 @@ pub fn run(mut app: TuiApp, handle: &Handle) -> Result<(), Report<TuiRunError>> 
     }
 
     // Shut down extension host.
-    let ext = app.core.ext_host().cloned();
-    if let Some(ext) = ext
-        && let Err(e) = ext.shutdown(&mut app.core)
-    {
+    if let Err(e) = app.services.ext_host().shutdown(&mut app.core) {
         tracing::error!(err = ?e, "extension host shutdown error");
     }
 
@@ -128,7 +79,7 @@ pub fn run(mut app: TuiApp, handle: &Handle) -> Result<(), Report<TuiRunError>> 
 fn run_main_loop(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     app: &mut TuiApp,
-    handle: &Handle,
+    handle: &tokio::runtime::Handle,
 ) -> Result<(), Report<TuiRunError>> {
     loop {
         let event = app
@@ -183,7 +134,7 @@ fn handle_suspend_action(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     app: &mut TuiApp,
     action: crate::suspend::SuspendAction,
-    handle: &Handle,
+    handle: &tokio::runtime::Handle,
 ) -> Result<(), Report<TuiRunError>> {
     // Cancel the event stream so crossterm stops polling the terminal.
     if let Some(task) = app.event_task.take() {

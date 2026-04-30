@@ -6,13 +6,10 @@ edition = "2024"
 [dependencies]
 nullslop-core = { workspace = true }
 nullslop-protocol = { workspace = true, features = ["which-key"] }
-nullslop-extension = { workspace = true }
 nullslop-component = { workspace = true }
 nullslop-component-core = { workspace = true }
 nullslop-component-ui = { workspace = true }
 nullslop-services = { workspace = true }
-nullslop-ext-host = { workspace = true }
-nullslop-echo = { workspace = true }
 wherror = { workspace = true }
 error-stack = { workspace = true }
 ratatui = { workspace = true }
@@ -34,6 +31,7 @@ serde_json = { workspace = true }
 [dev-dependencies]
 rstest = { workspace = true }
 tempfile = { workspace = true }
+nullslop-ext-host = { workspace = true }
 
 [lints]
 workspace = true
