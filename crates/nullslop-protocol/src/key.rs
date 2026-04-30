@@ -85,6 +85,20 @@ impl ratatui_which_key::Key for KeyEvent {
         })
     }
 
+    /// Parse a key from a special name string.
+    ///
+    /// Supports control-modified keys via the `c-` prefix (e.g. `"c-x"` → Ctrl+X),
+    /// as well as named keys like `"tab"`, `"enter"`, `"escape"`, arrow keys,
+    /// function keys (`"f1"`–`"f12"`), and symbolic aliases (`"lt"` → `<`, `"gt"` → `>`).
+    ///
+    /// Matching is case-insensitive.
+    ///
+    /// # Examples
+    ///
+    /// - `"c-x"` → Ctrl+X
+    /// - `"tab"` → Tab
+    /// - `"f5"` → F5
+    /// - `"lt"` → <
     fn from_special_name(name: &str) -> Option<Self> {
         let lower = name.to_ascii_lowercase();
 
