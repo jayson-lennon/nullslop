@@ -1,70 +1,55 @@
 # Architecture
 
-nullslop is a TUI chat application built on a component system. Everything the app does — handling input, switching modes, quitting, bridging extensions — is a component. Components are stateless adapters that route typed commands to domain objects. All state lives in one place.
+nullslop is a TUI chat application built on a component system with an extension bridge. Components are synchronous and have direct access to shared state. Extensions are asynchronous processes that communicate only via messages.
 
-## Top-Level Summary
-
-**Three layers, one data store:**
-
-1. **Domain objects** (`InputBox`, `Popup`, etc.) — hold behavior and enforce invariants. They don't know about components or the bus.
-2. **Components** — thin routing that maps commands to domain object method calls. Minimal logic of their own.
-3. **State** (`AppData` / `TuiState`) — the single source of truth. Holds domain objects. Everyone reads and writes here.
-
-The renderer queries state. It doesn't know or care which component wrote what.
-
-## Detailed Architecture
-
-### Data Flow
+## Data Flow
 
 ```
-Key press → Command → Bus → Component → Domain object method → State mutated → Renderer reads state
+  Command/Event (input)  <--- keymap input (produces commands)
+         |
+         v
+  +---- Bus (sync loop) ----------------------+    +-- AppState (single source of truth) --+
+  |                                           |    |                                       |
+  |  dispatch --> component handlers          |    |  component handlers read/write here   |
+  |                extension host             |    |              |                        |
+  |                    |                      |    |              v                        |
+  |                    v                      |    |         state mutated                 |
+  |               Out buffer                  |    |              |                        |
+  |                    |                      |    |              v                        |
+  |              new cmd/evt                  |    |         renderer reads                |
+  |                    |                      |    |              |                        |
+  |      loops back until queue empty         |    |              v                        |
+  |                    ^                      |    |         draws to screen               |
+  +-------------------------------------------+    +---------------------------------------+
 ```
 
-Each step has a single responsibility:
+### Bus properties
 
-| Step       | Responsibility                                     | Example                                            |
-| ---------- | -------------------------------------------------- | -------------------------------------------------- |
-| Key press  | Raw terminal event                                 | User presses `x`                                   |
-| Command    | Typed, serializable intent                         | `ChatBoxInsertChar { ch: 'x' }`                    |
-| Bus        | Dispatches commands by type to registered handlers | Looks up `ChatBoxInsertChar` handlers              |
-| Component  | Routes command to the right domain object method   | Calls `state.input_box.insert_char('x')`           |
-| Domain obj | Enforces invariants, mutates its own state         | Appends char, validates, updates cursor            |
-| Renderer   | Reads state, draws the frame                       | Renders `input_box.text()` at `input_box.cursor()` |
+- **Typed dispatch** — handlers register for specific `Command` or `Event` variants
+- **Command interception** — first handler returning `Stop` halts propagation for that command
+- **Events are fire-and-forget** — all handlers always run, no interception
+- **Cascading** — handlers submit new messages via `Out`, processed in subsequent iterations
 
-### State
+## Components
 
-`AppData` (in `nullslop-protocol`) holds shared application state — mode, chat history, the quit flag. `TuiState` (in `nullslop-tui`) holds ephemeral TUI concerns like scroll offset and domain objects such as `InputBox`.
+A **component** is a directory under `crates/nullslop-component/src/` having various submodules, depending on what it needs:
 
-All mutation goes through `&mut AppData`. There is no component-local state.
+| File         | Purpose                                                      |
+| ------------ | ------------------------------------------------------------ |
+| `mod.rs`     | Registration — wires the component into the bus and registry |
+| `handler.rs` | Bus access — reacts to commands/events, mutates `AppState`   |
+| `element.rs` | Rendering — implements `UiElement`, draws to a `Frame`       |
+| `state.rs`   | State — component-specific data held in `AppState`           |
 
-### Domain Objects
+For example, a chat input box needs all four since it handles input, rendering, and state. A clock display would only need `mod.rs` and `element.rs` since it just renders to the screen.
 
-Domain objects encapsulate behavior and hide their internals behind public methods:
+### Handler pattern
+
+Handlers are unit structs defined with the `define_handler!` macro, which wires specific command and event types to methods:
 
 ```rust
-pub struct InputBox {
-    text: String,         // private
-    cursor: usize,        // private
-}
-
-impl InputBox {
-    pub fn insert_char(&mut self, ch: char) { ... }
-    pub fn delete_grapheme(&mut self) { ... }
-    pub fn delete_word(&mut self) { ... }
-    pub fn text(&self) -> &str { ... }
-    pub fn cursor(&self) -> usize { ... }
-}
-```
-
-They are tested in isolation — grapheme handling, cursor bounds, empty buffer edge cases, etc.
-
-### Components
-
-Components are unit structs with no fields. They implement `CommandHandler<C>` or `EventHandler<E>` by delegating to domain object methods:
-
-```rust
-define_component! {
-    pub(crate) struct InputModeComponent;
+define_handler! {
+    pub(crate) struct ChatInputBoxHandler;
 
     commands {
         ChatBoxInsertChar: on_insert_char,
@@ -74,64 +59,77 @@ define_component! {
     events {}
 }
 
-impl InputModeComponent {
-    fn on_insert_char(cmd: &ChatBoxInsertChar, state: &mut AppData, _out: &mut Out) -> CommandAction {
-        state.input_box.insert_char(cmd.ch);
+impl ChatInputBoxHandler {
+    fn on_insert_char(cmd: &ChatBoxInsertChar, state: &mut AppState, _out: &mut Out) -> CommandAction {
+        state.chat_input.input_buffer.push(cmd.ch);
         CommandAction::Continue
     }
 }
 ```
 
-Component code is mechanical — "when this command arrives, make a decision and then call this method." The real logic lives in domain objects.
+Handlers are mechanical — "when this command or event arrives, call this method on state." Each component's `mod.rs` registers its handler and element in a single `register(bus, registry)` function called once at startup.
 
-### Bus
+### State
 
-The bus (`nullslop-component`) dispatches commands and events to handlers by `TypeId`. Key properties:
-
-- **Typed dispatch** — handlers only receive the command/event types they register for
-- **Command interception** — first handler returning `Stop` halts propagation
-- **Events are fire-and-forget** — all handlers always run, no interception
-- **Consistent snapshot** — one `&mut AppData` per bus iteration
-- **Cascading** — handlers can submit new commands/events via `Out`, processed in subsequent iterations
-- **Guard rail** — `max_iterations` (default 100) prevents infinite loops
-
-### Handler Traits
+`AppState` (in `nullslop-component`) is the single source of truth. All components read and write the same `AppState`. Component state within `AppState` _must always_ use a struct:
 
 ```rust
-pub trait CommandHandler<C: 'static> {
-    fn handle(&self, cmd: &C, state: &mut AppData, out: &mut Out) -> CommandAction;
-}
+#[derive(Debug)]
+pub struct AppState {
+    pub chat_input: ChatInputBoxState,
+    pub shutdown_tracker: ShutdownTrackerState,
 
-pub trait EventHandler<E: 'static> {
-    fn handle(&self, evt: &E, state: &mut AppData, out: &mut Out);
+    // (not a component)
+    pub should_quit: bool,
 }
 ```
 
-Takes `&self` so future scripted components (Lua, Python) can hold their runtime behind interior mutability (e.g., `Rc<RefCell<Runtime>>`). Native components are unit structs — `&self` is unused but harmless.
+`State` (in `nullslop-core`) wraps `AppState` and the extension registry in an `RwLock` for cross-thread access. The processing loop acquires a write lock, processes all pending commands and events, then releases it.
 
-### Keymap
+### Rendering
 
-The keymap binds physical keys to `Command` variants scoped by mode (`Normal`, `Input`). When a key matches, the which-key system produces a `Command` and feeds it into the bus.
+UI elements implement `UiElement<AppState>` from `nullslop-component-ui`. They read `AppState` and draw to a ratatui `Frame`. Elements don't know about the bus or handlers — they just read state and draw stuff.
 
-### Extensions
+## Extensions
 
-Extensions are out-of-process (e.g., subprocess communicating over JSON). They observe events and send commands back asynchronously. The extension host bridges between the external process and the bus. Extensions are separate from components — they use the same `Command`/`Event` wire protocol but don't implement handler traits.
+Extensions run asynchronously on separate threads or processes. They cannot access `AppState` — they communicate only through the command/event message protocol.
+
+```
+Host (nullslop)                                  Extension process
+────────────────                                 ─────────────────
+Extension host  ---> JSON over stdin/stdout -->  Extension SDK
+(nullslop-ext-host)                              (nullslop-extension)
+```
+
+- **`nullslop-ext-host`** — host side: discovers extensions, manages lifecycle, bridges messages between the bus and extension processes
+- **`nullslop-extension`** — SDK for authors: provides the `Extension` trait, JSON codec, and a `run!` macro
+
+Two host implementations exist: `ProcessExtensionHost` (subprocess, JSON over stdio) and `InMemoryExtensionHost` (OS thread, no serialization).
 
 ## Crate Structure
 
-| Crate                  | Responsibility                                                                                       |
-| ---------------------- | ---------------------------------------------------------------------------------------------------- |
-| `nullslop-protocol`    | `Command`, `Event`, `AppData`, `Mode`, `CommandAction` — wire types shared by all crates             |
-| `nullslop-component`   | `CommandHandler`, `EventHandler`, `Bus`, `Out`, `define_component!` macro — dispatch infrastructure |
-| `nullslop-core`        | `State` (wraps `AppData` + `ExtensionRegistry` in `RwLock`) — shared state container                 |
-| `nullslop-tui`         | Components, keymap, renderer, terminal setup — the TUI application                                  |
-| `nullslop-extension`   | JSON codec, subprocess management — extension host infrastructure                                    |
+| Crate                     | Responsibility                                                          |
+| ------------------------- | ----------------------------------------------------------------------- |
+| `nullslop-protocol`       | `Command`, `Event`, `CommandAction`, `Mode`, `Key` — wire types         |
+| `nullslop-component-core` | `CommandHandler`, `EventHandler`, `Bus`, `Out`, `define_handler!`       |
+| `nullslop-component-ui`   | `UiElement` trait, `UiRegistry` — renderable element infrastructure     |
+| `nullslop-component`      | Built-in components (chat input, chat log, quit, shutdown tracking)     |
+| `nullslop-core`           | `State` (RwLock wrapper), `AppCore` processing loop, extension registry |
+| `nullslop-services`       | `Services` container — runtime services shared across the application   |
+| `nullslop-tui`            | Terminal setup, event loop, keymap, renderer, top-level `TuiApp`        |
+| `nullslop-ext-host`       | Extension host implementations (process-based, in-memory)               |
+| `nullslop-extension`      | SDK for extension authors (`Extension` trait, codec, `run!` macro)      |
+| `nullslop-cli`            | CLI argument parsing                                                    |
+
+## Keymap
+
+The keymap (in `nullslop-tui`) binds physical keys to `Command` variants scoped by mode (`Normal`, `Input`). When a key matches, the which-key system produces a `Command` and feeds it into the bus.
 
 ## Testing Strategy
 
-- **Domain objects** — thorough unit tests for behavior and edge cases (grapheme handling, cursor bounds, etc.)
-- **Components** — thin integration tests verifying the right domain method is called
-- **Bus** — dispatch, propagation, cascading, and guard rail tests
-- **Renderer** — layout and size constraint tests
+- **Component handlers** — test via the bus: register handler, submit command, assert `AppState` changes
+- **UI elements** — test with ratatui `TestBackend`: render with known state, assert buffer contents
+- **Bus** — dispatch, propagation, cascading, and guard rail tests (uses `FakeCommandHandler`)
+- **State types** — unit tests for behavior (grapheme handling, cursor bounds, etc.)
 
-Tests follow Given/When/Then structure. Fakes (`FakeCommandHandler`, `FakeEventHandler`) verify dispatch without real logic.
+Tests follow Given/When/Then structure. See `AGENTS.md` for detailed testing patterns.

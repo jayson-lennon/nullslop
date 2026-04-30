@@ -1,6 +1,6 @@
 # Style Guide
 
-This document defines the coding conventions and architectural patterns for the `nullslop` codebase.
+This document defines the coding conventions and patterns for the `nullslop` codebase. For system design and data flow, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## 1. Overview
 
@@ -22,7 +22,7 @@ use wherror::Error;
 pub struct ExternalEditorError;
 ```
 
-**Result type pattern:**
+**Result with error context:**
 
 ```rust
 use error_stack::{Report, ResultExt};
@@ -40,23 +40,29 @@ pub fn load() -> Result<Config, Report<ConfigError>> {
 ```rust
 /// # Errors
 ///
-/// Returns an error if the database connection fails.
-pub async fn new(db_path: &str) -> Result<Self, Report<SqliteNoteDbError>>
+/// Returns an error if the terminal setup fails.
+pub fn run(tick_rate: Duration) -> Result<(), Report<TuiRunError>>
 ```
 
 ### Trait Usage
 
 Every external dependency or service must have a trait abstraction.
 
-**Backend trait pattern:**
+**Trait pattern:**
 
 ```rust
-use async_trait::async_trait;
+pub trait CommandHandler<C: 'static, S> {
+    fn handle(&self, cmd: &C, state: &mut S, out: &mut Out) -> CommandAction;
+}
 
-#[async_trait]
-pub trait PlaylistStorage: Send + Sync {
-    fn name(&self) -> &'static str;
-    async fn load(&self, dir: &CanonicalPath) -> Result<PlaylistData, Report<IoError>>;
+use wherror::Error;
+
+#[derive(Debug, Error)]
+#[error(debug)]
+pub struct FooBackendError;
+
+pub trait FooBackend {
+    fn fetch_all(&self) -> Result<Vec<Foo>, Report<FooBackendError>>;
 }
 ```
 
@@ -67,23 +73,22 @@ use std::sync::Arc;
 use derive_more::Debug;
 
 #[derive(Debug, Clone)]
-pub struct MpvClientService {
-    #[debug("backend<{}>", self.backend.name())]
-    backend: Arc<dyn MpvClient>,
+pub struct ExtensionHostService {
+    #[debug("ExtensionHost<{}>", self.backend.name())]
+    host: Arc<dyn ExtensionHost>,
 }
 
-impl MpvClientService {
-    pub fn new(backend: Arc<dyn MpvClient>) -> Self {
-        Self { backend }
+impl ExtensionHostService {
+    pub fn new(host: Arc<dyn ExtensionHost>) -> Self {
+        Self { host }
     }
 }
 ```
 
 **Key trait design rules:**
 
-- All traits must be `Send + Sync` for thread safety
 - Use `#[async_trait]` for async methods
-- Include a `name(&self) -> &'static str` method for debugging
+- Include a `name(&self) -> &'static str` method for debugging on service traits
 - Service structs wrap `Arc<dyn Trait>` for shared ownership
 
 ### Module Structure
@@ -91,73 +96,61 @@ impl MpvClientService {
 **Workspace organization:**
 
 ```
-Cargo.toml          # Workspace with members = ["crates/*", "tests/*"]
+Cargo.toml          # Workspace with members = ["crates/*", "extensions/*"]
 crates/
-  null-prophet/        # Main crate
+  nullslop/            # Main binary crate
     src/
-      lib.rs        # Module declarations and re-exports
-      feat/         # Feature modules (domain logic)
-      services.rs   # Service container
-      system_ctx.rs # Application context
-tests/
-  acceptance/       # Cucumber acceptance tests
+      lib.rs
+      main.rs
+      app.rs
+  nullslop-protocol/   # Command, Event, Mode, Key — wire types
+  nullslop-component-core/  # Bus, handler traits, define_handler! macro
+  nullslop-component-ui/    # UiElement trait, UiRegistry
+  nullslop-component/       # Built-in components (chat input, chat log, quit, etc.)
+  nullslop-core/       # State wrapper, AppCore loop, extension registry
+  nullslop-services/   # Services container (runtime dependencies)
+  nullslop-tui/        # Terminal, renderer, keymap, event loop
+  nullslop-ext-host/   # Extension host implementations
+  nullslop-extension/  # Extension author SDK
+  nullslop-cli/        # CLI argument parsing
+extensions/
+  nullslop-echo/       # Example echo extension
 ```
 
-**Feature module pattern (`feat/`):**
-
-```rust
-// feat/playlist/mod.rs
-pub mod storage;  // Submodule with implementations
-
-pub use storage::{PlaylistStorage, PlaylistStorageService};
-
-#[async_trait]
-pub trait PlaylistStorage: Send + Sync { ... }
-
-pub struct PlaylistStorageService { ... }
-```
-
-**Submodule with implementations:**
+**Component module pattern (under `nullslop-component/src/`):**
 
 ```
-feat/playlist/storage/
-├── mod.rs      # Re-exports
-├── sqlite.rs   # Real implementation
-└── fake.rs     # Test fake
+chat_input_box/
+├── mod.rs      # register(bus, registry) wiring
+├── handler.rs  # Bus handler via define_handler! macro
+├── element.rs  # UiElement<AppState> rendering
+└── state.rs    # Component-specific state (e.g., ChatInputBoxState)
 ```
+
+Not every component needs all four files. A display-only component (like chat log) may only have `mod.rs` and `element.rs`.
 
 ### Dependency Injection
 
-**Services container (shared with any parts of the application):**
+**Services container (in `nullslop-services`):**
 
 ```rust
 #[derive(Debug, Clone)]
 pub struct Services {
-    pub chat: ChatService,
-    pub rt: tokio::runtime::Handle,
-    // more fields as needed.
+    handle: Handle,
+    ext_host: ExtensionHostService,
 }
 ```
 
-**System context:**
+Created once at startup and shared throughout the application.
 
-```rust
-#[derive(Debug, Clone)]
-pub struct SystemCtx {
-    pub services: Services,
-    pub config: Config,
-    pub keymap: Keymap,
-}
-```
+All services within the `Services` struct must either:
+
+- Be cheap to clone
+- Use the "service wrapper" pattern detailed above.
 
 ## 3. Data Flow
 
-Command → SystemCtx → Services → Backend Trait → Implementation
-
-1. User action creates a `Command` enum variant
-2. `execute(ctx, command)` dispatches to domain logic
-3. Domain logic accesses services via `ctx.services`
-4. Services delegate to trait backends (real or fake)
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full data flow diagram and bus dispatch details.
 
 ## 4. Tests
 
@@ -169,7 +162,7 @@ Important:
 
 ### BDD-Style Tests (Given/When/Then)
 
-Structure tests with clear Given/When/Then sections:
+Structure tests with clear Given/When/Then sections, and name the test so it can be read as a standalone program behavior in the test report:
 
 ```rust
 fn pop_returns_none_when_stack_empty() {
@@ -184,24 +177,29 @@ fn pop_returns_none_when_stack_empty() {
 }
 ```
 
-**Example with service:**
+**Example with bus and state:**
 
 ```rust
-fn service_delegates_to_backend() {
-    // Given a service with a fake backend.
-    let fake = Arc::new(FakeBackend::new());
-    let service = MyService::new(fake.clone());
+#[test]
+fn quit_command_sets_should_quit_in_state() {
+    // Given a bus with AppQuitHandler registered.
+    let mut bus: Bus<AppState> = Bus::new();
+    AppQuitHandler.register(&mut bus);
 
-    // When calling the service method.
-    let result = service.do_thing();
+    // When processing the AppQuit command.
+    bus.submit_command(Command::AppQuit);
 
-    // Then the backend was called and result is successful.
-    assert!(result.is_ok());
-    assert_eq!(fake.call_count.load(Ordering::SeqCst), 1);
+    let mut state = AppState::new();
+    bus.process_commands(&mut state);
+
+    // Then should_quit should be set to true.
+    assert!(state.should_quit);
 }
 ```
 
 ### Parameterized Tests with rstest
+
+If a test has many inputs, the prefer parametrizing with `rstest`:
 
 ```rust
 #[rstest::rstest]
@@ -213,25 +211,27 @@ fn key_display(#[case] key: Key, #[case] expected: &str) {
 }
 ```
 
+For edge cases that don't easily fit into "expected", prefer a BDD-styled test instead.
+
 ### Async Tests
 
 ```rust
 #[tokio::test]
-async fn storage_loads_data() {
-    // Given a storage service with fake backend.
-    let storage = PlaylistStorageService::new(Arc::new(FakeStorageBackend::new()));
+async fn extension_host_loads_manifest() {
+    // Given an in-memory extension host.
+    let host = InMemoryExtensionHost::new();
 
-    // When loading data.
-    let result = storage.load(&path).await;
+    // When loading extensions.
+    let result = host.discover().await;
 
-    // Then the operation succeeds.
+    // Then discovery succeeds.
     assert!(result.is_ok());
 }
 ```
 
 ### Test Utilities
 
-**test_utils module structure:**
+**`test_utils` module structure:**
 
 ```rust
 // test_utils/mod.rs
@@ -239,135 +239,77 @@ pub mod context;
 pub mod fakes;
 pub mod fixtures;
 pub mod services;
-
-pub use context::NoteTestContext;
-pub use fakes::FakeMpvBackend;
-pub use services::create_test_services;
 ```
 
-**Test context pattern:**
+**Testing components via the bus:**
 
 ```rust
-pub struct NoteTestContext {
-    pub ctx: SystemCtx,
-    pub temp_file: NamedTempFile,
-}
+#[test]
+fn insert_char_appends_to_buffer() {
+    // Given a bus with ChatInputBoxHandler registered.
+    let mut bus: Bus<AppState> = Bus::new();
+    ChatInputBoxHandler.register(&mut bus);
 
-impl NoteTestContext {
-    pub async fn new() -> Self {
-        let services = create_test_services().await;
-        let ctx = SystemCtx { services, ... };
-        Self { ctx, temp_file }
-    }
-}
-```
+    // When processing the ChatBoxInsertChar('x') command.
+    bus.submit_command(Command::ChatBoxInsertChar {
+        payload: ChatBoxInsertChar { ch: 'x' },
+    });
+    let mut state = AppState::new();
+    bus.process_commands(&mut state);
 
-**Test services factory:**
-
-```rust
-pub async fn create_test_services() -> Services {
-    let db = Arc::new(SqliteNoteDb::new("sqlite::memory:").await.unwrap());
-    Services {
-        mpv: MpvClientService::new(Arc::new(FakeMpvBackend)),
-        media: MediaQueryService::new(Arc::new(FakeMediaBackend)),
-        // ... all services with fakes
-    }
+    // Then "x" is appended to the chat_input.input_buffer.
+    assert_eq!(state.chat_input.input_buffer, "x");
 }
 ```
 
 ### Fake Implementations
 
-**Simple fake:**
+**Simple fake (from `nullslop-component-core`):**
 
 ```rust
-pub struct FakeMpvBackend;
+pub struct FakeCommandHandler<C, S> { /* ... */ }
 
-impl MpvClient for FakeMpvBackend {
-    fn name(&self) -> &'static str { "fake" }
-    fn load_file(&self, _path: &Path) -> Result<(), Report<MpvError>> {
-        Ok(())
-    }
-}
-```
-
-**Stateful fake with call tracking:**
-
-```rust
-pub struct FakeStorageBackend {
-    data: Arc<RwLock<StorageData>>,
-    pub load_called: AtomicUsize,
-}
-
-impl FakeStorageBackend {
-    pub fn new() -> Self {
-        Self {
-            data: Arc::new(RwLock::new(StorageData::default())),
-            load_called: AtomicUsize::new(0),
-        }
-    }
-}
-
-impl PlaylistStorage for FakeStorageBackend {
-    async fn load(&self, _dir: &CanonicalPath) -> Result<PlaylistData, Report<IoError>> {
-        self.load_called.fetch_add(1, Ordering::SeqCst);
-        Ok(self.data.read().await.clone())
-    }
-}
+// Used in bus dispatch tests to verify handler registration
+// without real logic:
+let (fake, fake_calls) = FakeCommandHandler::<AppQuit, AppState>::continuing();
+bus.register_command_handler::<AppQuit, _>(fake);
 ```
 
 ## 5. Documentation
 
 ### Module-Level Documentation
 
+Module level documentation should explain what it's purpose and high-level behaviors. Only explain technical details as necessary to make the high-level documentation understandable.
+
 ```rust
-//! Playlist storage and management.
+//! Chat input box — where the user composes and sends messages.
 //!
-//! This module handles persisting and loading playlist data.
-//!
-//! # Notes vs Aliases
-//!
-//! - **Notes**: Searchable metadata attached to files.
-//! - **Aliases**: Display names shown in the TUI.
+//! This component manages the text input experience end to end: handling keystrokes,
+//! displaying the in-progress message, and switching between browsing and typing modes.
 ```
 
 ### Type Documentation
 
 ```rust
-/// A path to a media item, either local file or URL.
-///
-/// This enum distinguishes between local filesystem paths and web resources,
-/// allowing uniform handling while maintaining type safety.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ItemPath {
-    /// A local file path wrapped in [`CanonicalPath`].
-    File(CanonicalPath),
-    /// A URL string pointing to a web resource.
-    Url(String),
+/// The user's in-progress message being composed in the input box.
+#[derive(Debug)]
+pub struct ChatInputBoxState {
+    /// The text the user has typed so far.
+    input_buffer: String,
 }
-```
-
-### Service Documentation
-
-```rust
-/// Container for all injectable service dependencies.
-///
-/// Holds references to all services, enabling dependency injection
-/// and making it easy to swap implementations for testing.
-#[derive(Debug, Clone)]
-pub struct Services { ... }
 ```
 
 ## 6. Modification Guide
 
 When implementing features:
 
-1. **Search for related patterns** - Find similar features in `feat/` directory
-2. **Identify impacted types** - Check if new traits, services, or commands needed
-3. **Create trait first** - Define the abstraction before implementation
-4. **Implement real and fake** - Both must satisfy the trait
-5. **Wire into Services** - Add to `Services` struct and `create_test_services()`
-6. **Write tests** - Use Given/When/Then structure with test context and fakes
-7. **Add documentation** - Module docs, type docs, error docs. Documentation should describe the behavior and purpose, not the technical implementation (unless it's relevant to understanding).
+1. **Search for related patterns** — Find similar components in `nullslop-component/src/`
+2. **Identify impacted types** — Check if new commands, events, or state fields are needed
+3. **Add protocol types first** — Define new `Command`/`Event` variants in `nullslop-protocol`
+4. **Create the component directory** — Add `handler.rs`, `element.rs`, `state.rs` as needed
+5. **Register** — Wire into `register_all()` in `nullslop-component/src/lib.rs`
+6. **Write tests** — Use Given/When/Then structure, test via the bus
+7. **Add documentation** — Module docs, type docs, error docs. Describe behavior and purpose, not technical implementation.
 
 ## 8. Tooling
 
