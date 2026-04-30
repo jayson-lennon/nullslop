@@ -121,7 +121,7 @@ fn render_which_key(frame: &mut Frame<'_>, state: &mut crate::app::WhichKeyInsta
     let widget = WhichKey::new()
         .max_height(10)
         .position(PopupPosition::BottomRight)
-        .border_style(Style::default().fg(Color::Green));
+        .border_style(Style::default().fg(Color::Yellow));
     let buf = frame.buffer_mut();
     widget.render(buf, state);
 }

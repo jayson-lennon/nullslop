@@ -1,7 +1,7 @@
 //! Renders the chat input prompt line.
 //!
 //! Shows the user's in-progress message below a `>` prompt. When the user is
-//! actively typing (input mode), the prompt and border are highlighted in green and
+//! actively typing (input mode), the prompt and border are highlighted in yellow and
 //! the cursor appears at the end of the text. When browsing (normal mode), the
 //! prompt is shown without highlighting and no cursor is displayed.
 
@@ -29,14 +29,14 @@ impl UiElement<AppState> for ChatInputBoxElement {
 
         let prompt_style = if input_mode {
             Style::default()
-                .fg(Color::Green)
+                .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD)
         } else {
             Style::default().add_modifier(Modifier::BOLD)
         };
 
         let border_style = if input_mode {
-            Style::default().fg(Color::Green)
+            Style::default().fg(Color::Yellow)
         } else {
             Style::default()
         };
@@ -136,7 +136,7 @@ mod tests {
     }
 
     #[test]
-    fn render_input_mode_green_prompt() {
+    fn render_input_mode_yellow_prompt() {
         // Given a ChatInputBoxElement in Input mode with "hi" in buffer.
         let mut element = ChatInputBoxElement;
         let state = {
@@ -157,15 +157,15 @@ mod tests {
             })
             .unwrap();
 
-        // Then the ">" prompt is green.
+        // Then the ">" prompt is yellow.
         let buffer = terminal.backend().buffer().clone();
         let cell = buffer.cell((0, 1)).expect("cell should exist");
         assert_eq!(cell.symbol(), ">");
-        assert_eq!(cell.style().fg, Some(Color::Green));
+        assert_eq!(cell.style().fg, Some(Color::Yellow));
     }
 
     #[test]
-    fn render_input_mode_green_border() {
+    fn render_input_mode_yellow_border() {
         // Given a ChatInputBoxElement in Input mode.
         let mut element = ChatInputBoxElement;
         let state = {
@@ -185,10 +185,10 @@ mod tests {
             })
             .unwrap();
 
-        // Then the top border is green.
+        // Then the top border is yellow.
         let buffer = terminal.backend().buffer().clone();
         let cell = buffer.cell((0, 0)).expect("cell should exist");
-        assert_eq!(cell.style().fg, Some(Color::Green));
+        assert_eq!(cell.style().fg, Some(Color::Yellow));
     }
 
     #[test]
