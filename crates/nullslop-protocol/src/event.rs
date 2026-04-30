@@ -31,7 +31,6 @@ pub use crate::system::{EventApplicationReady, EventKeyDown, EventKeyUp, EventMo
 /// this enum. An event struct defined in a domain module without an enum variant
 /// here will not be broadcast by the bus.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
 #[serde(tag = "type")]
 pub enum Event {
     /// A key was pressed down.
