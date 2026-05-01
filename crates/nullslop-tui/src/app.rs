@@ -182,8 +182,10 @@ mod tests {
         // Given a new App.
         let app = create_test_app();
 
-        // Then which_key scope is Normal.
+        // When inspecting the which_key scope.
         assert_eq!(*app.which_key.scope(), Scope::Normal);
+
+        // Then it starts in Normal scope.
     }
 
     #[test]
@@ -326,6 +328,9 @@ mod tests {
 
     #[test]
     fn scope_for_mode_maps_correctly() {
+        // Given all Mode variants.
+        // When mapping each mode to a scope.
+        // Then each mode maps to its corresponding scope.
         assert_eq!(scope_for_mode(Mode::Normal), Scope::Normal);
         assert_eq!(scope_for_mode(Mode::Input), Scope::Input);
     }

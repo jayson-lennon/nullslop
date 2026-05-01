@@ -334,6 +334,7 @@ mod tests {
         bus.submit_command(Command::InsertChar {
             payload: InsertChar { ch: 'b' },
         });
+        // When processing MoveCursorLeft.
         bus.submit_command(Command::MoveCursorLeft);
 
         let mut state = AppState::new();
@@ -357,6 +358,7 @@ mod tests {
             payload: InsertChar { ch: 'b' },
         });
         bus.submit_command(Command::MoveCursorLeft);
+        // When processing MoveCursorRight.
         bus.submit_command(Command::MoveCursorRight);
 
         let mut state = AppState::new();
@@ -377,6 +379,7 @@ mod tests {
                 payload: InsertChar { ch },
             });
         }
+        // When processing MoveCursorToStart.
         bus.submit_command(Command::MoveCursorToStart);
 
         let mut state = AppState::new();
@@ -398,6 +401,7 @@ mod tests {
             });
         }
         bus.submit_command(Command::MoveCursorToStart);
+        // When processing MoveCursorToEnd.
         bus.submit_command(Command::MoveCursorToEnd);
 
         let mut state = AppState::new();
@@ -420,6 +424,7 @@ mod tests {
             payload: InsertChar { ch: 'b' },
         });
         bus.submit_command(Command::MoveCursorLeft);
+        // When processing DeleteGraphemeForward.
         bus.submit_command(Command::DeleteGraphemeForward);
 
         let mut state = AppState::new();
@@ -439,6 +444,7 @@ mod tests {
         bus.submit_command(Command::InsertChar {
             payload: InsertChar { ch: 'a' },
         });
+        // When processing DeleteGraphemeForward at end of buffer.
         bus.submit_command(Command::DeleteGraphemeForward);
 
         let mut state = AppState::new();
@@ -459,6 +465,7 @@ mod tests {
                 payload: InsertChar { ch },
             });
         }
+        // When processing MoveCursorWordLeft.
         bus.submit_command(Command::MoveCursorWordLeft);
 
         let mut state = AppState::new();
@@ -480,6 +487,7 @@ mod tests {
             });
         }
         bus.submit_command(Command::MoveCursorToStart);
+        // When processing MoveCursorWordRight.
         bus.submit_command(Command::MoveCursorWordRight);
 
         let mut state = AppState::new();

@@ -21,7 +21,7 @@ mod tests {
         // Given both variants.
         let actions = [CommandAction::Continue, CommandAction::Stop];
 
-        // Then they are not equal.
+        // When comparing the two variants.
         assert_ne!(actions[0], actions[1]);
     }
 }

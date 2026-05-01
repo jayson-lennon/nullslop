@@ -189,7 +189,7 @@ impl AppCore {
         timeout: Duration,
     ) {
         // 1. Mark shutdown active.
-        self.state.write().shutdown_tracker.shutdown_active = true;
+        self.state.write().shutdown_tracker.begin_shutdown();
 
         // 2. Send ApplicationShuttingDown to all actors.
         actor_host.send_system(SystemMessage::ApplicationShuttingDown);
@@ -239,8 +239,10 @@ mod tests {
         // Given a new AppCore.
         let core = AppCore::new();
 
-        // Then state has empty history and should_quit is false.
+        // When inspecting the default state.
         let guard = core.state.read();
+
+        // Then state has empty history and should_quit is false.
         assert!(guard.chat_history.is_empty());
         assert!(!guard.should_quit);
     }

@@ -89,6 +89,7 @@ mod tests {
     #[test]
     fn labels_are_distinct() {
         // Given all tabs.
+        // When collecting labels from each tab.
         let labels: Vec<&str> = ActiveTab::all()
             .iter()
             .map(super::ActiveTab::label)

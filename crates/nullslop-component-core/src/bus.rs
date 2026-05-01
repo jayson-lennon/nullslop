@@ -721,15 +721,21 @@ mod tests {
     fn has_pending_reflects_queue_state() {
         // Given an empty bus.
         let mut bus: Bus<TestState> = Bus::new();
+
+        // Then the bus has no pending messages.
         assert!(!bus.has_pending());
 
         // When submitting a command.
         bus.submit_command(Command::Quit);
+
+        // Then the bus has pending messages.
         assert!(bus.has_pending());
 
         // When processing commands.
         let mut state = TestState;
         bus.process_commands(&mut state);
+
+        // Then the bus has no pending messages again.
         assert!(!bus.has_pending());
     }
 
@@ -737,6 +743,8 @@ mod tests {
     fn has_pending_with_events() {
         // Given an empty bus.
         let mut bus: Bus<TestState> = Bus::new();
+
+        // Then the bus has no pending messages.
         assert!(!bus.has_pending());
 
         // When submitting an event.
@@ -746,11 +754,15 @@ mod tests {
                 to: npr::Mode::Input,
             },
         });
+
+        // Then the bus has pending messages.
         assert!(bus.has_pending());
 
         // When processing events.
         let mut state = TestState;
         bus.process_events(&mut state);
+
+        // Then the bus has no pending messages again.
         assert!(!bus.has_pending());
     }
 

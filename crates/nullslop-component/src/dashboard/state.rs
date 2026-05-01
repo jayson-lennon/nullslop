@@ -117,7 +117,10 @@ mod tests {
         // Given an empty dashboard.
         let dashboard = DashboardState::new();
 
+        // When inspecting the dashboard actors.
+        let actors = dashboard.actors();
+
         // Then there are no actors.
-        assert!(dashboard.actors().is_empty());
+        assert!(actors.is_empty());
     }
 }

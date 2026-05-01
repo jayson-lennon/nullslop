@@ -51,7 +51,7 @@ mod tests {
         // Given an ActorName.
         let name = ActorName::new("test-actor");
 
-        // Then deref gives the inner string.
+        // When dereferencing the ActorName.
         assert_eq!(&*name, "test-actor");
     }
 
@@ -61,7 +61,7 @@ mod tests {
         let from_string = ActorName::from(String::from("actor"));
         let from_str = ActorName::from("actor");
 
-        // Then both produce the same name.
+        // When comparing conversions from String and &str.
         assert_eq!(from_string, from_str);
     }
 }

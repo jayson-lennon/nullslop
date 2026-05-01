@@ -132,6 +132,7 @@ mod tests {
         let area1 = Rect::new(0, 0, 40, 10);
         let area2 = Rect::new(0, 10, 40, 10);
 
+        // When rendering the element twice.
         render_element(&mut element, area1, state);
         render_element(&mut element, area2, state);
 

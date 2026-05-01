@@ -196,28 +196,44 @@ mod tests {
 
     #[test]
     fn new_state_has_empty_buffer() {
+        // Given a new ChatInputBoxState.
         let state = ChatInputBoxState::new();
+
+        // When inspecting the buffer.
+        // Then it is empty.
         assert!(state.is_empty());
         assert_eq!(state.text(), "");
     }
 
     #[test]
     fn new_state_has_cursor_at_zero() {
+        // Given a new ChatInputBoxState.
         let state = ChatInputBoxState::new();
+
+        // When inspecting the cursor position.
+        // Then it is at 0.
         assert_eq!(state.cursor_pos(), 0);
     }
 
     #[test]
     fn text_returns_buffer_content() {
+        // Given a state with "hi" inserted.
         let mut state = ChatInputBoxState::new();
         state.insert_grapheme_at_cursor('h');
         state.insert_grapheme_at_cursor('i');
+
+        // When reading the text.
+        // Then it returns "hi".
         assert_eq!(state.text(), "hi");
     }
 
     #[test]
     fn is_empty_reflects_buffer_state() {
+        // Given a new state.
         let mut state = ChatInputBoxState::new();
+
+        // When inspecting is_empty before and after inserting.
+        // Then it starts true and becomes false.
         assert!(state.is_empty());
         state.insert_grapheme_at_cursor('a');
         assert!(!state.is_empty());
@@ -225,34 +241,52 @@ mod tests {
 
     #[test]
     fn grapheme_count_returns_cluster_count() {
+        // Given a state with "éNoël" inserted.
         let mut state = ChatInputBoxState::new();
         for ch in "éNoël".chars() {
             state.insert_grapheme_at_cursor(ch);
         }
+
+        // When reading the grapheme count.
+        // Then it returns 5.
         assert_eq!(state.grapheme_count(), 5);
     }
 
     #[test]
     fn insert_grapheme_at_cursor_appends_to_empty_buffer() {
+        // Given a new state with an empty buffer.
         let mut state = ChatInputBoxState::new();
+
+        // When inserting 'X'.
         state.insert_grapheme_at_cursor('X');
+
+        // Then the text is "X" and cursor is at 1.
         assert_eq!(state.text(), "X");
         assert_eq!(state.cursor_pos(), 1);
     }
 
     #[test]
     fn insert_grapheme_at_cursor_sequential() {
+        // Given a new state.
         let mut state = ChatInputBoxState::new();
+
+        // When inserting 'a', 'b', 'c' sequentially.
         state.insert_grapheme_at_cursor('a');
         state.insert_grapheme_at_cursor('b');
         state.insert_grapheme_at_cursor('c');
+
+        // Then the text is "abc" and cursor is at 3.
         assert_eq!(state.text(), "abc");
         assert_eq!(state.cursor_pos(), 3);
     }
 
     #[test]
     fn cursor_pos_advances_with_each_insert() {
+        // Given a new state.
         let mut state = ChatInputBoxState::new();
+
+        // When inserting characters one at a time.
+        // Then the cursor advances after each insert.
         assert_eq!(state.cursor_pos(), 0);
         state.insert_grapheme_at_cursor('a');
         assert_eq!(state.cursor_pos(), 1);
@@ -262,47 +296,72 @@ mod tests {
 
     #[test]
     fn delete_grapheme_before_cursor_removes_last() {
+        // Given "abc" with cursor at end (3).
         let mut state = ChatInputBoxState::new();
         state.insert_grapheme_at_cursor('a');
         state.insert_grapheme_at_cursor('b');
         state.insert_grapheme_at_cursor('c');
+
+        // When deleting before cursor.
         state.delete_grapheme_before_cursor();
+
+        // Then text is "ab" and cursor is at 2.
         assert_eq!(state.text(), "ab");
         assert_eq!(state.cursor_pos(), 2);
     }
 
     #[test]
     fn delete_grapheme_before_cursor_handles_unicode() {
+        // Given "é" with cursor at end (1).
         let mut state = ChatInputBoxState::new();
         state.insert_grapheme_at_cursor('é');
+
+        // When deleting before cursor.
         state.delete_grapheme_before_cursor();
+
+        // Then text is empty and cursor is at 0.
         assert_eq!(state.text(), "");
         assert_eq!(state.cursor_pos(), 0);
     }
 
     #[test]
     fn delete_grapheme_before_cursor_empty_is_noop() {
+        // Given a new empty state.
         let mut state = ChatInputBoxState::new();
+
+        // When deleting before cursor.
         state.delete_grapheme_before_cursor();
+
+        // Then buffer is still empty and cursor is at 0.
         assert!(state.is_empty());
         assert_eq!(state.cursor_pos(), 0);
     }
 
     #[test]
     fn replace_all_sets_text_and_cursor_at_end() {
+        // Given a new state.
         let mut state = ChatInputBoxState::new();
+
+        // When replacing all content with "hello".
         state.replace_all("hello".to_string());
+
+        // Then text is "hello" and cursor is at 5.
         assert_eq!(state.text(), "hello");
         assert_eq!(state.cursor_pos(), 5);
     }
 
     #[test]
     fn reset_clears_buffer_and_cursor() {
+        // Given "abc" with cursor at end (3).
         let mut state = ChatInputBoxState::new();
         state.insert_grapheme_at_cursor('a');
         state.insert_grapheme_at_cursor('b');
         state.insert_grapheme_at_cursor('c');
+
+        // When resetting.
         state.reset();
+
+        // Then buffer is empty and cursor is at 0.
         assert!(state.is_empty());
         assert_eq!(state.cursor_pos(), 0);
     }

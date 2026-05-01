@@ -155,6 +155,7 @@ mod tests {
     #[allow(clippy::too_many_lines)]
     fn event_type_name_exhaustive_coverage() {
         // Given all Event variants.
+        // When calling type_name() on each variant.
         // Then subscribable events return their EventMsg TYPE_NAME.
         assert_eq!(
             Event::ChatEntrySubmitted {

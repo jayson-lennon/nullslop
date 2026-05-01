@@ -152,7 +152,9 @@ mod tests {
         // Given a fake host.
         let host = FakeActorHost::new();
 
-        // Then name is correct.
+        // When querying the host name.
         assert_eq!(host.name(), "FakeActorHost");
+
+        // Then name is correct.
     }
 }

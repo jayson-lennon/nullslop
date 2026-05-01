@@ -102,7 +102,9 @@ mod tests {
         // Given a Shutdown envelope.
         let envelope: ActorEnvelope<()> = ActorEnvelope::Shutdown;
 
-        // Then it matches the Shutdown variant.
+        // When matching on the envelope.
         assert!(matches!(envelope, ActorEnvelope::Shutdown));
+
+        // Then it matches the Shutdown variant.
     }
 }

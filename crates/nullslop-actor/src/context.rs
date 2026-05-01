@@ -220,6 +220,7 @@ mod tests {
         ctx.subscribe_command_by_name("echo");
         ctx.subscribe_event_by_name("system::KeyDown");
 
+        // When taking registrations twice.
         let first = ctx.take_registrations();
         let second = ctx.take_registrations();
 
@@ -319,8 +320,10 @@ mod tests {
         // Given a context with a name.
         let ctx = ActorContext::new("my-actor", test_sink());
 
-        // Then name returns the assigned name.
+        // When querying the context name.
         assert_eq!(ctx.name(), "my-actor");
+
+        // Then name returns the assigned name.
     }
 
     #[test]

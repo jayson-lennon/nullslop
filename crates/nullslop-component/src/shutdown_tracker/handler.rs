@@ -91,7 +91,7 @@ mod tests {
         ShutdownTrackerHandler.register(&mut bus);
         let mut state = AppState::new();
         state.shutdown_tracker.track("actor-a");
-        state.shutdown_tracker.shutdown_active = true;
+        state.shutdown_tracker.begin_shutdown();
 
         // When the actor completes shutdown.
         bus.submit_event(Event::ActorShutdownCompleted {
@@ -119,7 +119,7 @@ mod tests {
         ShutdownTrackerHandler.register(&mut bus);
         let mut state = AppState::new();
         state.shutdown_tracker.track("actor-a");
-        state.shutdown_tracker.shutdown_active = true;
+        state.shutdown_tracker.begin_shutdown();
 
         // When an untracked actor completes shutdown.
         bus.submit_event(Event::ActorShutdownCompleted {

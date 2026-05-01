@@ -61,8 +61,10 @@ mod tests {
         // Given a new Out.
         let out = Out::new();
 
-        // Then it is empty.
+        // When checking if the Out is empty.
         assert!(out.is_empty());
+
+        // Then it is empty.
     }
 
     #[test]

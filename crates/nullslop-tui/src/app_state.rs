@@ -21,8 +21,10 @@ mod tests {
         // Given a default AppStatus.
         let status = AppStatus::default();
 
-        // Then it is Starting.
+        // When inspecting the default value.
         assert_eq!(status, AppStatus::Starting);
+
+        // Then it is Starting.
     }
 
     #[test]
@@ -34,7 +36,7 @@ mod tests {
             AppStatus::ShuttingDown,
         ];
 
-        // Then no two are equal.
+        // When comparing each pair of variants.
         for (i, a) in variants.iter().enumerate() {
             for (j, b) in variants.iter().enumerate() {
                 if i != j {

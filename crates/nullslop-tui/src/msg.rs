@@ -39,7 +39,7 @@ mod tests {
             },
         });
 
-        // Then it matches and the entry is accessible.
+        // When matching on the message.
         match msg {
             Msg::Command(npr::Command::PushChatEntry { payload }) => {
                 assert_eq!(
@@ -56,8 +56,10 @@ mod tests {
         // Given a Tick message.
         let msg = Msg::Tick;
 
-        // Then it matches Tick.
+        // When matching the message.
         assert!(matches!(msg, Msg::Tick));
+
+        // Then it matches Tick.
     }
 
     #[test]
@@ -69,7 +71,9 @@ mod tests {
         ));
         let msg = Msg::Input(event);
 
-        // Then it matches Input.
+        // When matching on the message.
         assert!(matches!(msg, Msg::Input(_)));
+
+        // Then it matches Input.
     }
 }

@@ -11,7 +11,7 @@ pub struct ShutdownTrackerState {
     /// Actors that are currently running.
     pending: HashSet<String>,
     /// Whether the application has begun shutting down.
-    pub shutdown_active: bool,
+    shutdown_active: bool,
 }
 
 impl ShutdownTrackerState {
@@ -19,6 +19,11 @@ impl ShutdownTrackerState {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Signal that the application has started shutting down.
+    pub fn begin_shutdown(&mut self) {
+        self.shutdown_active = true;
     }
 
     /// Record that an actor has started.
@@ -52,49 +57,76 @@ mod tests {
 
     #[test]
     fn track_adds_to_pending() {
+        // Given a new shutdown tracker.
         let mut tracker = ShutdownTrackerState::new();
+
+        // When tracking an actor.
         tracker.track("ext-a");
+
+        // Then the actor appears in pending names.
         assert_eq!(tracker.pending_names(), vec!["ext-a".to_string()]);
     }
 
     #[test]
     fn complete_removes_from_pending() {
+        // Given a tracker with one tracked actor.
         let mut tracker = ShutdownTrackerState::new();
         tracker.track("ext-a");
+
+        // When completing that actor.
         let was_tracked = tracker.complete("ext-a");
+
+        // Then it was known and pending is now empty.
         assert!(was_tracked);
         assert!(tracker.pending_names().is_empty());
     }
 
     #[test]
     fn is_complete_false_when_not_active() {
+        // Given a tracker with shutdown not active.
         let tracker = ShutdownTrackerState::new();
+
+        // When checking is_complete.
+        // Then it returns false because shutdown is not active.
         assert!(!tracker.is_complete());
     }
 
     #[test]
     fn is_complete_false_when_pending() {
+        // Given a tracker with an active shutdown and one pending actor.
         let mut tracker = ShutdownTrackerState::new();
         tracker.track("ext-a");
-        tracker.shutdown_active = true;
+        tracker.begin_shutdown();
+
+        // When checking is_complete.
+        // Then it returns false because an actor is still pending.
         assert!(!tracker.is_complete());
     }
 
     #[test]
     fn is_complete_true_when_active_and_empty() {
+        // Given a tracker with an active shutdown and no pending actors.
         let mut tracker = ShutdownTrackerState::new();
-        tracker.shutdown_active = true;
+        tracker.begin_shutdown();
+
+        // When checking is_complete.
+        // Then it returns true.
         assert!(tracker.is_complete());
     }
 
     #[test]
     fn pending_names_returns_pending() {
+        // Given a tracker with three tracked actors.
         let mut tracker = ShutdownTrackerState::new();
         tracker.track("ext-a");
         tracker.track("ext-b");
         tracker.track("ext-c");
+
+        // When collecting pending names.
         let mut names = tracker.pending_names();
         names.sort();
+
+        // Then all three actors are listed.
         assert_eq!(names, vec!["ext-a", "ext-b", "ext-c"]);
     }
 }

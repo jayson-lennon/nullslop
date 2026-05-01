@@ -70,34 +70,55 @@ mod tests {
 
     #[test]
     fn new_data_has_empty_history() {
+        // Given a new AppState.
         let data = AppState::new();
+
+        // When inspecting chat history.
+        // Then it is empty.
         assert!(data.chat_history.is_empty());
     }
 
     #[test]
     fn push_entry_adds_to_history() {
+        // Given a new AppState.
         let mut data = AppState::new();
         let entry = ChatEntry::user("hello");
+
+        // When pushing an entry.
         let index = data.push_entry(entry);
+
+        // Then the index is 0 and history has one entry.
         assert_eq!(index, 0);
         assert_eq!(data.chat_history.len(), 1);
     }
 
     #[test]
     fn default_mode_is_normal() {
+        // Given a new AppState.
         let data = AppState::new();
+
+        // When inspecting the mode.
+        // Then it is Normal.
         assert_eq!(data.mode, Mode::Normal);
     }
 
     #[test]
     fn default_chat_input_is_empty() {
+        // Given a new AppState.
         let data = AppState::new();
+
+        // When inspecting the chat input.
+        // Then it is empty.
         assert!(data.chat_input.is_empty());
     }
 
     #[test]
     fn default_should_quit_is_false() {
+        // Given a new AppState.
         let data = AppState::new();
+
+        // When inspecting should_quit.
+        // Then it is false.
         assert!(!data.should_quit);
     }
 }

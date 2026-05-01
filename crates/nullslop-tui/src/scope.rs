@@ -29,8 +29,10 @@ mod tests {
     #[test]
     fn scopes_are_equal_to_themselves() {
         // Given each scope variant.
-        // Then it equals itself.
+        // When comparing each scope to itself.
         assert_eq!(Scope::Normal, Scope::Normal);
         assert_eq!(Scope::Input, Scope::Input);
+
+        // Then each scope equals itself.
     }
 }

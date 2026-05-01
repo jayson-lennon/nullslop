@@ -96,8 +96,10 @@ mod tests {
         // Given an ActorHostError.
         let err = crate::error::ActorHostError;
 
-        // Then it can be formatted for debug and display.
+        // When formatting the error.
         let _debug = format!("{err:?}");
+
+        // Then it can be formatted for debug and display.
     }
 
     #[test]
@@ -106,8 +108,10 @@ mod tests {
         let host = std::sync::Arc::new(crate::fake::FakeActorHost::new());
         let service = ActorHostService::new(host);
 
-        // Then backend returns the host.
+        // When querying the backend name.
         assert_eq!(service.backend().name(), "FakeActorHost");
+
+        // Then backend returns the host.
 
         // And send_event/send_command/send_system don't panic.
         service.send_event(&Event::KeyDown {
