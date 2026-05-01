@@ -99,13 +99,32 @@ impl TuiApp {
         match msg {
             Msg::Tick => {}
             Msg::Input(event) => {
-                if let crossterm::event::Event::Key(key) = event
-                    && key.kind == crossterm::event::KeyEventKind::Press
-                    && let Some(protocol_key) = crate::convert::from_crossterm(key)
-                    && let Some(cmd) = self.which_key.handle_key(protocol_key)
-                {
-                    self.route_command(cmd);
+                let crossterm::event::Event::Key(key) = event else {
+                    return;
+                };
+                if key.kind != crossterm::event::KeyEventKind::Press {
+                    return;
                 }
+                let Some(protocol_key) = crate::convert::from_crossterm(key) else {
+                    tracing::info!(
+                        crossterm_code = ?key.code,
+                        crossterm_mods = ?key.modifiers,
+                        "key converted to None"
+                    );
+                    return;
+                };
+                tracing::info!(
+                    key = ?protocol_key.key,
+                    mods = ?protocol_key.modifiers,
+                    scope = ?self.which_key.scope(),
+                    "key event received"
+                );
+                let Some(cmd) = self.which_key.handle_key(protocol_key) else {
+                    tracing::info!("key produced no command");
+                    return;
+                };
+                tracing::info!(command = %cmd, "dispatching command");
+                self.route_command(cmd);
             }
             Msg::Command(cmd) => {
                 self.route_command(cmd);
@@ -123,7 +142,7 @@ impl TuiApp {
                 self.which_key.toggle();
             }
             Command::EditInput => {
-                let initial_content = self.core.state.read().chat_input.text().to_string();
+                let initial_content = self.core.state.read().active_chat_input().text().to_string();
                 self.suspend.request(SuspendAction::Edit {
                     initial_content,
                     on_result: Box::new(|result| result),
@@ -159,11 +178,16 @@ mod tests {
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     use nullslop_actor_host::FakeActorHost;
     use nullslop_protocol as npr;
+    use nullslop_services::providers::FakeLlmServiceFactory;
 
     use super::*;
 
     fn key_event(code: KeyCode) -> crossterm::event::Event {
         crossterm::event::Event::Key(KeyEvent::new(code, KeyModifiers::NONE))
+    }
+
+    fn key_event_with_mod(code: KeyCode, modifiers: KeyModifiers) -> crossterm::event::Event {
+        crossterm::event::Event::Key(KeyEvent::new(code, modifiers))
     }
 
     fn create_test_app() -> TuiApp {
@@ -173,7 +197,10 @@ mod tests {
         ));
         let handle = rt.handle().clone();
         let actor_host: Arc<dyn nullslop_actor_host::ActorHost> = Arc::new(FakeActorHost::new());
-        let services = nullslop_services::Services::new(handle, actor_host);
+        let llm = nullslop_services::providers::LlmServiceFactoryService::new(Arc::new(
+            FakeLlmServiceFactory::new(vec![]),
+        ));
+        let services = nullslop_services::Services::new(handle, actor_host, llm);
         TuiApp::new(services)
     }
 
@@ -223,7 +250,7 @@ mod tests {
         app.core
             .state
             .write()
-            .chat_input
+            .active_chat_input_mut()
             .replace_all("hello".to_string());
 
         // When pressing Enter.
@@ -232,12 +259,12 @@ mod tests {
         // Then process core and verify.
         app.core.tick();
         let guard = app.core.state.read();
-        assert_eq!(guard.chat_history.len(), 1);
+        assert_eq!(guard.active_session().history().len(), 1);
         assert_eq!(
-            guard.chat_history[0].kind,
+            guard.active_session().history()[0].kind,
             npr::ChatEntryKind::User("hello".to_string())
         );
-        assert!(guard.chat_input.is_empty());
+        assert!(guard.active_chat_input().is_empty());
     }
 
     #[test]
@@ -275,6 +302,7 @@ mod tests {
         // When routing a PushChatEntry with an actor entry.
         app.route_command(Command::PushChatEntry {
             payload: npr::chat_input::PushChatEntry {
+                session_id: npr::SessionId::new(),
                 entry: npr::ChatEntry::actor("nullslop-echo", "HELLO"),
             },
         });
@@ -282,9 +310,9 @@ mod tests {
         // Then process core and verify.
         app.core.tick();
         let guard = app.core.state.read();
-        assert_eq!(guard.chat_history.len(), 1);
+        assert_eq!(guard.active_session().history().len(), 1);
         assert_eq!(
-            guard.chat_history[0].kind,
+            guard.active_session().history()[0].kind,
             npr::ChatEntryKind::Actor {
                 source: "nullslop-echo".to_string(),
                 text: "HELLO".to_string(),
@@ -299,5 +327,53 @@ mod tests {
         // Then each mode maps to its corresponding scope.
         assert_eq!(scope_for_mode(Mode::Normal), Scope::Normal);
         assert_eq!(scope_for_mode(Mode::Input), Scope::Input);
+    }
+
+    #[test]
+    fn app_input_shift_enter_inserts_newline() {
+        // Given an App in Input scope with "hello" in buffer.
+        let mut app = create_test_app();
+        app.which_key.set_scope(Scope::Input);
+        app.core
+            .state
+            .write()
+            .active_chat_input_mut()
+            .replace_all("hello".to_string());
+
+        // When pressing Shift+Enter.
+        app.handle_msg(Msg::Input(key_event_with_mod(
+            KeyCode::Enter,
+            KeyModifiers::SHIFT,
+        )));
+
+        // Then process core and verify newline was inserted.
+        app.core.tick();
+        let guard = app.core.state.read();
+        assert_eq!(guard.active_chat_input().text(), "hello\n");
+        assert!(guard.active_session().history().is_empty());
+    }
+
+    #[test]
+    fn app_input_ctrl_enter_inserts_newline() {
+        // Given an App in Input scope with "hello" in buffer.
+        let mut app = create_test_app();
+        app.which_key.set_scope(Scope::Input);
+        app.core
+            .state
+            .write()
+            .active_chat_input_mut()
+            .replace_all("hello".to_string());
+
+        // When pressing Ctrl+Enter.
+        app.handle_msg(Msg::Input(key_event_with_mod(
+            KeyCode::Enter,
+            KeyModifiers::CONTROL,
+        )));
+
+        // Then process core and verify newline was inserted.
+        app.core.tick();
+        let guard = app.core.state.read();
+        assert_eq!(guard.active_chat_input().text(), "hello\n");
+        assert!(guard.active_session().history().is_empty());
     }
 }

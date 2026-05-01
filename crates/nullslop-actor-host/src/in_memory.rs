@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use error_stack::Report;
 use nullslop_actor::{Actor, ActorContext, ActorEnvelope, ActorRef, SystemMessage};
-use nullslop_protocol::{ActorName, Command, CommandMsg, CommandName, Event, EventTypeName};
+use nullslop_protocol::{ActorName, Command, CommandName, Event, EventTypeName};
 use parking_lot::Mutex;
 
 use crate::actor_host::ActorHost;
@@ -251,9 +251,8 @@ impl ActorHost for InMemoryActorHost {
     }
 
     fn send_command(&self, command: &Command, source: Option<&ActorName>) {
-        let name = match command {
-            Command::PushChatEntry { .. } => nullslop_protocol::chat_input::PushChatEntry::NAME,
-            _ => return,
+        let Some(name) = command.command_name() else {
+            return;
         };
         if let Some(entries) = self.routing.command_routes.get(name) {
             for entry in entries {
@@ -283,7 +282,7 @@ mod tests {
     use nullslop_actor::error::SendResult;
     use nullslop_actor::{Actor, ActorContext, ActorEnvelope, ActorRef, MessageSink};
     use nullslop_protocol::chat_input::ChatEntrySubmitted;
-    use nullslop_protocol::{Command, Event};
+    use nullslop_protocol::{Command, CommandMsg, Event};
 
     use super::*;
 
@@ -437,6 +436,7 @@ mod tests {
         // When sending a subscribed event.
         let event = Event::ChatEntrySubmitted {
             payload: ChatEntrySubmitted {
+                session_id: nullslop_protocol::SessionId::new(),
                 entry: nullslop_protocol::ChatEntry::user("hello"),
             },
         };
@@ -445,8 +445,14 @@ mod tests {
 
         // Then the actor received the event.
         let msgs = received.lock().unwrap().clone();
-        assert!(!msgs.is_empty(), "actor should receive the subscribed event");
-        assert!(msgs.iter().any(|m| m.contains("event:")), "expected event message, got: {msgs:?}");
+        assert!(
+            !msgs.is_empty(),
+            "actor should receive the subscribed event"
+        );
+        assert!(
+            msgs.iter().any(|m| m.contains("event:")),
+            "expected event message, got: {msgs:?}"
+        );
 
         host.shutdown_with_timeout(Duration::from_millis(200))
             .expect("shutdown");
@@ -482,14 +488,8 @@ mod tests {
         // Then both actors receive it regardless of subscriptions.
         let msgs_a = received1.lock().unwrap().clone();
         let msgs_b = received2.lock().unwrap().clone();
-        assert!(
-            !msgs_a.is_empty(),
-            "actor-a should receive system message"
-        );
-        assert!(
-            !msgs_b.is_empty(),
-            "actor-b should receive system message"
-        );
+        assert!(!msgs_a.is_empty(), "actor-a should receive system message");
+        assert!(!msgs_b.is_empty(), "actor-b should receive system message");
 
         host.shutdown_with_timeout(Duration::from_millis(200))
             .expect("shutdown");
@@ -515,6 +515,7 @@ mod tests {
         host.send_command(
             &Command::PushChatEntry {
                 payload: nullslop_protocol::chat_input::PushChatEntry {
+                    session_id: nullslop_protocol::SessionId::new(),
                     entry: nullslop_protocol::ChatEntry::user("test"),
                 },
             },
@@ -524,8 +525,14 @@ mod tests {
 
         // Then the actor received the command.
         let msgs = received.lock().unwrap().clone();
-        assert!(!msgs.is_empty(), "actor should receive the registered command");
-        assert!(msgs.iter().any(|m| m.contains("command:")), "expected command message, got: {msgs:?}");
+        assert!(
+            !msgs.is_empty(),
+            "actor should receive the registered command"
+        );
+        assert!(
+            msgs.iter().any(|m| m.contains("command:")),
+            "expected command message, got: {msgs:?}"
+        );
 
         host.shutdown_with_timeout(Duration::from_millis(200))
             .expect("shutdown");
@@ -553,7 +560,10 @@ mod tests {
 
         // Then no messages were delivered to the actor.
         let msgs = received.lock().unwrap().clone();
-        assert!(msgs.is_empty(), "actor should not receive unregistered command: {msgs:?}");
+        assert!(
+            msgs.is_empty(),
+            "actor should not receive unregistered command: {msgs:?}"
+        );
 
         host.shutdown_with_timeout(Duration::from_millis(200))
             .expect("shutdown");
@@ -605,6 +615,7 @@ mod tests {
         // When sending an event with source of actor-a.
         let event = Event::ChatEntrySubmitted {
             payload: ChatEntrySubmitted {
+                session_id: nullslop_protocol::SessionId::new(),
                 entry: nullslop_protocol::ChatEntry::user("hello"),
             },
         };

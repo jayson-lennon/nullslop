@@ -21,6 +21,8 @@ pub enum ChatEntryKind {
     User(String),
     /// A system-generated message (status updates, etc.).
     System(String),
+    /// A response from an AI assistant.
+    Assistant(String),
     /// A message from an actor, identified by source name.
     Actor {
         /// The name of the actor that produced this entry.
@@ -46,6 +48,15 @@ impl ChatEntry {
         Self {
             timestamp: jiff::Timestamp::now(),
             kind: ChatEntryKind::System(text.into()),
+        }
+    }
+
+    /// Create a new assistant chat entry with the current timestamp.
+    #[must_use]
+    pub fn assistant(text: impl Into<String>) -> Self {
+        Self {
+            timestamp: jiff::Timestamp::now(),
+            kind: ChatEntryKind::Assistant(text.into()),
         }
     }
 
@@ -114,6 +125,22 @@ mod tests {
         let back: ChatEntry = serde_json::from_str(&json).expect("deserialize");
 
         // Then it matches the original.
+        assert_eq!(back.kind, entry.kind);
+        assert_eq!(back.timestamp, entry.timestamp);
+    }
+
+    #[test]
+    fn assistant_entry_has_assistant_kind() {
+        let text = "hello";
+        let entry = ChatEntry::assistant(text);
+        assert_eq!(entry.kind, ChatEntryKind::Assistant("hello".to_string()));
+    }
+
+    #[test]
+    fn assistant_entry_serialization_roundtrip() {
+        let entry = ChatEntry::assistant("hello");
+        let json = serde_json::to_string(&entry).expect("serialize");
+        let back: ChatEntry = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(back.kind, entry.kind);
         assert_eq!(back.timestamp, entry.timestamp);
     }

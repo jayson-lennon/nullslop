@@ -1,0 +1,19 @@
+[package]
+name = "nullslop-llm"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+nullslop-actor = { workspace = true }
+nullslop-protocol = { workspace = true }
+nullslop-services = { workspace = true }
+tokio = { workspace = true }
+futures = { workspace = true }
+tracing = { workspace = true }
+llm = { workspace = true }
+
+[lints]
+workspace = true

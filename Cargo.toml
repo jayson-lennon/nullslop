@@ -16,10 +16,12 @@ nullslop-cli = { workspace = true }
 nullslop-tui = { workspace = true }
 nullslop-core = { workspace = true }
 nullslop-services = { workspace = true }
+nullslop-providers = { workspace = true }
 nullslop-component = { workspace = true }
 nullslop-actor-host = { workspace = true }
 nullslop-actor = { workspace = true }
 nullslop-echo = { workspace = true }
+nullslop-llm = { workspace = true }
 tokio = { workspace = true }
 kanal = { workspace = true }
 wherror = { workspace = true }
@@ -31,6 +33,7 @@ clap-verbosity-flag = { workspace = true }
 ratatui-which-key = { workspace = true }
 nullslop-protocol = { workspace = true, features = ["which-key"] }
 tempfile = { workspace = true }
+dotenvy = { workspace = true }
 
 [workspace.dependencies]
 # Internal
@@ -43,8 +46,10 @@ nullslop-component = { path = "crates/nullslop-component" }
 nullslop-cli = { path = "crates/nullslop-cli" }
 nullslop-services = { path = "crates/nullslop-services" }
 nullslop-echo = { path = "actors/nullslop-echo" }
+nullslop-llm = { path = "actors/nullslop-llm" }
 nullslop-actor = { path = "crates/nullslop-actor" }
 nullslop-actor-host = { path = "crates/nullslop-actor-host" }
+nullslop-providers = { path = "crates/nullslop-providers" }
 nullslop-protocol-derive = { path = "crates/nullslop-protocol-derive" }
 
 # Error handling
@@ -82,10 +87,16 @@ tempfile = "3"
 clap = { version = "4", features = ["derive"] }
 clap-verbosity-flag = "3"
 
+# LLM
+llm = { version = "1.3", default-features = false, features = ["openrouter", "default-tls"] }
+
 # Other
 dirs = "6"
+dotenvy = "0.15"
 unicode-segmentation = "1"
+async-trait = "0.1"
 dialoguer = "0.12"
+rand = "0.9"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 

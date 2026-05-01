@@ -50,7 +50,7 @@ impl ratatui_which_key::Key for KeyEvent {
             return format!("<C-{}>", c.to_ascii_lowercase());
         }
 
-        match self.key {
+        let base = match self.key {
             Key::Char(' ') => "Space".to_string(),
             Key::Char(c) => c.to_string(),
             Key::Tab => "Tab".to_string(),
@@ -67,6 +67,13 @@ impl ratatui_which_key::Key for KeyEvent {
             Key::PageDown => "PageDown".to_string(),
             Key::Delete => "Delete".to_string(),
             Key::F(n) => format!("F{n}"),
+        };
+
+        match (self.modifiers.shift, self.modifiers.ctrl) {
+            (true, false) => format!("S-{base}"),
+            (false, true) => format!("C-{base}"),
+            (true, true) => format!("C-S-{base}"),
+            _ => base,
         }
     }
 
@@ -90,8 +97,10 @@ impl ratatui_which_key::Key for KeyEvent {
 
     /// Parse a key from a special name string.
     ///
-    /// Supports control-modified keys via the `c-` prefix (e.g. `"c-x"` → Ctrl+X),
-    /// as well as named keys like `"tab"`, `"enter"`, `"escape"`, arrow keys,
+    /// Supports modifier-prefixed forms: `c-` for Ctrl and `s-` for Shift.
+    /// Modifiers apply to both named keys and single characters.
+    ///
+    /// Named keys: `"tab"`, `"enter"`, `"escape"`, arrow keys,
     /// function keys (`"f1"`–`"f12"`), and symbolic aliases (`"lt"` → `<`, `"gt"` → `>`).
     ///
     /// Matching is case-insensitive.
@@ -99,21 +108,31 @@ impl ratatui_which_key::Key for KeyEvent {
     /// # Examples
     ///
     /// - `"c-x"` → Ctrl+X
+    /// - `"s-enter"` → Shift+Enter
+    /// - `"c-enter"` → Ctrl+Enter
     /// - `"tab"` → Tab
     /// - `"f5"` → F5
     /// - `"lt"` → <
     fn from_special_name(name: &str) -> Option<Self> {
         let lower = name.to_ascii_lowercase();
 
-        if lower.starts_with("c-") && lower.len() == 3 {
-            let c = lower.chars().nth(2)?;
-            return Some(KeyEvent {
-                key: Key::Char(c),
-                modifiers: Modifiers::ctrl(),
-            });
-        }
+        let (modifiers, rest): (Modifiers, &str) = if lower.starts_with("s-") {
+            (Modifiers::shift(), &lower[2..])
+        } else if lower.starts_with("c-") && lower.len() > 2 && !lower[2..].starts_with('f') {
+            // c-X where X is a single char (not "f" for function keys)
+            if lower[2..].len() == 1 {
+                let c = lower.chars().nth(2)?;
+                return Some(KeyEvent {
+                    key: Key::Char(c),
+                    modifiers: Modifiers::ctrl(),
+                });
+            }
+            (Modifiers::ctrl(), &lower[2..])
+        } else {
+            (Modifiers::none(), lower.as_str())
+        };
 
-        let key = match lower.as_str() {
+        let key = match rest {
             "tab" => Key::Tab,
             "enter" => Key::Enter,
             "bs" | "backspace" => Key::Backspace,
@@ -140,10 +159,7 @@ impl ratatui_which_key::Key for KeyEvent {
             _ => return None,
         };
 
-        Some(KeyEvent {
-            key,
-            modifiers: Modifiers::none(),
-        })
+        Some(KeyEvent { key, modifiers })
     }
 }
 
@@ -275,5 +291,52 @@ mod tests {
 
         // Then it matches the original.
         assert_eq!(back, event);
+    }
+
+    #[cfg(feature = "which-key")]
+    use ratatui_which_key::Key as _;
+
+    #[cfg(feature = "which-key")]
+    #[test]
+    fn from_special_name_s_enter_returns_shift_enter() {
+        // Given the special name "s-enter".
+        let result = KeyEvent::from_special_name("s-enter");
+
+        // When parsing.
+        let key_event = result.expect("should parse");
+
+        // Then it is Shift+Enter.
+        assert_eq!(key_event.key, Key::Enter);
+        assert!(key_event.modifiers.shift);
+        assert!(!key_event.modifiers.ctrl);
+    }
+
+    #[cfg(feature = "which-key")]
+    #[test]
+    fn from_special_name_c_enter_returns_ctrl_enter() {
+        // Given the special name "c-enter".
+        let result = KeyEvent::from_special_name("c-enter");
+
+        // When parsing.
+        let key_event = result.expect("should parse");
+
+        // Then it is Ctrl+Enter.
+        assert_eq!(key_event.key, Key::Enter);
+        assert!(key_event.modifiers.ctrl);
+        assert!(!key_event.modifiers.shift);
+    }
+
+    #[cfg(feature = "which-key")]
+    #[test]
+    fn from_special_name_enter_returns_unmodified() {
+        // Given the special name "enter".
+        let result = KeyEvent::from_special_name("enter");
+
+        // When parsing.
+        let key_event = result.expect("should parse");
+
+        // Then it is plain Enter with no modifiers.
+        assert_eq!(key_event.key, Key::Enter);
+        assert!(key_event.modifiers.is_none());
     }
 }

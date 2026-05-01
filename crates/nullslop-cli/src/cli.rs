@@ -17,6 +17,13 @@ pub struct Cli {
     #[arg(long)]
     pub log_dir: Option<PathBuf>,
 
+    /// Use the sample LLM provider instead of a real backend.
+    ///
+    /// No API key is required. The provider responds to `!response`
+    /// and `!think` commands with canned, streamed output.
+    #[arg(long)]
+    pub fake_llm: bool,
+
     /// The subcommand to run. If omitted, launches the TUI.
     #[command(subcommand)]
     pub command: Option<Commands>,

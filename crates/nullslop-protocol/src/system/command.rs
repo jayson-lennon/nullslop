@@ -27,3 +27,13 @@ pub struct EditInput;
 #[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
 #[cmd("system")]
 pub struct ToggleWhichKey;
+
+/// Scroll the chat log up (toward older messages).
+#[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
+#[cmd("system")]
+pub struct ScrollUp;
+
+/// Scroll the chat log down (toward newer messages).
+#[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
+#[cmd("system")]
+pub struct ScrollDown;

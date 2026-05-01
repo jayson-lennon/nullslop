@@ -8,6 +8,9 @@
 use std::io::{self, Stdout};
 
 use crossterm::{
+    event::{
+        KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+    },
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
@@ -42,6 +45,18 @@ pub fn run(mut app: TuiApp) -> Result<(), Report<TuiRunError>> {
         .change_context(TuiRunError)
         .attach("failed to enter alternate screen")?;
 
+    // Enable Kitty keyboard protocol so crossterm can distinguish
+    // modified special keys (e.g. Shift+Enter, Ctrl+Enter).
+    // Terminals that don't support it silently ignore the sequence.
+    execute!(
+        stdout,
+        PushKeyboardEnhancementFlags(
+            KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+        )
+    )
+    .change_context(TuiRunError)
+    .attach("failed to push keyboard enhancement flags")?;
+
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)
         .change_context(TuiRunError)
@@ -65,6 +80,9 @@ pub fn run(mut app: TuiApp) -> Result<(), Report<TuiRunError>> {
     );
 
     // Restore terminal.
+    if let Err(e) = execute!(terminal.backend_mut(), PopKeyboardEnhancementFlags) {
+        tracing::error!(err = ?e, "failed to pop keyboard enhancement flags");
+    }
     if let Err(e) = disable_raw_mode() {
         tracing::error!(err = ?e, "failed to disable raw mode");
     }
@@ -134,7 +152,7 @@ fn run_main_loop(
 /// 5. Invokes the `on_result` closure to produce the new input buffer content
 /// 6. Restarts the event stream task
 /// 7. Redraws the terminal
-/// 8. Writes the result directly to `AppState.chat_input` via `replace_all`
+/// 8. Writes the result directly to the active session's input box via `replace_all`
 fn handle_suspend_action(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     app: &mut TuiApp,
@@ -176,7 +194,7 @@ fn handle_suspend_action(
 
     // Handle the suspend result directly — set input_buffer on AppState.
     if let Some(content) = result_content {
-        app.core.state.write().chat_input.replace_all(content);
+        app.core.state.write().active_chat_input_mut().replace_all(content);
     }
 
     Ok(())

@@ -114,14 +114,17 @@ mod tests {
         // Then backend returns the host.
 
         // And send_event/send_command/send_system don't panic.
-        service.send_event(&Event::KeyDown {
-            payload: nullslop_protocol::system::KeyDown {
-                key: nullslop_protocol::KeyEvent {
-                    key: nullslop_protocol::Key::Enter,
-                    modifiers: nullslop_protocol::Modifiers::none(),
+        service.send_event(
+            &Event::KeyDown {
+                payload: nullslop_protocol::system::KeyDown {
+                    key: nullslop_protocol::KeyEvent {
+                        key: nullslop_protocol::Key::Enter,
+                        modifiers: nullslop_protocol::Modifiers::none(),
+                    },
                 },
             },
-        }, None);
+            None,
+        );
         service.send_command(&Command::Quit, None);
         service.send_system(nullslop_actor::SystemMessage::ApplicationReady);
 

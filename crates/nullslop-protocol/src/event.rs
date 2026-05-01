@@ -21,6 +21,7 @@ pub use crate::custom::EventMsg;
 // Internal imports for enum definition, type_name(), and tests.
 use crate::actor::{ActorShutdownCompleted, ActorStarted, ActorStarting};
 use crate::chat_input::ChatEntrySubmitted;
+use crate::provider::StreamCompleted;
 use crate::system::{KeyDown, KeyUp, ModeChanged};
 
 /// Every event the host can broadcast.
@@ -83,6 +84,13 @@ pub enum Event {
         #[serde(flatten)]
         payload: ActorShutdownCompleted,
     },
+    /// A streaming LLM response completed.
+    #[serde(rename = "stream_completed")]
+    StreamCompleted {
+        /// The session whose stream completed.
+        #[serde(flatten)]
+        payload: StreamCompleted,
+    },
 }
 
 impl Event {
@@ -97,22 +105,26 @@ impl Event {
             Self::KeyDown { .. } => Some(KeyDown::TYPE_NAME),
             Self::KeyUp { .. } => Some(KeyUp::TYPE_NAME),
             Self::ModeChanged { .. } => Some(ModeChanged::TYPE_NAME),
+            Self::StreamCompleted { .. } => Some(StreamCompleted::TYPE_NAME),
         }
     }
-
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ChatEntry, Key, KeyEvent, Mode, Modifiers};
+    use crate::{ChatEntry, Key, KeyEvent, Mode, Modifiers, SessionId};
+    use crate::provider::StreamCompletedReason;
 
     #[test]
     fn event_chat_entry_submitted_preserves_entry() {
         // Given a ChatEntrySubmitted event with a user entry.
         let entry = ChatEntry::user("hello");
         let event = Event::ChatEntrySubmitted {
-            payload: ChatEntrySubmitted { entry },
+            payload: ChatEntrySubmitted {
+                session_id: SessionId::new(),
+                entry,
+            },
         };
 
         // When serialized and deserialized.
@@ -134,11 +146,12 @@ mod tests {
     #[rstest::rstest]
     #[case::key_down(Event::KeyDown { payload: KeyDown { key: KeyEvent { key: Key::Char('a'), modifiers: Modifiers::none() } } })]
     #[case::key_up(Event::KeyUp { payload: KeyUp { key: KeyEvent { key: Key::Enter, modifiers: Modifiers::none() } } })]
-    #[case::chat_submitted(Event::ChatEntrySubmitted { payload: ChatEntrySubmitted { entry: ChatEntry::user("test") } })]
+    #[case::chat_submitted(Event::ChatEntrySubmitted { payload: ChatEntrySubmitted { session_id: SessionId::new(), entry: ChatEntry::user("test") } })]
     #[case::mode_changed(Event::ModeChanged { payload: ModeChanged { from: Mode::Normal, to: Mode::Input } })]
     #[case::actor_starting(Event::ActorStarting { payload: ActorStarting { name: "actor-a".into() } })]
     #[case::actor_started(Event::ActorStarted { payload: ActorStarted { name: "actor-a".into() } })]
     #[case::actor_shutdown_completed(Event::ActorShutdownCompleted { payload: ActorShutdownCompleted { name: "actor-a".into() } })]
+    #[case::stream_completed(Event::StreamCompleted { payload: StreamCompleted { session_id: SessionId::new(), reason: StreamCompletedReason::Finished } })]
     fn event_roundtrip_all_variants(#[case] event: Event) {
         // Given an event variant.
         let json = serde_json::to_string(&event).expect("serialize");
@@ -160,6 +173,7 @@ mod tests {
         assert_eq!(
             Event::ChatEntrySubmitted {
                 payload: ChatEntrySubmitted {
+                    session_id: SessionId::new(),
                     entry: ChatEntry::user("test"),
                 }
             }
@@ -244,5 +258,8 @@ mod tests {
         assert_eq!(KeyDown::TYPE_NAME, "system::KeyDown");
         assert_eq!(KeyUp::TYPE_NAME, "system::KeyUp");
         assert_eq!(ModeChanged::TYPE_NAME, "system::ModeChanged");
+
+        // Then StreamCompleted has the correct TYPE_NAME.
+        assert_eq!(StreamCompleted::TYPE_NAME, "provider::StreamCompleted");
     }
 }

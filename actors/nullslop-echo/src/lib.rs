@@ -49,6 +49,7 @@ impl EchoActor {
             Event::ChatEntrySubmitted {
                 payload:
                     ChatEntrySubmitted {
+                        session_id,
                         entry:
                             ChatEntry {
                                 kind: ChatEntryKind::User(text),
@@ -60,6 +61,7 @@ impl EchoActor {
                 tokio::time::sleep(Duration::from_secs(1)).await;
                 if let Err(e) = ctx.send_command(Command::PushChatEntry {
                     payload: chat_input::PushChatEntry {
+                        session_id: session_id.clone(),
                         entry: ChatEntry::actor("nullslop-echo", text.to_uppercase()),
                     },
                 }) {

@@ -73,6 +73,4 @@ impl MessageSink for TestSink {
 }
 
 #[cfg(test)]
-mod tests {
-
-}
+mod tests {}

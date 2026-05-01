@@ -20,8 +20,13 @@ pub use crate::custom::CommandMsg;
 
 // Internal imports for enum definition and Display impl.
 use crate::actor::ProceedWithShutdown;
-use crate::chat_input::{InsertChar, PushChatEntry, SubmitMessage};
-use crate::provider::SendMessage;
+use crate::chat_input::{
+    Clear, DeleteGrapheme, DeleteGraphemeForward, EnqueueUserMessage, InsertChar, MoveCursorToEnd,
+    MoveCursorToStart, MoveCursorWordLeft, MoveCursorWordRight, PushChatEntry, SetChatInputText,
+    SubmitMessage,
+};
+use crate::chat_input::{MoveCursorLeft, MoveCursorRight};
+use crate::provider::{CancelStream, SendMessage, SendToLlmProvider, StreamToken};
 use crate::system::SetMode;
 use crate::tab::SwitchTab;
 
@@ -109,13 +114,45 @@ pub enum Command {
     },
     /// Cancel the active provider stream.
     #[serde(rename = "cancel_stream")]
-    CancelStream,
+    CancelStream {
+        /// The cancel stream command.
+        #[serde(flatten)]
+        payload: CancelStream,
+    },
+    /// Send conversation context to the LLM provider.
+    #[serde(rename = "send_to_llm_provider")]
+    SendToLlmProvider {
+        /// The full conversation history as LLM messages.
+        #[serde(flatten)]
+        payload: SendToLlmProvider,
+    },
+    /// A single token from a streaming LLM response.
+    #[serde(rename = "stream_token")]
+    StreamToken {
+        /// The stream token.
+        #[serde(flatten)]
+        payload: StreamToken,
+    },
     /// Push a chat entry into the conversation history.
     #[serde(rename = "push_chat_entry")]
     PushChatEntry {
         /// The chat entry to add.
         #[serde(flatten)]
         payload: PushChatEntry,
+    },
+    /// Enqueue a user message for queued processing.
+    #[serde(rename = "enqueue_user_message")]
+    EnqueueUserMessage {
+        /// The message to enqueue.
+        #[serde(flatten)]
+        payload: EnqueueUserMessage,
+    },
+    /// Set the chat input buffer text directly.
+    #[serde(rename = "set_chat_input_text")]
+    SetChatInputText {
+        /// The new input text.
+        #[serde(flatten)]
+        payload: SetChatInputText,
     },
     /// Proceed with shutdown after actor coordination.
     #[serde(rename = "proceed_with_shutdown")]
@@ -124,6 +161,50 @@ pub enum Command {
         #[serde(flatten)]
         payload: ProceedWithShutdown,
     },
+    /// Scroll the chat log up (toward older messages).
+    #[serde(rename = "scroll_up")]
+    ScrollUp,
+    /// Scroll the chat log down (toward newer messages).
+    #[serde(rename = "scroll_down")]
+    ScrollDown,
+}
+
+impl Command {
+    /// Returns the routing name for this command, if it has one.
+    ///
+    /// Analogous to [`Event::type_name()`]. Returns `None` for commands
+    /// that are not routed to actors (e.g., internal UI commands).
+    #[must_use]
+    pub fn command_name(&self) -> Option<&'static str> {
+        match self {
+            Self::InsertChar { .. } => Some(InsertChar::NAME),
+            Self::DeleteGrapheme => Some(DeleteGrapheme::NAME),
+            Self::SubmitMessage { .. } => Some(SubmitMessage::NAME),
+            Self::Clear => Some(Clear::NAME),
+            Self::MoveCursorLeft => Some(MoveCursorLeft::NAME),
+            Self::MoveCursorRight => Some(MoveCursorRight::NAME),
+            Self::MoveCursorToStart => Some(MoveCursorToStart::NAME),
+            Self::MoveCursorToEnd => Some(MoveCursorToEnd::NAME),
+            Self::DeleteGraphemeForward => Some(DeleteGraphemeForward::NAME),
+            Self::MoveCursorWordLeft => Some(MoveCursorWordLeft::NAME),
+            Self::MoveCursorWordRight => Some(MoveCursorWordRight::NAME),
+            Self::SetMode { .. } => Some(SetMode::NAME),
+            Self::Quit
+            | Self::EditInput
+            | Self::ToggleWhichKey
+            | Self::ScrollUp
+            | Self::ScrollDown => None,
+            Self::SwitchTab { .. } => Some(SwitchTab::NAME),
+            Self::SendMessage { .. } => Some(SendMessage::NAME),
+            Self::CancelStream { .. } => Some(CancelStream::NAME),
+            Self::SendToLlmProvider { .. } => Some(SendToLlmProvider::NAME),
+            Self::StreamToken { .. } => Some(StreamToken::NAME),
+            Self::PushChatEntry { .. } => Some(PushChatEntry::NAME),
+            Self::EnqueueUserMessage { .. } => Some(EnqueueUserMessage::NAME),
+            Self::SetChatInputText { .. } => Some(SetChatInputText::NAME),
+            Self::ProceedWithShutdown { .. } => Some(ProceedWithShutdown::NAME),
+        }
+    }
 }
 
 impl std::fmt::Display for Command {
@@ -146,8 +227,18 @@ impl std::fmt::Display for Command {
             Command::ToggleWhichKey => write!(f, "toggle which-key"),
             Command::SwitchTab { payload } => write!(f, "switch tab {:?}", payload.direction),
             Command::SendMessage { .. } => write!(f, "send message"),
-            Command::CancelStream => write!(f, "cancel stream"),
+            Command::CancelStream { .. } => write!(f, "cancel stream"),
+            Command::SendToLlmProvider { .. } => write!(f, "send to LLM provider"),
+            Command::StreamToken { payload } => {
+                write!(
+                    f,
+                    "stream token '{}' (idx {})",
+                    payload.token, payload.index
+                )
+            }
             Command::PushChatEntry { .. } => write!(f, "push chat entry"),
+            Command::EnqueueUserMessage { .. } => write!(f, "enqueue user message"),
+            Command::SetChatInputText { .. } => write!(f, "set chat input text"),
             Command::ProceedWithShutdown { payload } => {
                 write!(
                     f,
@@ -156,6 +247,8 @@ impl std::fmt::Display for Command {
                     payload.timed_out.len()
                 )
             }
+            Command::ScrollUp => write!(f, "scroll up"),
+            Command::ScrollDown => write!(f, "scroll down"),
         }
     }
 }
@@ -164,6 +257,7 @@ impl std::fmt::Display for Command {
 mod tests {
     use super::*;
     use crate::Mode;
+    use crate::SessionId;
 
     #[test]
     fn command_insert_char_serialization() {
@@ -195,16 +289,18 @@ mod tests {
     #[rstest::rstest]
     #[case::insert_char(Command::InsertChar { payload: InsertChar { ch: 'x' } })]
     #[case::delete_grapheme(Command::DeleteGrapheme)]
-    #[case::submit_message(Command::SubmitMessage { payload: SubmitMessage { text: "hello".into() } })]
+    #[case::submit_message(Command::SubmitMessage { payload: SubmitMessage { session_id: SessionId::new(), text: "hello".into() } })]
     #[case::clear(Command::Clear)]
     #[case::set_mode(Command::SetMode { payload: SetMode { mode: Mode::Input } })]
     #[case::quit(Command::Quit)]
     #[case::edit_input(Command::EditInput)]
     #[case::toggle_which_key(Command::ToggleWhichKey)]
     #[case::switch_tab(Command::SwitchTab { payload: SwitchTab { direction: crate::TabDirection::Next } })]
-    #[case::send_message(Command::SendMessage { payload: SendMessage { text: "hi".into() } })]
-    #[case::cancel_stream(Command::CancelStream)]
-    #[case::push_chat_entry(Command::PushChatEntry { payload: PushChatEntry { entry: crate::ChatEntry::user("hi") } })]
+    #[case::send_message(Command::SendMessage { payload: SendMessage { session_id: SessionId::new(), text: "hi".into() } })]
+    #[case::cancel_stream(Command::CancelStream { payload: CancelStream { session_id: SessionId::new() } })]
+    #[case::send_to_llm_provider(Command::SendToLlmProvider { payload: SendToLlmProvider { session_id: SessionId::new(), messages: vec![] } })]
+    #[case::stream_token(Command::StreamToken { payload: StreamToken { session_id: SessionId::new(), index: 0, token: "hello".into() } })]
+    #[case::push_chat_entry(Command::PushChatEntry { payload: PushChatEntry { session_id: SessionId::new(), entry: crate::ChatEntry::user("hi") } })]
     #[case::proceed_with_shutdown(Command::ProceedWithShutdown { payload: ProceedWithShutdown { completed: vec!["ext-a".into()], timed_out: vec!["ext-b".into()] } })]
     #[case::move_cursor_left(Command::MoveCursorLeft)]
     #[case::move_cursor_right(Command::MoveCursorRight)]
@@ -213,6 +309,10 @@ mod tests {
     #[case::delete_forward(Command::DeleteGraphemeForward)]
     #[case::move_cursor_word_left(Command::MoveCursorWordLeft)]
     #[case::move_cursor_word_right(Command::MoveCursorWordRight)]
+    #[case::enqueue_user_message(Command::EnqueueUserMessage { payload: EnqueueUserMessage { session_id: SessionId::new(), text: "hello".into() } })]
+    #[case::set_chat_input_text(Command::SetChatInputText { payload: SetChatInputText { session_id: SessionId::new(), text: "restored".into() } })]
+    #[case::scroll_up(Command::ScrollUp)]
+    #[case::scroll_down(Command::ScrollDown)]
     fn command_roundtrip_all_variants(#[case] cmd: Command) {
         // Given a command variant.
         let json = serde_json::to_string(&cmd).expect("serialize");
@@ -223,5 +323,41 @@ mod tests {
         // Then it matches the original when re-serialized.
         let back_json = serde_json::to_string(&back).expect("re-serialize");
         assert_eq!(json, back_json);
+    }
+
+    #[test]
+    fn command_name_returns_name_for_routable_commands() {
+        // Given routable command variants.
+        // When calling command_name().
+        // Then they return their routing name.
+        assert_eq!(
+            Command::PushChatEntry {
+                payload: PushChatEntry {
+                    session_id: SessionId::new(),
+                    entry: crate::ChatEntry::user("test"),
+                },
+            }
+            .command_name(),
+            Some(PushChatEntry::NAME)
+        );
+        assert_eq!(
+            Command::CancelStream {
+                payload: CancelStream {
+                    session_id: SessionId::new(),
+                },
+            }
+            .command_name(),
+            Some(CancelStream::NAME)
+        );
+    }
+
+    #[test]
+    fn command_name_returns_none_for_internal_commands() {
+        // Given internal UI commands.
+        // When calling command_name().
+        // Then they return None (not routed to actors).
+        assert_eq!(Command::Quit.command_name(), None);
+        assert_eq!(Command::EditInput.command_name(), None);
+        assert_eq!(Command::ToggleWhichKey.command_name(), None);
     }
 }

@@ -278,6 +278,6 @@ mod tests {
         core.tick();
 
         // Then the character appears in chat_input.input_buffer.
-        assert_eq!(core.state.read().chat_input.text(), "x");
+        assert_eq!(core.state.read().active_chat_input().text(), "x");
     }
 }

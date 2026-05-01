@@ -35,6 +35,7 @@ mod tests {
         // Given a Command message with a PushChatEntry.
         let msg = Msg::Command(npr::Command::PushChatEntry {
             payload: PushChatEntry {
+                session_id: npr::SessionId::new(),
                 entry: npr::ChatEntry::user("hello"),
             },
         });
@@ -50,6 +51,4 @@ mod tests {
             _ => panic!("expected Command"),
         }
     }
-
-
 }

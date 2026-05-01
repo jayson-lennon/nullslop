@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ChatEntry;
 use crate::CommandMsg;
+use crate::SessionId;
 
 /// Insert a character into the chat input buffer.
 #[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
@@ -25,6 +26,8 @@ pub struct DeleteGrapheme;
 #[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
 #[cmd("chat_input")]
 pub struct SubmitMessage {
+    /// The session this message belongs to.
+    pub session_id: SessionId,
     /// The message text.
     pub text: String,
 }
@@ -75,6 +78,32 @@ pub struct MoveCursorWordRight;
 #[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
 #[cmd("chat_input")]
 pub struct PushChatEntry {
+    /// The session this entry belongs to.
+    pub session_id: SessionId,
     /// The chat entry to add.
     pub entry: ChatEntry,
+}
+
+/// Enqueue a user message for processing by the message queue.
+///
+/// Submitted instead of directly pushing a chat entry when the queue is active.
+#[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
+#[cmd("chat_input")]
+pub struct EnqueueUserMessage {
+    /// The session this message belongs to.
+    pub session_id: SessionId,
+    /// The message text to enqueue.
+    pub text: String,
+}
+
+/// Set the chat input buffer text directly.
+///
+/// Used when draining queued messages back into the input box (e.g. on cancel).
+#[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
+#[cmd("chat_input")]
+pub struct SetChatInputText {
+    /// The session whose input buffer to set.
+    pub session_id: SessionId,
+    /// The new text for the input buffer.
+    pub text: String,
 }

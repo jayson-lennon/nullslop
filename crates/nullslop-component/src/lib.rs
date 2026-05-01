@@ -20,12 +20,15 @@ pub mod app_state;
 pub mod char_counter;
 pub mod chat_input_box;
 pub mod chat_log;
+pub mod chat_session;
 pub mod dashboard;
+pub mod provider;
 pub mod shutdown_tracker;
 pub mod tab_nav;
 
 pub use app_state::AppState;
 pub use chat_input_box::ChatInputBoxState;
+pub use chat_session::ChatSessionState;
 pub use dashboard::DashboardState;
 pub use shutdown_tracker::ShutdownTrackerState;
 
@@ -49,6 +52,7 @@ pub fn register_all(bus: &mut AppBus, registry: &mut AppUiRegistry) {
     char_counter::register(bus, registry);
     dashboard::register(bus, registry);
     tab_nav::register(bus, registry);
+    provider::register(bus, registry);
 }
 
 /// Register only TUI elements (no bus handlers).
@@ -61,6 +65,8 @@ pub fn register_tui_elements(registry: &mut AppUiRegistry) {
     registry.register(Box::new(chat_log::ChatLogElement));
     registry.register(Box::new(char_counter::CharCounterElement));
     registry.register(Box::new(dashboard::DashboardElement));
+    registry.register(Box::new(provider::indicator::StreamingIndicatorElement));
+    registry.register(Box::new(provider::queue_element::QueueDisplayElement));
 }
 
 #[cfg(test)]
@@ -167,7 +173,7 @@ mod macro_tests {
 
     impl MultiHandler {
         fn on_insert_char(cmd: &InsertChar, state: &mut AppState, _out: &mut Out) -> CommandAction {
-            state.chat_input.insert_grapheme_at_cursor(cmd.ch);
+            state.active_chat_input_mut().insert_grapheme_at_cursor(cmd.ch);
             CommandAction::Continue
         }
 
@@ -177,7 +183,7 @@ mod macro_tests {
         }
 
         fn on_mode_changed(_evt: &ModeChanged, state: &mut AppState, _out: &mut Out) {
-            state.chat_input.insert_grapheme_at_cursor('!');
+            state.active_chat_input_mut().insert_grapheme_at_cursor('!');
         }
     }
 
@@ -195,7 +201,7 @@ mod macro_tests {
         bus.process_commands(&mut state);
 
         // Then the command handler ran.
-        assert_eq!(state.chat_input.text(), "h");
+        assert_eq!(state.active_chat_input().text(), "h");
         assert!(!state.should_quit);
 
         // When also processing Quit.
@@ -215,6 +221,6 @@ mod macro_tests {
         bus.process_events(&mut state);
 
         // Then the event handler ran (chat_input.text() has "h!").
-        assert_eq!(state.chat_input.text(), "h!");
+        assert_eq!(state.active_chat_input().text(), "h!");
     }
 }

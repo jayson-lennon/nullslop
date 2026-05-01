@@ -7,8 +7,8 @@ mod command;
 mod event;
 
 pub use command::{
-    Clear, DeleteGrapheme, DeleteGraphemeForward, InsertChar, MoveCursorLeft, MoveCursorRight,
-    MoveCursorToEnd, MoveCursorToStart, MoveCursorWordLeft, MoveCursorWordRight, PushChatEntry,
-    SubmitMessage,
+    Clear, DeleteGrapheme, DeleteGraphemeForward, EnqueueUserMessage, InsertChar, MoveCursorLeft,
+    MoveCursorRight, MoveCursorToEnd, MoveCursorToStart, MoveCursorWordLeft, MoveCursorWordRight,
+    PushChatEntry, SetChatInputText, SubmitMessage,
 };
 pub use event::ChatEntrySubmitted;

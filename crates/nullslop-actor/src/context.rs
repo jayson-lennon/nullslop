@@ -35,6 +35,10 @@ pub struct ActorContext {
     actor_refs: HashMap<TypeId, Box<dyn Any + Send + Sync>>, // Actually Box<ActorRef<M>>
     /// Message sink for sending commands/events to the application.
     sink: Arc<dyn MessageSink>,
+    /// Type-erased data storage for constructor injection.
+    ///
+    /// Uses the same `TypeId` pattern as `actor_refs`.
+    data: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
 }
 
 impl ActorContext {
@@ -50,6 +54,7 @@ impl ActorContext {
             commands: Vec::new(),
             actor_refs: HashMap::new(),
             sink,
+            data: HashMap::new(),
         }
     }
 
@@ -111,6 +116,26 @@ impl ActorContext {
             .map(|boxed| *boxed)
     }
 
+    /// Stores typed data for constructor injection.
+    ///
+    /// Uses the same `TypeId` pattern as [`set_actor_ref`](Self::set_actor_ref).
+    /// The wiring code injects data before calling `activate`, and `activate`
+    /// extracts it via [`take_data`](Self::take_data).
+    pub fn set_data<T: Send + Sync + 'static>(&mut self, data: T) {
+        self.data.insert(TypeId::of::<T>(), Box::new(data));
+    }
+
+    /// Removes and returns injected data of type `T`.
+    ///
+    /// Returns `None` if no data of this type was stored.
+    /// This is a take (not a clone) — subsequent calls return `None`.
+    pub fn take_data<T: Send + Sync + 'static>(&mut self) -> Option<T> {
+        self.data
+            .remove(&TypeId::of::<T>())
+            .and_then(|boxed| boxed.downcast::<T>().ok())
+            .map(|boxed| *boxed)
+    }
+
     /// Sends a command to the application via the message sink.
     ///
     /// # Errors
@@ -127,6 +152,15 @@ impl ActorContext {
     /// Returns an error if the message sink fails to deliver.
     pub fn send_event(&self, event: Event) -> SendResult {
         self.sink.send_event(event)
+    }
+
+    /// Returns a reference-counted clone of the message sink.
+    ///
+    /// Useful for passing the sink to spawned tasks that need to
+    /// send commands or events independently of the actor context.
+    #[must_use]
+    pub fn sink(&self) -> Arc<dyn MessageSink> {
+        self.sink.clone()
     }
 
     /// Returns the accumulated event subscriptions and command registrations,
@@ -327,6 +361,60 @@ mod tests {
     }
 
     #[test]
+    fn set_and_take_data_roundtrip() {
+        // Given a context with injected data.
+        let mut ctx = ActorContext::new("test", test_sink());
+        ctx.set_data(42i32);
+
+        // When taking the data.
+        let result = ctx.take_data::<i32>();
+
+        // Then the value is returned.
+        assert_eq!(result, Some(42));
+    }
+
+    #[test]
+    fn take_data_returns_none_when_empty() {
+        // Given a context with no injected data.
+        let mut ctx = ActorContext::new("test", test_sink());
+
+        // When taking data that was never set.
+        let result = ctx.take_data::<i32>();
+
+        // Then None is returned.
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn take_data_removes_from_context() {
+        // Given a context with injected data.
+        let mut ctx = ActorContext::new("test", test_sink());
+        ctx.set_data("hello".to_string());
+
+        // When taking it twice.
+        let first = ctx.take_data::<String>();
+        let second = ctx.take_data::<String>();
+
+        // Then first is Some and second is None.
+        assert_eq!(first, Some("hello".to_string()));
+        assert!(second.is_none());
+    }
+
+    #[test]
+    fn sink_returns_arc_clone() {
+        // Given a context with a test sink.
+        let sink = test_sink_as_concrete();
+        let ctx = ActorContext::new("test", sink.clone());
+
+        // When getting the sink accessor.
+        let cloned = ctx.sink();
+
+        // Then it can send commands that the original sink records.
+        cloned.send_command(Command::Quit).expect("send");
+        assert_eq!(sink.commands().len(), 1);
+    }
+
+    #[test]
     fn announce_started_sends_actor_started_event() {
         // Given a context with a test sink.
         let sink = test_sink_as_concrete();
@@ -360,7 +448,7 @@ mod tests {
         assert_eq!(events.len(), 1);
         match &events[0] {
             Event::ActorShutdownCompleted { payload } => {
-                    assert_eq!(payload.name, "my-actor");
+                assert_eq!(payload.name, "my-actor");
             }
             other => panic!("expected ActorShutdownCompleted, got {other:?}"),
         }

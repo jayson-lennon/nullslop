@@ -1,0 +1,26 @@
+//! Provider events.
+
+use serde::{Deserialize, Serialize};
+
+use crate::EventMsg;
+use crate::SessionId;
+
+/// Why the stream completed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StreamCompletedReason {
+    /// The stream finished normally (all tokens received).
+    Finished,
+    /// The stream was cancelled by the user.
+    Canceled,
+}
+
+/// Streaming response completed for a session.
+#[derive(Debug, Clone, Serialize, Deserialize, EventMsg)]
+#[event_msg("provider")]
+pub struct StreamCompleted {
+    /// The session whose stream completed.
+    pub session_id: SessionId,
+    /// Why the stream completed.
+    pub reason: StreamCompletedReason,
+}

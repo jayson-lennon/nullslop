@@ -12,7 +12,7 @@ use crate::TuiApp;
 /// Minimum terminal width.
 pub const MIN_WIDTH: u16 = 40;
 /// Minimum terminal height.
-pub const MIN_HEIGHT: u16 = 12;
+pub const MIN_HEIGHT: u16 = 13;
 
 /// Top-level application layout areas.
 pub struct AppLayout {
@@ -20,6 +20,10 @@ pub struct AppLayout {
     pub tabs: Rect,
     /// The main content area (fills remaining space).
     pub content: Rect,
+    /// The streaming indicator area (1 row between content and counter).
+    pub indicator: Rect,
+    /// The queue display area (dynamic height based on queue length).
+    pub queue: Rect,
     /// The character counter area (1 row above input, chat tab only).
     pub counter: Rect,
     /// The input box area (3 rows at bottom, chat tab only).
@@ -34,21 +38,32 @@ impl AppLayout {
     }
 
     /// Computes the layout for the given terminal area.
+    ///
+    /// `input_lines` is the number of visual lines the input box needs
+    /// (used for dynamic multi-line input height).
+    ///
+    /// `queue_lines` is the number of rows for the queue display area
+    /// (0 when queue is empty).
     #[must_use]
-    pub fn new(area: Rect) -> Self {
+    pub fn new(area: Rect, input_lines: u16, queue_lines: u16) -> Self {
         let [tabs, rest] =
             Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(area);
 
-        let [content, counter, input] = Layout::vertical([
+        let input_height = 1 + input_lines.max(1); // top border + at least 1 line
+        let [content, indicator, queue, counter, input] = Layout::vertical([
             Constraint::Min(1),
             Constraint::Length(1),
-            Constraint::Length(3),
+            Constraint::Length(queue_lines),
+            Constraint::Length(1),
+            Constraint::Length(input_height),
         ])
         .areas(rest);
 
         Self {
             tabs,
             content,
+            indicator,
+            queue,
             counter,
             input,
         }
@@ -71,8 +86,9 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
         return;
     }
 
-    let layout = AppLayout::new(area);
     let state = app.core.state.read();
+    let queue_len = state.active_session().queue_len() as u16;
+    let layout = AppLayout::new(area, state.active_chat_input().visual_line_count() as u16, queue_len);
 
     // Tab bar — always visible.
     render_tab_bar(frame, layout.tabs, &app.tab_manager);
@@ -82,6 +98,14 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
             // Chat log
             if let Some(element) = app.ui_registry.get_mut("chat-log") {
                 element.render(frame, layout.content, &state);
+            }
+            // Streaming indicator (dedicated row between content and input)
+            if let Some(element) = app.ui_registry.get_mut("streaming-indicator") {
+                element.render(frame, layout.indicator, &state);
+            }
+            // Queue display
+            if let Some(element) = app.ui_registry.get_mut("queue-display") {
+                element.render(frame, layout.queue, &state);
             }
             // Character counter
             if let Some(element) = app.ui_registry.get_mut("char-counter") {
@@ -139,8 +163,8 @@ mod tests {
 
     #[test]
     fn app_layout_meets_min_size() {
-        // Given a 40x12 area.
-        let area = Rect::new(0, 0, 40, 12);
+        // Given a 40x13 area.
+        let area = Rect::new(0, 0, 40, 13);
 
         // When checking meets_min_size.
         let result = AppLayout::meets_min_size(area);
@@ -161,7 +185,6 @@ mod tests {
         assert!(!result);
     }
 
-
     #[test]
     fn init_tab_manager_has_two_tabs() {
         // Given a default tab manager.
@@ -172,5 +195,39 @@ mod tests {
         assert_eq!(mgr.tab_count(), 2);
         assert!(mgr.active_tab().is_some());
         assert_eq!(mgr.active_tab().unwrap().name, "Chat");
+    }
+
+    #[test]
+    fn app_layout_includes_indicator_row() {
+        // Given a 40x13 area.
+        let area = Rect::new(0, 0, 40, 13);
+        let layout = AppLayout::new(area, 1, 0);
+
+        // Then the indicator row has height 1 and is between content and counter.
+        assert_eq!(layout.indicator.height, 1);
+        assert!(layout.indicator.y > layout.content.y);
+        assert!(layout.indicator.y < layout.counter.y);
+    }
+
+    #[test]
+    fn app_layout_queue_area_has_dynamic_height() {
+        // Given a 40x20 area with 3 queued messages.
+        let area = Rect::new(0, 0, 40, 20);
+        let layout = AppLayout::new(area, 1, 3);
+
+        // Then the queue area has height 3 and sits between indicator and counter.
+        assert_eq!(layout.queue.height, 3);
+        assert!(layout.queue.y > layout.indicator.y);
+        assert!(layout.queue.y < layout.counter.y);
+    }
+
+    #[test]
+    fn app_layout_queue_area_zero_height_when_empty() {
+        // Given a 40x13 area with no queued messages.
+        let area = Rect::new(0, 0, 40, 13);
+        let layout = AppLayout::new(area, 1, 0);
+
+        // Then the queue area has height 0.
+        assert_eq!(layout.queue.height, 0);
     }
 }

@@ -82,14 +82,15 @@ mod tests {
     fn state_read_returns_app_state() {
         // Given a State with a chat entry.
         let mut data = AppState::new();
-        data.push_entry(ChatEntry::user("hello"));
+        data.active_session_mut()
+            .push_entry(ChatEntry::user("hello"));
         let state = State::new(data);
 
         // When reading.
         let guard = state.read();
 
         // Then the entry is visible.
-        assert_eq!(guard.chat_history.len(), 1);
+        assert_eq!(guard.active_session().history().len(), 1);
     }
 
     #[test]
@@ -100,12 +101,14 @@ mod tests {
         // When writing and pushing an entry.
         {
             let mut guard = state.write();
-            guard.push_entry(ChatEntry::user("hello"));
+            guard
+                .active_session_mut()
+                .push_entry(ChatEntry::user("hello"));
         }
 
         // Then the entry appears on next read.
         let guard = state.read();
-        assert_eq!(guard.chat_history.len(), 1);
+        assert_eq!(guard.active_session().history().len(), 1);
     }
 
     #[test]
@@ -119,10 +122,11 @@ mod tests {
         // Then both clones point to the same underlying data.
         {
             let mut guard = clone.write();
-            guard.push_entry(ChatEntry::user("shared"));
+            guard
+                .active_session_mut()
+                .push_entry(ChatEntry::user("shared"));
         }
         let guard = state.read();
-        assert_eq!(guard.chat_history.len(), 1);
+        assert_eq!(guard.active_session().history().len(), 1);
     }
-
 }

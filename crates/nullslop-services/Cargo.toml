@@ -5,8 +5,14 @@ edition = "2024"
 
 [dependencies]
 nullslop-actor-host = { workspace = true }
+nullslop-protocol = { workspace = true }
+nullslop-providers = { workspace = true }
 tokio = { workspace = true }
+futures = { workspace = true }
+wherror = { workspace = true }
+error-stack = { workspace = true }
 derive_more = { workspace = true }
+async-trait = { workspace = true }
 
 [lints]
 workspace = true

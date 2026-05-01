@@ -41,4 +41,3 @@ pub trait Actor {
     /// Shuts down the actor. Called after the run loop exits.
     fn shutdown(self) -> impl Future<Output = ()> + Send;
 }
-

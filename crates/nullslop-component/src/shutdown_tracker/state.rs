@@ -50,5 +50,3 @@ impl ShutdownTrackerState {
         self.pending.iter().cloned().collect()
     }
 }
-
-

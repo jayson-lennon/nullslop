@@ -87,7 +87,9 @@ mod tests {
             .try_recv()
             .expect("recv should succeed")
             .expect("should have value");
-        assert!(matches!(msg, AppMsg::Event { event, .. } if matches!(event, Event::KeyDown { .. })));
+        assert!(
+            matches!(msg, AppMsg::Event { event, .. } if matches!(event, Event::KeyDown { .. }))
+        );
     }
 
     #[test]

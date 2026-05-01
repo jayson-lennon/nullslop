@@ -9,7 +9,7 @@ use std::{env, fs::File, path::PathBuf, sync::Arc};
 
 use clap_verbosity_flag::{Verbosity, WarnLevel};
 use error_stack::{Report, ResultExt};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
+use tracing_subscriber::{EnvFilter, Layer, layer::SubscriberExt, util::SubscriberInitExt};
 use wherror::Error;
 
 /// Error type returned when tracing subscriber initialization fails.
@@ -71,9 +71,7 @@ pub fn init(
                 .append(true)
                 .open(&path)
                 .change_context(TracingInitError)
-                .attach_with(|| {
-                    format!("failed to open file '{}' for tracing", path.display())
-                })?;
+                .attach_with(|| format!("failed to open file '{}' for tracing", path.display()))?;
 
             let file_layer = tracing_subscriber::fmt::layer()
                 .with_file(true)
@@ -84,45 +82,40 @@ pub fn init(
 
             tracing_subscriber::registry().with(file_layer).init();
         }
-        TracingMode::Headless { log_file } => {
-            match log_file {
-                Some(path) => {
-                    let logfile = File::options()
-                        .create(true)
-                        .append(true)
-                        .open(&path)
-                        .change_context(TracingInitError)
-                        .attach_with(|| {
-                            format!(
-                                "failed to open file '{}' for tracing",
-                                path.display()
-                            )
-                        })?;
+        TracingMode::Headless { log_file } => match log_file {
+            Some(path) => {
+                let logfile = File::options()
+                    .create(true)
+                    .append(true)
+                    .open(&path)
+                    .change_context(TracingInitError)
+                    .attach_with(|| {
+                        format!("failed to open file '{}' for tracing", path.display())
+                    })?;
 
-                    let file_layer: Box<dyn Layer<_> + Send + Sync + 'static> =
-                        tracing_subscriber::fmt::layer()
-                            .with_file(true)
-                            .with_line_number(true)
-                            .with_target(true)
-                            .with_writer(Arc::new(logfile))
-                            .with_filter(EnvFilter::new(filter.clone()))
-                            .boxed();
+                let file_layer: Box<dyn Layer<_> + Send + Sync + 'static> =
+                    tracing_subscriber::fmt::layer()
+                        .with_file(true)
+                        .with_line_number(true)
+                        .with_target(true)
+                        .with_writer(Arc::new(logfile))
+                        .with_filter(EnvFilter::new(filter.clone()))
+                        .boxed();
 
-                    let terminal_layer = tracing_subscriber::fmt::layer()
-                        .with_filter(EnvFilter::new(filter));
+                let terminal_layer =
+                    tracing_subscriber::fmt::layer().with_filter(EnvFilter::new(filter));
 
-                    tracing_subscriber::registry()
-                        .with(file_layer)
-                        .with(terminal_layer)
-                        .init();
-                }
-                None => {
-                    tracing_subscriber::fmt()
-                        .with_env_filter(EnvFilter::new(filter))
-                        .init();
-                }
+                tracing_subscriber::registry()
+                    .with(file_layer)
+                    .with(terminal_layer)
+                    .init();
             }
-        }
+            None => {
+                tracing_subscriber::fmt()
+                    .with_env_filter(EnvFilter::new(filter))
+                    .init();
+            }
+        },
     }
 
     tracing::info!("");

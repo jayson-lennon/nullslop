@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 use error_stack::{Report, ResultExt};
 use nullslop_core::{AppCore, AppMsg, TickResult};
 use nullslop_protocol::Command;
+use nullslop_protocol::SessionId;
 use nullslop_protocol::chat_input::SubmitMessage;
 use wherror::Error;
 
@@ -56,6 +57,7 @@ impl HeadlessApp {
             .send(AppMsg::Command {
                 command: Command::SubmitMessage {
                     payload: SubmitMessage {
+                        session_id: SessionId::new(),
                         text: message.to_string(),
                     },
                 },
@@ -156,7 +158,7 @@ impl HeadlessApp {
     /// Prints the chat history to the log for visibility.
     pub fn print_history(&self) {
         let state = self.core.state.read();
-        for entry in &state.chat_history {
+        for entry in state.active_session().history() {
             tracing::info!("{entry:?}");
         }
     }
@@ -194,6 +196,7 @@ mod tests {
 
     use nullslop_actor_host::FakeActorHost;
     use nullslop_protocol::{Key, KeyEvent, Modifiers};
+    use nullslop_services::providers::FakeLlmServiceFactory;
 
     use super::*;
 
@@ -309,7 +312,10 @@ mod tests {
 
         let actor_host: Arc<dyn nullslop_actor_host::ActorHost> = Arc::new(FakeActorHost::new());
 
-        let services = nullslop_services::Services::new(handle, actor_host);
+        let llm = nullslop_services::providers::LlmServiceFactoryService::new(Arc::new(
+            FakeLlmServiceFactory::new(vec![]),
+        ));
+        let services = nullslop_services::Services::new(handle, actor_host, llm);
         HeadlessApp::new(core, services)
     }
 
@@ -336,6 +342,6 @@ mod tests {
         // Then no state changes occurred.
         let state = headless.core.state.read();
         assert!(!state.should_quit);
-        assert!(state.chat_history.is_empty());
+        assert!(state.active_session().history().is_empty());
     }
 }

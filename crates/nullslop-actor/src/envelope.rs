@@ -35,4 +35,3 @@ pub enum ActorEnvelope<M> {
     /// Shutdown signal — the actor should clean up and exit its run loop.
     Shutdown,
 }
-

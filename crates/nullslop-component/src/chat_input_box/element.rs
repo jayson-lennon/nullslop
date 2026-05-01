@@ -40,27 +40,51 @@ impl UiElement<AppState> for ChatInputBoxElement {
             Style::default()
         };
 
-        let line = Line::from(vec![
-            Span::styled("> ", prompt_style),
-            Span::styled(state.chat_input.text(), Style::default()),
-        ]);
+        let text_style = Style::default();
+
+        let lines = build_lines(state.active_chat_input().text(), prompt_style, text_style);
 
         let block = Block::default()
             .borders(Borders::TOP)
             .border_style(border_style);
         let inner = block.inner(area);
 
-        let input_widget = Paragraph::new(line).block(block);
+        let input_widget = Paragraph::new(lines).block(block);
         frame.render_widget(input_widget, area);
 
-        // Position cursor at the end of the prompt + text when in input mode.
+        // Position cursor when in input mode.
         if input_mode {
+            let (row, col) = state.active_chat_input().cursor_row_col();
             let prompt_width: usize = 2; // "> " = 2 columns
-            let cursor_x = inner.x + (prompt_width + state.chat_input.cursor_pos()) as u16;
-            let cursor_y = inner.y;
+            let indent_width: usize = 2; // "  " = 2 columns
+            let x_offset = if row == 0 { prompt_width } else { indent_width };
+            let cursor_x = inner.x + (x_offset + col) as u16;
+            let cursor_y = inner.y + row as u16;
             frame.set_cursor_position((cursor_x, cursor_y));
         }
     }
+}
+
+/// Build visual lines from the input buffer text, splitting on `\n`.
+///
+/// The first line gets a `> ` prompt prefix, continuation lines get `  ` indentation.
+fn build_lines<'a>(text: &str, prompt_style: Style, text_style: Style) -> Vec<Line<'a>> {
+    if text.is_empty() {
+        return vec![Line::from(vec![
+            Span::styled("> ", prompt_style),
+        ])];
+    }
+
+    let segments = text.split('\n');
+    let mut lines = Vec::new();
+    for (i, segment) in segments.enumerate() {
+        let prefix = if i == 0 { "> " } else { "  " };
+        lines.push(Line::from(vec![
+            Span::styled(prefix, prompt_style),
+            Span::styled(segment.to_string(), text_style),
+        ]));
+    }
+    lines
 }
 
 #[cfg(test)]
@@ -90,7 +114,7 @@ mod tests {
         let state = {
             let mut s = AppState::new();
             for ch in "hello".chars() {
-                s.chat_input.insert_grapheme_at_cursor(ch);
+                s.active_chat_input_mut().insert_grapheme_at_cursor(ch);
             }
             s
         };
@@ -143,7 +167,7 @@ mod tests {
             let mut s = AppState::new();
             s.mode = Mode::Input;
             for ch in "hi".chars() {
-                s.chat_input.insert_grapheme_at_cursor(ch);
+                s.active_chat_input_mut().insert_grapheme_at_cursor(ch);
             }
             s
         };
@@ -201,7 +225,7 @@ mod tests {
             let mut s = AppState::new();
             s.mode = Mode::Input;
             for ch in "abc".chars() {
-                s.chat_input.insert_grapheme_at_cursor(ch);
+                s.active_chat_input_mut().insert_grapheme_at_cursor(ch);
             }
             s
         };
@@ -253,10 +277,10 @@ mod tests {
             let mut s = AppState::new();
             s.mode = Mode::Input;
             for ch in "abc".chars() {
-                s.chat_input.insert_grapheme_at_cursor(ch);
+                s.active_chat_input_mut().insert_grapheme_at_cursor(ch);
             }
-            s.chat_input.move_cursor_to_start();
-            s.chat_input.move_cursor_right(); // cursor at 1 (between 'a' and 'b')
+            s.active_chat_input_mut().move_cursor_to_start();
+            s.active_chat_input_mut().move_cursor_right(); // cursor at 1 (between 'a' and 'b')
             s
         };
 
@@ -285,9 +309,9 @@ mod tests {
             let mut s = AppState::new();
             s.mode = Mode::Input;
             for ch in "hi".chars() {
-                s.chat_input.insert_grapheme_at_cursor(ch);
+                s.active_chat_input_mut().insert_grapheme_at_cursor(ch);
             }
-            s.chat_input.move_cursor_to_start();
+            s.active_chat_input_mut().move_cursor_to_start();
             s
         };
 
@@ -316,7 +340,7 @@ mod tests {
             let mut s = AppState::new();
             s.mode = Mode::Input;
             for ch in "hi".chars() {
-                s.chat_input.insert_grapheme_at_cursor(ch);
+                s.active_chat_input_mut().insert_grapheme_at_cursor(ch);
             }
             // cursor already at end (2) after inserts
             s
@@ -337,5 +361,109 @@ mod tests {
         terminal
             .backend_mut()
             .assert_cursor_position(Position { x: 4, y: 1 });
+    }
+
+    #[test]
+    fn render_multiline_text_produces_multiple_lines() {
+        // Given a ChatInputBoxElement with "hello\nworld" in buffer (Normal mode).
+        let mut element = ChatInputBoxElement;
+        let state = {
+            let mut s = AppState::new();
+            for ch in "hello\nworld".chars() {
+                s.active_chat_input_mut().insert_grapheme_at_cursor(ch);
+            }
+            s
+        };
+
+        let backend = TestBackend::new(40, 5);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 40, 5);
+
+        // When rendering.
+        terminal
+            .draw(|frame| {
+                element.render(frame, area, &state);
+            })
+            .unwrap();
+
+        // Then line 1 (row 1) has "> " prefix and "hello".
+        let buffer = terminal.backend().buffer().clone();
+        let cell = buffer.cell((0, 1)).expect("cell should exist");
+        assert_eq!(cell.symbol(), ">");
+        let h_cell = buffer.cell((2, 1)).expect("cell should exist");
+        assert_eq!(h_cell.symbol(), "h");
+
+        // And line 2 (row 2) has "  " indent and "world".
+        let indent_cell = buffer.cell((0, 2)).expect("cell should exist");
+        assert_eq!(indent_cell.symbol(), " ");
+        let w_cell = buffer.cell((2, 2)).expect("cell should exist");
+        assert_eq!(w_cell.symbol(), "w");
+    }
+
+    #[test]
+    fn render_multiline_cursor_on_second_line() {
+        // Given a ChatInputBoxElement in Input mode with "ab\ncd" and cursor at end.
+        let mut element = ChatInputBoxElement;
+        let state = {
+            let mut s = AppState::new();
+            s.mode = Mode::Input;
+            for ch in "ab\ncd".chars() {
+                s.active_chat_input_mut().insert_grapheme_at_cursor(ch);
+            }
+            s
+        };
+
+        let backend = TestBackend::new(40, 5);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 40, 5);
+
+        // When rendering.
+        terminal
+            .draw(|frame| {
+                element.render(frame, area, &state);
+            })
+            .unwrap();
+
+        // Then cursor is at position (4, 2): row 1, col 2 ("ab\n" → row 0 col 2, "cd" → row 1 col 2).
+        // inner.x=0, indent=2, col=2 → x=4, y=inner.y + 1 = 1 + 1 = 2.
+        terminal
+            .backend_mut()
+            .assert_cursor_position(Position { x: 4, y: 2 });
+    }
+
+    #[test]
+    fn render_multiline_cursor_between_newlines() {
+        // Given a ChatInputBoxElement in Input mode with "a\n\nb" and cursor at the empty middle line.
+        let mut element = ChatInputBoxElement;
+        let state = {
+            let mut s = AppState::new();
+            s.mode = Mode::Input;
+            for ch in "a\n\nb".chars() {
+                s.active_chat_input_mut().insert_grapheme_at_cursor(ch);
+            }
+            // Cursor is at end (pos 4). Move back 1 to be on the empty middle line.
+            s.active_chat_input_mut().move_cursor_left(); // now at pos 3, which is after the second \n, before 'b'
+            // Actually: "a\n\nb" → graphemes: a(0) \n(1) \n(2) b(3). cursor at 3 = before 'b'.
+            // Move left once more to be at pos 2 = after first \n, on empty line.
+            s.active_chat_input_mut().move_cursor_left();
+            s
+        };
+
+        let backend = TestBackend::new(40, 5);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 40, 5);
+
+        // When rendering.
+        terminal
+            .draw(|frame| {
+                element.render(frame, area, &state);
+            })
+            .unwrap();
+
+        // Then cursor is on row 1 (empty middle line), col 0.
+        // inner.y=1, row=1 → y=2, indent=2, col=0 → x=2.
+        terminal
+            .backend_mut()
+            .assert_cursor_position(Position { x: 2, y: 2 });
     }
 }

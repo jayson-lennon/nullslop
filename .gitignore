@@ -1,16 +1,29 @@
 *
 
+# scm
 !.gitignore
 
-# whitelist `src` directories and their children, regardless of place
+# Rust
+!actors/
+!actors/**/
 !actors/**/*.rs
+!actors/**/Cargo.toml
+!crates/
+!crates/**/
 !crates/**/*.rs
+!crates/**/Cargo.toml
 !src/
 !src/**/
 !src/**/*.rs
 !Cargo.{toml,lock}#
 
+# cmd runner
 !justfile
+
+# legal
 !LICENSE
+
+# agents
 !AGENTS.md
 !ARCHITECTURE.md
+!.ba/

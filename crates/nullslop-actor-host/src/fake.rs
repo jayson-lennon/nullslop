@@ -95,14 +95,17 @@ mod tests {
         let host = FakeActorHost::new();
 
         // When sending a KeyDown event.
-        host.send_event(&Event::KeyDown {
-            payload: nullslop_protocol::system::KeyDown {
-                key: nullslop_protocol::KeyEvent {
-                    key: nullslop_protocol::Key::Enter,
-                    modifiers: nullslop_protocol::Modifiers::none(),
+        host.send_event(
+            &Event::KeyDown {
+                payload: nullslop_protocol::system::KeyDown {
+                    key: nullslop_protocol::KeyEvent {
+                        key: nullslop_protocol::Key::Enter,
+                        modifiers: nullslop_protocol::Modifiers::none(),
+                    },
                 },
             },
-        }, None);
+            None,
+        );
 
         // Then the event is recorded.
         assert_eq!(host.events_sent().len(), 1);
@@ -144,7 +147,10 @@ mod tests {
 
         // Then the system message is recorded.
         assert_eq!(host.system_sent().len(), 1);
-        assert!(matches!(host.system_sent()[0], SystemMessage::ApplicationReady));
+        assert!(matches!(
+            host.system_sent()[0],
+            SystemMessage::ApplicationReady
+        ));
     }
 
     #[test]

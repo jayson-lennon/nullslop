@@ -3,5 +3,5 @@
 mod command;
 mod event;
 
-pub use command::{EditInput, Quit, SetMode, ToggleWhichKey};
+pub use command::{EditInput, Quit, ScrollDown, ScrollUp, SetMode, ToggleWhichKey};
 pub use event::{KeyDown, KeyUp, ModeChanged};

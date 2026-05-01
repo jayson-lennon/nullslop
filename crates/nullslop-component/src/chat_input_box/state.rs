@@ -52,6 +52,43 @@ impl ChatInputBoxState {
         self.input_buffer.graphemes(true).count()
     }
 
+    /// Returns the number of visual lines (splits on `\n` graphemes + 1).
+    #[must_use]
+    pub fn visual_line_count(&self) -> usize {
+        if self.input_buffer.is_empty() {
+            return 1;
+        }
+        let newline_count = self
+            .input_buffer
+            .graphemes(true)
+            .filter(|g| *g == "\n")
+            .count();
+        newline_count + 1
+    }
+
+    /// Returns the cursor's `(row, col)` position within the multi-line buffer.
+    ///
+    /// Row is 0-indexed (line number), col is the grapheme offset within that line.
+    #[must_use]
+    pub fn cursor_row_col(&self) -> (usize, usize) {
+        let mut row = 0;
+        let mut col = 0;
+
+        for (i, g) in self.input_buffer.graphemes(true).enumerate() {
+            if i == self.cursor_pos {
+                break;
+            }
+            if g == "\n" {
+                row += 1;
+                col = 0;
+            } else {
+                col += 1;
+            }
+        }
+
+        (row, col)
+    }
+
     /// Insert a character at the current cursor position and advance the cursor by 1.
     pub fn insert_grapheme_at_cursor(&mut self, ch: char) {
         let byte_offset = self
@@ -259,5 +296,110 @@ mod tests {
 
         // Then cursor is at 8 (after "au ").
         assert_eq!(state.cursor_pos(), 8);
+    }
+
+    #[test]
+    fn visual_line_count_single_line() {
+        // Given "hello".
+        let mut state = ChatInputBoxState::new();
+        for ch in "hello".chars() {
+            state.insert_grapheme_at_cursor(ch);
+        }
+
+        // When reading visual line count.
+        // Then it is 1.
+        assert_eq!(state.visual_line_count(), 1);
+    }
+
+    #[test]
+    fn visual_line_count_two_lines() {
+        // Given "hello\nworld".
+        let mut state = ChatInputBoxState::new();
+        for ch in "hello\nworld".chars() {
+            state.insert_grapheme_at_cursor(ch);
+        }
+
+        // When reading visual line count.
+        // Then it is 2.
+        assert_eq!(state.visual_line_count(), 2);
+    }
+
+    #[test]
+    fn visual_line_count_empty() {
+        // Given an empty buffer.
+        let state = ChatInputBoxState::new();
+
+        // When reading visual line count.
+        // Then it is 1.
+        assert_eq!(state.visual_line_count(), 1);
+    }
+
+    #[test]
+    fn visual_line_count_trailing_newline() {
+        // Given "hello\n".
+        let mut state = ChatInputBoxState::new();
+        for ch in "hello\n".chars() {
+            state.insert_grapheme_at_cursor(ch);
+        }
+
+        // When reading visual line count.
+        // Then it is 2 (trailing newline creates an empty line below).
+        assert_eq!(state.visual_line_count(), 2);
+    }
+
+    #[test]
+    fn cursor_row_col_on_first_line() {
+        // Given "hello" with cursor at end.
+        let mut state = ChatInputBoxState::new();
+        for ch in "hello".chars() {
+            state.insert_grapheme_at_cursor(ch);
+        }
+
+        // When reading cursor row/col.
+        // Then it is (0, 5).
+        assert_eq!(state.cursor_row_col(), (0, 5));
+    }
+
+    #[test]
+    fn cursor_row_col_on_second_line() {
+        // Given "hello\nworld" with cursor at end.
+        let mut state = ChatInputBoxState::new();
+        for ch in "hello\nworld".chars() {
+            state.insert_grapheme_at_cursor(ch);
+        }
+
+        // When reading cursor row/col.
+        // Then it is (1, 5).
+        assert_eq!(state.cursor_row_col(), (1, 5));
+    }
+
+    #[test]
+    fn cursor_row_col_at_start_of_second_line() {
+        // Given "hello\nworld" with cursor right after the newline.
+        let mut state = ChatInputBoxState::new();
+        for ch in "hello\nworld".chars() {
+            state.insert_grapheme_at_cursor(ch);
+        }
+        state.move_cursor_to_start();
+        state.move_cursor_right(); // h
+        state.move_cursor_right(); // e
+        state.move_cursor_right(); // l
+        state.move_cursor_right(); // l
+        state.move_cursor_right(); // o
+        state.move_cursor_right(); // \n  → cursor is now at start of line 2
+
+        // When reading cursor row/col.
+        // Then it is (1, 0).
+        assert_eq!(state.cursor_row_col(), (1, 0));
+    }
+
+    #[test]
+    fn cursor_row_col_empty_buffer() {
+        // Given an empty buffer.
+        let state = ChatInputBoxState::new();
+
+        // When reading cursor row/col.
+        // Then it is (0, 0).
+        assert_eq!(state.cursor_row_col(), (0, 0));
     }
 }

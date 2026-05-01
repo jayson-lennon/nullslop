@@ -19,7 +19,7 @@ impl UiElement<AppState> for CharCounterElement {
     }
 
     fn render(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppState) {
-        let count = state.chat_input.grapheme_count();
+        let count = state.active_chat_input().grapheme_count();
         let text = format!("chars: {count}");
         let widget = Paragraph::new(text);
         frame.render_widget(widget, area);
@@ -79,7 +79,7 @@ mod tests {
         let state = {
             let mut s = AppState::new();
             for ch in "hello".chars() {
-                s.chat_input.insert_grapheme_at_cursor(ch);
+                s.active_chat_input_mut().insert_grapheme_at_cursor(ch);
             }
             s
         };
@@ -109,7 +109,7 @@ mod tests {
         let state = {
             let mut s = AppState::new();
             for ch in "écafé".chars() {
-                s.chat_input.insert_grapheme_at_cursor(ch);
+                s.active_chat_input_mut().insert_grapheme_at_cursor(ch);
             }
             s
         };

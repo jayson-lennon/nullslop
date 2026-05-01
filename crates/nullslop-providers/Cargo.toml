@@ -1,0 +1,18 @@
+[package]
+name = "nullslop-providers"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+nullslop-protocol = { workspace = true }
+tokio = { workspace = true }
+futures = { workspace = true }
+llm = { workspace = true }
+wherror = { workspace = true }
+error-stack = { workspace = true }
+derive_more = { workspace = true }
+async-trait = { workspace = true }
+rand = { workspace = true }
+
+[lints]
+workspace = true

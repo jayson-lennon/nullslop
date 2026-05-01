@@ -58,4 +58,3 @@ impl DashboardState {
             .collect()
     }
 }
-

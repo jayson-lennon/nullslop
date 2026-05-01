@@ -41,8 +41,7 @@ use nullslop_protocol::chat_input::{
     Clear, DeleteGrapheme, DeleteGraphemeForward, MoveCursorLeft, MoveCursorRight, MoveCursorToEnd,
     MoveCursorToStart, MoveCursorWordLeft, MoveCursorWordRight,
 };
-use nullslop_protocol::provider::CancelStream;
-use nullslop_protocol::system::{EditInput, Quit, ToggleWhichKey};
+use nullslop_protocol::system::{EditInput, Quit, ScrollDown, ScrollUp, ToggleWhichKey};
 use nullslop_protocol::{ActorName, Command, CommandAction, Event};
 
 use crate::handler::{CommandHandler, EventHandler};
@@ -360,15 +359,34 @@ impl<S> Bus<S> {
             Command::SendMessage { payload } => {
                 self.dispatch_command_to_handlers(&payload, state, &mut out);
             }
-            Command::CancelStream => {
-                let cmd = CancelStream;
-                self.dispatch_command_to_handlers(&cmd, state, &mut out);
+            Command::CancelStream { payload } => {
+                self.dispatch_command_to_handlers(&payload, state, &mut out);
+            }
+            Command::SendToLlmProvider { payload } => {
+                self.dispatch_command_to_handlers(&payload, state, &mut out);
+            }
+            Command::StreamToken { payload } => {
+                self.dispatch_command_to_handlers(&payload, state, &mut out);
             }
             Command::PushChatEntry { payload } => {
                 self.dispatch_command_to_handlers(&payload, state, &mut out);
             }
+            Command::EnqueueUserMessage { payload } => {
+                self.dispatch_command_to_handlers(&payload, state, &mut out);
+            }
+            Command::SetChatInputText { payload } => {
+                self.dispatch_command_to_handlers(&payload, state, &mut out);
+            }
             Command::ProceedWithShutdown { payload } => {
                 self.dispatch_command_to_handlers(&payload, state, &mut out);
+            }
+            Command::ScrollUp => {
+                let cmd = ScrollUp;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
+            }
+            Command::ScrollDown => {
+                let cmd = ScrollDown;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
         }
         self.flush_out(out);
@@ -415,6 +433,9 @@ impl<S> Bus<S> {
                 self.dispatch_event_to_handlers(&payload, state, &mut out);
             }
             Event::ActorShutdownCompleted { payload } => {
+                self.dispatch_event_to_handlers(&payload, state, &mut out);
+            }
+            Event::StreamCompleted { payload } => {
                 self.dispatch_event_to_handlers(&payload, state, &mut out);
             }
         }
@@ -763,6 +784,7 @@ mod tests {
         });
         bus.submit_command(Command::SendMessage {
             payload: SendMessage {
+                session_id: npr::SessionId::new(),
                 text: "hello".into(),
             },
         });
