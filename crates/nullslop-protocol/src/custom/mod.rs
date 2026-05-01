@@ -4,6 +4,7 @@
 //! strings used by the derive macros in domain modules.
 
 mod command;
+#[cfg(test)]
 mod derive_tests;
 mod event;
 

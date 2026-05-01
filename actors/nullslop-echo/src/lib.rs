@@ -8,8 +8,8 @@
 use std::time::Duration;
 
 use nullslop_actor::{Actor, ActorContext, ActorEnvelope, SystemMessage};
-use nullslop_protocol::chat_input::ChatEntrySubmitted;
-use nullslop_protocol::{ChatEntryKind, Command, Event};
+use nullslop_protocol::chat_input::{self, ChatEntrySubmitted};
+use nullslop_protocol::{ChatEntry, ChatEntryKind, Command, Event};
 
 /// Direct message type for the echo actor.
 /// Currently unused — the echo actor only responds to bus events.
@@ -46,22 +46,26 @@ impl Actor for EchoActor {
 impl EchoActor {
     async fn process_event(event: &Event, ctx: &ActorContext) {
         match event {
-            Event::ChatEntrySubmitted { payload } => match &payload.entry.kind {
-                ChatEntryKind::User(text) => {
-                    tokio::time::sleep(Duration::from_secs(1)).await;
-                    if let Err(e) = ctx.send_command(Command::PushChatEntry {
-                        payload: nullslop_protocol::chat_input::PushChatEntry {
-                            entry: nullslop_protocol::ChatEntry::actor(
-                                "nullslop-echo",
-                                text.to_uppercase(),
-                            ),
-                        },
-                    }) {
-                        tracing::error!(err = ?e, "echo actor failed to send command");
-                    }
+            Event::ChatEntrySubmitted {
+                payload:
+                    ChatEntrySubmitted {
+                        entry:
+                            ChatEntry {
+                                kind: ChatEntryKind::User(text),
+                                ..
+                            },
+                        ..
+                    },
+            } => {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                if let Err(e) = ctx.send_command(Command::PushChatEntry {
+                    payload: chat_input::PushChatEntry {
+                        entry: ChatEntry::actor("nullslop-echo", text.to_uppercase()),
+                    },
+                }) {
+                    tracing::error!(err = ?e, "echo actor failed to send command");
                 }
-                _ => {}
-            },
+            }
             _ => {}
         }
     }
