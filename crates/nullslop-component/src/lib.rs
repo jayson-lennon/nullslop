@@ -66,7 +66,7 @@ pub fn register_tui_elements(registry: &mut AppUiRegistry) {
 #[cfg(test)]
 mod macro_tests {
     use npr::chat_input::InsertChar;
-    use npr::system::{ApplicationReady, Quit};
+    use npr::system::{ModeChanged, Quit};
     use npr::{Command, CommandAction, Event};
     use nullslop_component_core::fake::FakeCommandHandler;
     use nullslop_component_core::{Bus, Out};
@@ -155,12 +155,12 @@ mod macro_tests {
         commands {}
 
         events {
-            ApplicationReady: on_ready,
+            ModeChanged: on_mode_changed,
         }
     }
 
     impl EventHandlerTest {
-        fn on_ready(_evt: &ApplicationReady, state: &mut AppState, _out: &mut Out) {
+        fn on_mode_changed(_evt: &ModeChanged, state: &mut AppState, _out: &mut Out) {
             state.should_quit = true;
         }
     }
@@ -171,8 +171,13 @@ mod macro_tests {
         let mut bus: Bus<AppState> = Bus::new();
         EventHandlerTest.register(&mut bus);
 
-        // When processing an ApplicationReady event.
-        bus.submit_event(Event::ApplicationReady);
+        // When processing a ModeChanged event.
+        bus.submit_event(Event::ModeChanged {
+            payload: ModeChanged {
+                from: npr::Mode::Normal,
+                to: npr::Mode::Input,
+            },
+        });
         let mut state = AppState::new();
         bus.process_events(&mut state);
 
@@ -192,7 +197,7 @@ mod macro_tests {
         }
 
         events {
-            ApplicationReady: on_ready,
+            ModeChanged: on_mode_changed,
         }
     }
 
@@ -207,7 +212,7 @@ mod macro_tests {
             CommandAction::Continue
         }
 
-        fn on_ready(_evt: &ApplicationReady, state: &mut AppState, _out: &mut Out) {
+        fn on_mode_changed(_evt: &ModeChanged, state: &mut AppState, _out: &mut Out) {
             state.chat_input.insert_grapheme_at_cursor('!');
         }
     }
@@ -236,8 +241,13 @@ mod macro_tests {
         // Then should_quit is now true.
         assert!(state.should_quit);
 
-        // When processing an ApplicationReady.
-        bus.submit_event(Event::ApplicationReady);
+        // When processing a ModeChanged event.
+        bus.submit_event(Event::ModeChanged {
+            payload: ModeChanged {
+                from: npr::Mode::Normal,
+                to: npr::Mode::Input,
+            },
+        });
         bus.process_events(&mut state);
 
         // Then the event handler ran (chat_input.text() has "h!").

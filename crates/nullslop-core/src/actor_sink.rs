@@ -71,18 +71,23 @@ mod tests {
         let (tx, rx) = kanal::unbounded();
         let sink = ActorMessageSink::new(tx);
 
-        // When sending an event.
-        sink.send_event(Event::ApplicationReady)
-            .expect("send should succeed");
+        // When sending a KeyDown event.
+        sink.send_event(Event::KeyDown {
+            payload: nullslop_protocol::system::KeyDown {
+                key: nullslop_protocol::KeyEvent {
+                    key: nullslop_protocol::Key::Enter,
+                    modifiers: nullslop_protocol::Modifiers::none(),
+                },
+            },
+        })
+        .expect("send should succeed");
 
         // Then the message is received as AppMsg::Event.
         let msg = rx
             .try_recv()
             .expect("recv should succeed")
             .expect("should have value");
-        assert!(
-            matches!(msg, AppMsg::Event { event, .. } if matches!(event, Event::ApplicationReady))
-        );
+        assert!(matches!(msg, AppMsg::Event { event, .. } if matches!(event, Event::KeyDown { .. })));
     }
 
     #[test]

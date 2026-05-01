@@ -85,8 +85,15 @@ mod tests {
         // Given an empty Out.
         let mut out = Out::new();
 
-        // When submitting an event.
-        out.submit_event(Event::ApplicationReady);
+        // When submitting a KeyDown event.
+        out.submit_event(Event::KeyDown {
+            payload: npr::system::KeyDown {
+                key: npr::KeyEvent {
+                    key: npr::Key::Enter,
+                    modifiers: npr::Modifiers::none(),
+                },
+            },
+        });
 
         // Then it is not empty and has one event.
         assert!(!out.is_empty());
@@ -109,9 +116,16 @@ mod tests {
 
     #[test]
     fn drain_events_takes_and_clears() {
-        // Given an Out with an event.
+        // Given an Out with a KeyDown event.
         let mut out = Out::new();
-        out.submit_event(Event::ApplicationReady);
+        out.submit_event(Event::KeyDown {
+            payload: npr::system::KeyDown {
+                key: npr::KeyEvent {
+                    key: npr::Key::Enter,
+                    modifiers: npr::Modifiers::none(),
+                },
+            },
+        });
 
         // When draining events.
         let evts = out.drain_events();
@@ -142,7 +156,14 @@ mod tests {
 
         // When submitting both commands and events.
         out.submit_command(Command::Quit);
-        out.submit_event(Event::ApplicationReady);
+        out.submit_event(Event::KeyDown {
+            payload: npr::system::KeyDown {
+                key: npr::KeyEvent {
+                    key: npr::Key::Char('a'),
+                    modifiers: npr::Modifiers::none(),
+                },
+            },
+        });
         out.submit_command(Command::DeleteGrapheme);
 
         // Then both buffers contain their items.

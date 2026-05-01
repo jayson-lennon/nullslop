@@ -188,14 +188,14 @@ mod tests {
         let mut ctx = ActorContext::new("test", test_sink());
 
         // When subscribing to two events.
-        ctx.subscribe_event_by_name("system::ApplicationReady");
+        ctx.subscribe_event_by_name("system::KeyDown");
         ctx.subscribe_event_by_name("chat_input::ChatEntrySubmitted");
 
         // Then take_registrations returns both subscriptions.
         let (subscriptions, _) = ctx.take_registrations();
         assert_eq!(
             subscriptions,
-            vec!["system::ApplicationReady", "chat_input::ChatEntrySubmitted"]
+            vec!["system::KeyDown", "chat_input::ChatEntrySubmitted"]
         );
     }
 
@@ -218,7 +218,7 @@ mod tests {
         // Given a context with registrations.
         let mut ctx = ActorContext::new("test", test_sink());
         ctx.subscribe_command_by_name("echo");
-        ctx.subscribe_event_by_name("system::ApplicationReady");
+        ctx.subscribe_event_by_name("system::KeyDown");
 
         let first = ctx.take_registrations();
         let second = ctx.take_registrations();
@@ -297,14 +297,21 @@ mod tests {
         let sink = test_sink_as_concrete();
         let ctx = ActorContext::new("test", sink.clone());
 
-        // When sending an event.
-        ctx.send_event(Event::ApplicationReady)
-            .expect("send should succeed");
+        // When sending a KeyDown event.
+        ctx.send_event(Event::KeyDown {
+            payload: nullslop_protocol::system::KeyDown {
+                key: nullslop_protocol::KeyEvent {
+                    key: nullslop_protocol::Key::Enter,
+                    modifiers: nullslop_protocol::Modifiers::none(),
+                },
+            },
+        })
+        .expect("send should succeed");
 
         // Then the sink recorded the event.
         let events = sink.events();
         assert_eq!(events.len(), 1);
-        assert!(matches!(events[0], Event::ApplicationReady));
+        assert!(matches!(events[0], Event::KeyDown { .. }));
     }
 
     #[test]

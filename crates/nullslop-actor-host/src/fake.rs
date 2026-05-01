@@ -1,6 +1,7 @@
 //! Fake actor host for testing.
 
 use error_stack::Report;
+use nullslop_actor::SystemMessage;
 use nullslop_protocol::{ActorName, Command, Event};
 use parking_lot::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -14,6 +15,7 @@ use crate::error::ActorHostError;
 pub struct FakeActorHost {
     events_sent: Mutex<Vec<Event>>,
     commands_sent: Mutex<Vec<Command>>,
+    system_sent: Mutex<Vec<SystemMessage>>,
     shutdown_called: AtomicBool,
 }
 
@@ -24,6 +26,7 @@ impl FakeActorHost {
         Self {
             events_sent: Mutex::new(Vec::new()),
             commands_sent: Mutex::new(Vec::new()),
+            system_sent: Mutex::new(Vec::new()),
             shutdown_called: AtomicBool::new(false),
         }
     }
@@ -38,6 +41,12 @@ impl FakeActorHost {
     #[must_use]
     pub fn commands_sent(&self) -> Vec<Command> {
         self.commands_sent.lock().clone()
+    }
+
+    /// Returns all system messages that were routed through this host.
+    #[must_use]
+    pub fn system_sent(&self) -> Vec<SystemMessage> {
+        self.system_sent.lock().clone()
     }
 
     /// Returns whether shutdown was called.
@@ -66,6 +75,10 @@ impl ActorHost for FakeActorHost {
         self.commands_sent.lock().push(command.clone());
     }
 
+    fn send_system(&self, msg: SystemMessage) {
+        self.system_sent.lock().push(msg);
+    }
+
     fn shutdown(&self) -> Result<(), Report<ActorHostError>> {
         self.shutdown_called.store(true, Ordering::SeqCst);
         Ok(())
@@ -81,12 +94,19 @@ mod tests {
         // Given a fake host.
         let host = FakeActorHost::new();
 
-        // When sending an event.
-        host.send_event(&Event::ApplicationReady, None);
+        // When sending a KeyDown event.
+        host.send_event(&Event::KeyDown {
+            payload: nullslop_protocol::system::KeyDown {
+                key: nullslop_protocol::KeyEvent {
+                    key: nullslop_protocol::Key::Enter,
+                    modifiers: nullslop_protocol::Modifiers::none(),
+                },
+            },
+        }, None);
 
         // Then the event is recorded.
         assert_eq!(host.events_sent().len(), 1);
-        assert!(matches!(host.events_sent()[0], Event::ApplicationReady));
+        assert!(matches!(host.events_sent()[0], Event::KeyDown { .. }));
     }
 
     #[test]
@@ -112,6 +132,19 @@ mod tests {
 
         // Then shutdown was recorded.
         assert!(host.is_shutdown());
+    }
+
+    #[test]
+    fn fake_host_tracks_system_messages() {
+        // Given a fake host.
+        let host = FakeActorHost::new();
+
+        // When sending a system message.
+        host.send_system(SystemMessage::ApplicationReady);
+
+        // Then the system message is recorded.
+        assert_eq!(host.system_sent().len(), 1);
+        assert!(matches!(host.system_sent()[0], SystemMessage::ApplicationReady));
     }
 
     #[test]

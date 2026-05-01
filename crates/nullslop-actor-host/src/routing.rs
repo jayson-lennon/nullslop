@@ -23,6 +23,8 @@ pub struct RoutingEntry {
     pub send_event: Box<dyn Fn(Event) + Send + Sync>,
     /// Sends a command to this actor (wraps in `ActorEnvelope::Command`).
     pub send_command: Box<dyn Fn(Command) + Send + Sync>,
+    /// Sends a system message to this actor (wraps in `ActorEnvelope::System`).
+    pub send_system: Box<dyn Fn(nullslop_actor::SystemMessage) + Send + Sync>,
     /// Sends a shutdown signal to this actor.
     pub send_shutdown: Box<dyn Fn() + Send + Sync>,
 }
@@ -49,11 +51,17 @@ mod tests {
                 let _ = ref_clone.send_event(event);
             }),
             send_command: Box::new(|_| {}),
+            send_system: Box::new(|_| {}),
             send_shutdown: Box::new(|| {}),
         };
 
-        // When calling send_event.
-        (entry.send_event)(nullslop_protocol::Event::ApplicationReady);
+        // When calling send_event with a ModeChanged event.
+        (entry.send_event)(nullslop_protocol::Event::ModeChanged {
+            payload: nullslop_protocol::system::ModeChanged {
+                from: nullslop_protocol::Mode::Normal,
+                to: nullslop_protocol::Mode::Input,
+            },
+        });
 
         // Then it is received as an Event envelope.
         let msg = rx
@@ -62,7 +70,7 @@ mod tests {
             .expect("should have value");
         assert!(matches!(
             msg,
-            ActorEnvelope::Event(nullslop_protocol::Event::ApplicationReady)
+            ActorEnvelope::Event(nullslop_protocol::Event::ModeChanged { .. })
         ));
     }
 
@@ -79,6 +87,7 @@ mod tests {
             send_command: Box::new(move |command| {
                 let _ = ref_clone.send_command(command);
             }),
+            send_system: Box::new(|_| {}),
             send_shutdown: Box::new(|| {}),
         };
 
@@ -107,6 +116,7 @@ mod tests {
             commands: vec![],
             send_event: Box::new(|_| {}),
             send_command: Box::new(|_| {}),
+            send_system: Box::new(|_| {}),
             send_shutdown: Box::new(move || {
                 let _ = ref_clone.shutdown();
             }),
@@ -121,5 +131,36 @@ mod tests {
             .expect("recv should succeed")
             .expect("should have value");
         assert!(matches!(msg, ActorEnvelope::Shutdown));
+    }
+
+    #[test]
+    fn send_system_closure_wraps_and_delivers() {
+        // Given a RoutingEntry built from an ActorRef<String>.
+        let (actor_ref, rx) = make_actor_ref_and_rx();
+        let ref_clone = actor_ref.clone();
+        let entry = super::RoutingEntry {
+            name: "test".to_string(),
+            subscriptions: vec![],
+            commands: vec![],
+            send_event: Box::new(|_| {}),
+            send_command: Box::new(|_| {}),
+            send_system: Box::new(move |msg| {
+                let _ = ref_clone.send_system(msg);
+            }),
+            send_shutdown: Box::new(|| {}),
+        };
+
+        // When calling send_system with ApplicationReady.
+        (entry.send_system)(nullslop_actor::SystemMessage::ApplicationReady);
+
+        // Then it is received as a System envelope.
+        let msg = rx
+            .try_recv()
+            .expect("recv should succeed")
+            .expect("should have value");
+        assert!(matches!(
+            msg,
+            ActorEnvelope::System(nullslop_actor::SystemMessage::ApplicationReady)
+        ));
     }
 }

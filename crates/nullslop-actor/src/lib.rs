@@ -21,6 +21,6 @@ pub mod message_sink;
 pub use actor::Actor;
 pub use actor_ref::ActorRef;
 pub use context::ActorContext;
-pub use envelope::ActorEnvelope;
+pub use envelope::{ActorEnvelope, SystemMessage};
 pub use error::{ActorSendError, SendResult};
 pub use message_sink::MessageSink;

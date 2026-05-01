@@ -21,7 +21,7 @@ pub use crate::custom::EventMsg;
 // Internal imports for enum definition, type_name(), and tests.
 use crate::actor::{ActorShutdownCompleted, ActorStarted, ActorStarting};
 use crate::chat_input::ChatEntrySubmitted;
-use crate::system::{ApplicationReady, ApplicationShuttingDown, KeyDown, KeyUp, ModeChanged};
+use crate::system::{KeyDown, KeyUp, ModeChanged};
 
 /// Every event the host can broadcast.
 ///
@@ -62,9 +62,6 @@ pub enum Event {
         #[serde(flatten)]
         payload: ModeChanged,
     },
-    /// The application has finished starting up.
-    #[serde(rename = "application_ready")]
-    ApplicationReady,
     /// An actor is starting up.
     #[serde(rename = "actor_starting")]
     ActorStarting {
@@ -86,9 +83,6 @@ pub enum Event {
         #[serde(flatten)]
         payload: ActorShutdownCompleted,
     },
-    /// The application is shutting down.
-    #[serde(rename = "application_shutting_down")]
-    ApplicationShuttingDown,
 }
 
 impl Event {
@@ -97,45 +91,21 @@ impl Event {
     pub fn type_name(&self) -> Option<&str> {
         match self {
             Self::ChatEntrySubmitted { .. } => Some(ChatEntrySubmitted::TYPE_NAME),
-            Self::ApplicationReady => Some(ApplicationReady::TYPE_NAME),
             Self::ActorStarting { .. } => Some(ActorStarting::TYPE_NAME),
             Self::ActorStarted { .. } => Some(ActorStarted::TYPE_NAME),
             Self::ActorShutdownCompleted { .. } => Some(ActorShutdownCompleted::TYPE_NAME),
-            Self::ApplicationShuttingDown => Some(ApplicationShuttingDown::TYPE_NAME),
             Self::KeyDown { .. } => Some(KeyDown::TYPE_NAME),
             Self::KeyUp { .. } => Some(KeyUp::TYPE_NAME),
             Self::ModeChanged { .. } => Some(ModeChanged::TYPE_NAME),
         }
     }
 
-    /// Returns `true` if this event should be broadcast to all actors
-    /// regardless of their subscriptions.
-    ///
-    /// Application-level lifecycle events (ready, shutting down) are broadcast
-    /// so every actor can participate in startup/shutdown without manual
-    /// subscription boilerplate.
-    #[must_use]
-    pub fn is_lifecycle_broadcast(&self) -> bool {
-        matches!(self, Self::ApplicationReady | Self::ApplicationShuttingDown)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{ChatEntry, Key, KeyEvent, Mode, Modifiers};
-
-    #[test]
-    fn event_application_ready_serialization() {
-        // Given an ApplicationReady.
-        let event = Event::ApplicationReady;
-
-        // When serialized.
-        let json = serde_json::to_string(&event).expect("serialize");
-
-        // Then it is {"type":"application_ready"}.
-        assert_eq!(json, r#"{"type":"application_ready"}"#);
-    }
 
     #[test]
     fn event_chat_entry_submitted_preserves_entry() {
@@ -166,11 +136,9 @@ mod tests {
     #[case::key_up(Event::KeyUp { payload: KeyUp { key: KeyEvent { key: Key::Enter, modifiers: Modifiers::none() } } })]
     #[case::chat_submitted(Event::ChatEntrySubmitted { payload: ChatEntrySubmitted { entry: ChatEntry::user("test") } })]
     #[case::mode_changed(Event::ModeChanged { payload: ModeChanged { from: Mode::Normal, to: Mode::Input } })]
-    #[case::application_ready(Event::ApplicationReady)]
     #[case::actor_starting(Event::ActorStarting { payload: ActorStarting { name: "actor-a".into() } })]
     #[case::actor_started(Event::ActorStarted { payload: ActorStarted { name: "actor-a".into() } })]
     #[case::actor_shutdown_completed(Event::ActorShutdownCompleted { payload: ActorShutdownCompleted { name: "actor-a".into() } })]
-    #[case::application_shutting_down(Event::ApplicationShuttingDown)]
     fn event_roundtrip_all_variants(#[case] event: Event) {
         // Given an event variant.
         let json = serde_json::to_string(&event).expect("serialize");
@@ -198,10 +166,6 @@ mod tests {
             Some(ChatEntrySubmitted::TYPE_NAME)
         );
         assert_eq!(
-            Event::ApplicationReady.type_name(),
-            Some(ApplicationReady::TYPE_NAME)
-        );
-        assert_eq!(
             Event::ActorStarting {
                 payload: ActorStarting {
                     name: "actor-a".into(),
@@ -227,10 +191,6 @@ mod tests {
             }
             .type_name(),
             Some(ActorShutdownCompleted::TYPE_NAME)
-        );
-        assert_eq!(
-            Event::ApplicationShuttingDown.type_name(),
-            Some(ApplicationShuttingDown::TYPE_NAME)
         );
 
         // Then key and mode events return their TYPE_NAME.
@@ -274,51 +234,14 @@ mod tests {
             ChatEntrySubmitted::TYPE_NAME,
             "chat_input::ChatEntrySubmitted"
         );
-        assert_eq!(ApplicationReady::TYPE_NAME, "system::ApplicationReady");
         assert_eq!(ActorStarting::TYPE_NAME, "actor::ActorStarting");
         assert_eq!(ActorStarted::TYPE_NAME, "actor::ActorStarted");
         assert_eq!(
             ActorShutdownCompleted::TYPE_NAME,
             "actor::ActorShutdownCompleted"
         );
-        assert_eq!(
-            ApplicationShuttingDown::TYPE_NAME,
-            "system::ApplicationShuttingDown"
-        );
         assert_eq!(KeyDown::TYPE_NAME, "system::KeyDown");
         assert_eq!(KeyUp::TYPE_NAME, "system::KeyUp");
         assert_eq!(ModeChanged::TYPE_NAME, "system::ModeChanged");
-    }
-
-    #[test]
-    fn is_lifecycle_broadcast_returns_true_for_application_ready() {
-        // Given an ApplicationReady event.
-        let event = Event::ApplicationReady;
-
-        // Then it is a lifecycle broadcast.
-        assert!(event.is_lifecycle_broadcast());
-    }
-
-    #[test]
-    fn is_lifecycle_broadcast_returns_true_for_application_shutting_down() {
-        // Given an ApplicationShuttingDown event.
-        let event = Event::ApplicationShuttingDown;
-
-        // Then it is a lifecycle broadcast.
-        assert!(event.is_lifecycle_broadcast());
-    }
-
-    #[rstest::rstest]
-    #[case::key_down(Event::KeyDown { payload: KeyDown { key: KeyEvent { key: Key::Char('a'), modifiers: Modifiers::none() } } })]
-    #[case::key_up(Event::KeyUp { payload: KeyUp { key: KeyEvent { key: Key::Enter, modifiers: Modifiers::none() } } })]
-    #[case::chat_submitted(Event::ChatEntrySubmitted { payload: ChatEntrySubmitted { entry: ChatEntry::user("test") } })]
-    #[case::mode_changed(Event::ModeChanged { payload: ModeChanged { from: Mode::Normal, to: Mode::Input } })]
-    #[case::actor_starting(Event::ActorStarting { payload: ActorStarting { name: "actor-a".into() } })]
-    #[case::actor_started(Event::ActorStarted { payload: ActorStarted { name: "actor-a".into() } })]
-    #[case::actor_shutdown_completed(Event::ActorShutdownCompleted { payload: ActorShutdownCompleted { name: "actor-a".into() } })]
-    fn is_lifecycle_broadcast_returns_false_for_non_lifecycle_events(#[case] event: Event) {
-        // Given a non-lifecycle event variant.
-        // Then it is not a lifecycle broadcast.
-        assert!(!event.is_lifecycle_broadcast());
     }
 }

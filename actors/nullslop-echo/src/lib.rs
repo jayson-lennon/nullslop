@@ -7,7 +7,7 @@
 
 use std::time::Duration;
 
-use nullslop_actor::{Actor, ActorContext, ActorEnvelope};
+use nullslop_actor::{Actor, ActorContext, ActorEnvelope, SystemMessage};
 use nullslop_protocol::chat_input::ChatEntrySubmitted;
 use nullslop_protocol::{ChatEntryKind, Command, Event};
 
@@ -29,7 +29,13 @@ impl Actor for EchoActor {
 
     async fn handle(&mut self, msg: ActorEnvelope<EchoDirectMsg>, ctx: &ActorContext) {
         match msg {
-            ActorEnvelope::Event(event) => self.on_event(&event, ctx).await,
+            ActorEnvelope::System(SystemMessage::ApplicationShuttingDown) => {
+                ctx.announce_shutdown_completed();
+            }
+            ActorEnvelope::System(SystemMessage::ApplicationReady) => {
+                ctx.announce_started();
+            }
+            ActorEnvelope::Event(event) => Self::process_event(&event, ctx).await,
             ActorEnvelope::Command(_) | ActorEnvelope::Direct(_) | ActorEnvelope::Shutdown => {}
         }
     }
@@ -38,33 +44,25 @@ impl Actor for EchoActor {
 }
 
 impl EchoActor {
-    async fn on_event(&self, event: &Event, ctx: &ActorContext) {
+    async fn process_event(event: &Event, ctx: &ActorContext) {
         match event {
-            Event::ApplicationShuttingDown => {
-                ctx.announce_shutdown_completed();
-            }
-            Event::ApplicationReady => {
-                ctx.announce_started();
-            }
-            _ => Self::send_echo(event, ctx).await,
-        }
-    }
-
-    async fn send_echo(event: &Event, ctx: &ActorContext) {
-        if let Event::ChatEntrySubmitted { payload } = event
-            && let ChatEntryKind::User(text) = &payload.entry.kind
-        {
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            if let Err(e) = ctx.send_command(Command::PushChatEntry {
-                payload: nullslop_protocol::chat_input::PushChatEntry {
-                    entry: nullslop_protocol::ChatEntry::actor(
-                        "nullslop-echo",
-                        text.to_uppercase(),
-                    ),
-                },
-            }) {
-                tracing::error!(err = ?e, "echo actor failed to send command");
-            }
+            Event::ChatEntrySubmitted { payload } => match &payload.entry.kind {
+                ChatEntryKind::User(text) => {
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    if let Err(e) = ctx.send_command(Command::PushChatEntry {
+                        payload: nullslop_protocol::chat_input::PushChatEntry {
+                            entry: nullslop_protocol::ChatEntry::actor(
+                                "nullslop-echo",
+                                text.to_uppercase(),
+                            ),
+                        },
+                    }) {
+                        tracing::error!(err = ?e, "echo actor failed to send command");
+                    }
+                }
+                _ => {}
+            },
+            _ => {}
         }
     }
 }

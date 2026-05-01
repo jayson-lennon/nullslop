@@ -31,13 +31,3 @@ pub struct ModeChanged {
     /// The new mode.
     pub to: Mode,
 }
-
-/// The application has finished starting up.
-#[derive(Debug, Clone, Serialize, Deserialize, EventMsg)]
-#[event_msg("system")]
-pub struct ApplicationReady;
-
-/// The application is shutting down.
-#[derive(Debug, Clone, Serialize, Deserialize, EventMsg)]
-#[event_msg("system")]
-pub struct ApplicationShuttingDown;

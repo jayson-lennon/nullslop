@@ -8,6 +8,7 @@
 use std::time::{Duration, Instant};
 
 use nullslop_actor_host::ActorHostService;
+use nullslop_actor::SystemMessage;
 use nullslop_component::AppState;
 use nullslop_component_core::Bus;
 
@@ -176,7 +177,7 @@ impl AppCore {
     /// Runs coordinated shutdown of the actor system.
     ///
     /// 1. Marks shutdown active on the tracker.
-    /// 2. Sends `EventApplicationShuttingDown` to all actors.
+    /// 2. Sends `SystemMessage::ApplicationShuttingDown` to all actors.
     /// 3. Tick loop: drains actor events through the bus until the shutdown
     ///    tracker reports complete or the timeout expires.
     /// 4. Joins actor tasks via the host.
@@ -191,7 +192,7 @@ impl AppCore {
         self.state.write().shutdown_tracker.shutdown_active = true;
 
         // 2. Send ApplicationShuttingDown to all actors.
-        actor_host.send_event(&nullslop_protocol::Event::ApplicationShuttingDown, None);
+        actor_host.send_system(SystemMessage::ApplicationShuttingDown);
 
         // 3. Tick loop: drain actor events through bus until tracker complete or timeout.
         let start = Instant::now();

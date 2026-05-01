@@ -4,4 +4,4 @@ mod command;
 mod event;
 
 pub use command::{EditInput, Quit, SetMode, ToggleWhichKey};
-pub use event::{ApplicationReady, ApplicationShuttingDown, KeyDown, KeyUp, ModeChanged};
+pub use event::{KeyDown, KeyUp, ModeChanged};

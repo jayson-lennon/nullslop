@@ -153,14 +153,23 @@ mod tests {
 
     #[test]
     fn fake_event_handler_records_call() {
-        // Given a fake event handler.
-        use npr::system::ApplicationReady;
-        let (handler, calls) = FakeEventHandler::<ApplicationReady, TestState>::new();
+        // Given a fake event handler for KeyDown.
+        use npr::system::KeyDown;
+        let (handler, calls) = FakeEventHandler::<KeyDown, TestState>::new();
         let mut state = TestState;
         let mut out = Out::new();
 
         // When handling an event.
-        handler.handle(&ApplicationReady, &mut state, &mut out);
+        handler.handle(
+            &KeyDown {
+                key: npr::KeyEvent {
+                    key: npr::Key::Enter,
+                    modifiers: npr::Modifiers::none(),
+                },
+            },
+            &mut state,
+            &mut out,
+        );
 
         // Then the call was recorded.
         assert_eq!(calls.borrow().len(), 1);

@@ -1,6 +1,7 @@
 //! Actor host trait and service wrapper.
 
 use error_stack::Report;
+use nullslop_actor::SystemMessage;
 use nullslop_protocol::{ActorName, Command, Event};
 
 use crate::error::ActorHostError;
@@ -19,6 +20,9 @@ pub trait ActorHost: Send + Sync + 'static {
 
     /// Routes a command to registered actors, skipping the source.
     fn send_command(&self, command: &Command, source: Option<&ActorName>);
+
+    /// Sends a system message to all actors (no subscription needed).
+    fn send_system(&self, msg: SystemMessage);
 
     /// Shuts down all actors gracefully.
     ///
@@ -68,6 +72,11 @@ impl ActorHostService {
         self.svc.send_command(command, source);
     }
 
+    /// Sends a system message to all actors via the backend.
+    pub fn send_system(&self, msg: SystemMessage) {
+        self.svc.send_system(msg);
+    }
+
     /// Shuts down all actors via the backend.
     ///
     /// # Errors
@@ -100,9 +109,17 @@ mod tests {
         // Then backend returns the host.
         assert_eq!(service.backend().name(), "FakeActorHost");
 
-        // And send_event/send_command don't panic.
-        service.send_event(&Event::ApplicationReady, None);
+        // And send_event/send_command/send_system don't panic.
+        service.send_event(&Event::KeyDown {
+            payload: nullslop_protocol::system::KeyDown {
+                key: nullslop_protocol::KeyEvent {
+                    key: nullslop_protocol::Key::Enter,
+                    modifiers: nullslop_protocol::Modifiers::none(),
+                },
+            },
+        }, None);
         service.send_command(&Command::Quit, None);
+        service.send_system(nullslop_actor::SystemMessage::ApplicationReady);
 
         // And shutdown returns Ok.
         service.shutdown().expect("shutdown should succeed");

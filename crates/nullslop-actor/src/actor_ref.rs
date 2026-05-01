@@ -88,6 +88,20 @@ impl<M: Send + 'static> ActorRef<M> {
         )
     }
 
+    /// Sends a system message to the actor.
+    ///
+    /// The message is wrapped in [`ActorEnvelope::System`] before sending.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the channel is closed.
+    pub fn send_system(&self, msg: crate::SystemMessage) -> SendResult {
+        from_kanal_send(
+            self.cell.sender.read().send(ActorEnvelope::System(msg)),
+            "failed to send system message to actor",
+        )
+    }
+
     /// Atomically replaces the inner sender, returning the old one.
     ///
     /// Used during actor restart to redirect all messages to a new channel
@@ -161,7 +175,14 @@ mod tests {
 
         // When sending an event.
         actor_ref
-            .send_event(Event::ApplicationReady)
+            .send_event(Event::KeyDown {
+                payload: nullslop_protocol::system::KeyDown {
+                    key: nullslop_protocol::KeyEvent {
+                        key: nullslop_protocol::Key::Enter,
+                        modifiers: nullslop_protocol::Modifiers::none(),
+                    },
+                },
+            })
             .expect("send should succeed");
 
         // Then it is received as an Event envelope.
@@ -169,7 +190,7 @@ mod tests {
             .try_recv()
             .expect("recv should succeed")
             .expect("should have value");
-        assert!(matches!(msg, ActorEnvelope::Event(Event::ApplicationReady)));
+        assert!(matches!(msg, ActorEnvelope::Event(Event::KeyDown { .. })));
     }
 
     #[test]
@@ -189,6 +210,28 @@ mod tests {
             .expect("recv should succeed")
             .expect("should have value");
         assert!(matches!(msg, ActorEnvelope::Command(Command::Quit)));
+    }
+
+    #[test]
+    fn send_system_delivers_system_message() {
+        // Given an ActorRef with an unbounded channel.
+        let (tx, rx) = kanal::unbounded::<ActorEnvelope<()>>();
+        let actor_ref = ActorRef::new(tx);
+
+        // When sending a system message.
+        actor_ref
+            .send_system(crate::SystemMessage::ApplicationReady)
+            .expect("send should succeed");
+
+        // Then it is received as a System envelope.
+        let msg = rx
+            .try_recv()
+            .expect("recv should succeed")
+            .expect("should have value");
+        assert!(matches!(
+            msg,
+            ActorEnvelope::System(crate::SystemMessage::ApplicationReady)
+        ));
     }
 
     #[test]

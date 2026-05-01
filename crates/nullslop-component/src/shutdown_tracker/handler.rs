@@ -7,7 +7,6 @@
 use crate::AppState;
 use npr::actor::ProceedWithShutdown;
 use npr::actor::{ActorShutdownCompleted, ActorStarted, ActorStarting};
-use npr::system::ApplicationShuttingDown;
 use nullslop_component_core::{Out, define_handler};
 use nullslop_protocol as npr;
 
@@ -20,7 +19,6 @@ define_handler! {
         ActorStarting: on_actor_starting,
         ActorStarted: on_actor_started,
         ActorShutdownCompleted: on_actor_shutdown_completed,
-        ApplicationShuttingDown: on_application_shutting_down,
     }
 }
 
@@ -51,15 +49,6 @@ impl ShutdownTrackerHandler {
                 },
             });
         }
-    }
-
-    fn on_application_shutting_down(
-        _evt: &ApplicationShuttingDown,
-        state: &mut AppState,
-        _out: &mut Out,
-    ) {
-        state.shutdown_tracker.shutdown_active = true;
-        tracing::info!("application shutting down");
     }
 }
 
@@ -146,21 +135,6 @@ mod tests {
             state.shutdown_tracker.pending_names(),
             vec!["actor-a".to_string()]
         );
-    }
-
-    #[test]
-    fn shutdown_tracker_sets_active_on_shutting_down() {
-        // Given a bus with ShutdownTrackerHandler registered.
-        let mut bus: Bus<AppState> = Bus::new();
-        ShutdownTrackerHandler.register(&mut bus);
-
-        // When an EventApplicationShuttingDown event is processed.
-        bus.submit_event(Event::ApplicationShuttingDown);
-        let mut state = AppState::new();
-        bus.process_events(&mut state);
-
-        // Then shutdown_active is true.
-        assert!(state.shutdown_tracker.shutdown_active);
     }
 
     #[test]

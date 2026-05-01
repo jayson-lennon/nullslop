@@ -42,9 +42,7 @@ use nullslop_protocol::chat_input::{
     MoveCursorToStart, MoveCursorWordLeft, MoveCursorWordRight,
 };
 use nullslop_protocol::provider::CancelStream;
-use nullslop_protocol::system::{
-    ApplicationReady, ApplicationShuttingDown, EditInput, Quit, ToggleWhichKey,
-};
+use nullslop_protocol::system::{EditInput, Quit, ToggleWhichKey};
 use nullslop_protocol::{ActorName, Command, CommandAction, Event};
 
 use crate::handler::{CommandHandler, EventHandler};
@@ -410,10 +408,6 @@ impl<S> Bus<S> {
             Event::ModeChanged { payload } => {
                 self.dispatch_event_to_handlers(&payload, state, &mut out);
             }
-            Event::ApplicationReady => {
-                let evt = ApplicationReady;
-                self.dispatch_event_to_handlers(&evt, state, &mut out);
-            }
             Event::ActorStarting { payload } => {
                 self.dispatch_event_to_handlers(&payload, state, &mut out);
             }
@@ -422,10 +416,6 @@ impl<S> Bus<S> {
             }
             Event::ActorShutdownCompleted { payload } => {
                 self.dispatch_event_to_handlers(&payload, state, &mut out);
-            }
-            Event::ApplicationShuttingDown => {
-                let evt = ApplicationShuttingDown;
-                self.dispatch_event_to_handlers(&evt, state, &mut out);
             }
         }
         self.flush_out(out);
@@ -470,7 +460,7 @@ mod tests {
     use crate::fake::{FakeCommandHandler, FakeEventHandler};
     use npr::chat_input::{DeleteGrapheme, InsertChar};
     use npr::provider::SendMessage;
-    use npr::system::{ApplicationReady, KeyDown, Quit, SetMode};
+    use npr::system::{KeyDown, ModeChanged, Quit, SetMode};
     use nullslop_protocol as npr;
 
     /// Simple state type for testing bus dispatch.
@@ -611,13 +601,20 @@ mod tests {
 
     #[test]
     fn unit_event_dispatches_correctly() {
-        // Given a bus with a handler for ApplicationReady (unit struct).
-        let (handler, calls) = FakeEventHandler::<ApplicationReady, TestState>::new();
+        // Given a bus with a handler for KeyDown (struct with payload).
+        let (handler, calls) = FakeEventHandler::<KeyDown, TestState>::new();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_event_handler::<ApplicationReady, _>(handler);
+        bus.register_event_handler::<KeyDown, _>(handler);
 
-        // When processing a unit event.
-        bus.submit_event(Event::ApplicationReady);
+        // When processing a KeyDown event.
+        bus.submit_event(Event::KeyDown {
+            payload: KeyDown {
+                key: npr::KeyEvent {
+                    key: npr::Key::Char('a'),
+                    modifiers: npr::Modifiers::none(),
+                },
+            },
+        });
         let mut state = TestState;
         bus.process_events(&mut state);
 
@@ -627,15 +624,20 @@ mod tests {
 
     #[test]
     fn all_event_handlers_run() {
-        // Given a bus with two event handlers.
-        let (h1, calls1) = FakeEventHandler::<ApplicationReady, TestState>::new();
-        let (h2, calls2) = FakeEventHandler::<ApplicationReady, TestState>::new();
+        // Given a bus with two event handlers for ModeChanged.
+        let (h1, calls1) = FakeEventHandler::<ModeChanged, TestState>::new();
+        let (h2, calls2) = FakeEventHandler::<ModeChanged, TestState>::new();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_event_handler::<ApplicationReady, _>(h1);
-        bus.register_event_handler::<ApplicationReady, _>(h2);
+        bus.register_event_handler::<ModeChanged, _>(h1);
+        bus.register_event_handler::<ModeChanged, _>(h2);
 
         // When processing an event.
-        bus.submit_event(Event::ApplicationReady);
+        bus.submit_event(Event::ModeChanged {
+            payload: ModeChanged {
+                from: npr::Mode::Normal,
+                to: npr::Mode::Input,
+            },
+        });
         let mut state = TestState;
         bus.process_events(&mut state);
 
@@ -738,7 +740,12 @@ mod tests {
         assert!(!bus.has_pending());
 
         // When submitting an event.
-        bus.submit_event(Event::ApplicationReady);
+        bus.submit_event(Event::ModeChanged {
+            payload: ModeChanged {
+                from: npr::Mode::Normal,
+                to: npr::Mode::Input,
+            },
+        });
         assert!(bus.has_pending());
 
         // When processing events.
@@ -784,18 +791,23 @@ mod tests {
 
     impl CommandHandler<Quit, TestState> for CommandToEventHandler {
         fn handle(&self, _cmd: &Quit, _state: &mut TestState, out: &mut Out) -> CommandAction {
-            out.submit_event(Event::ApplicationReady);
+            out.submit_event(Event::ModeChanged {
+                payload: ModeChanged {
+                    from: npr::Mode::Normal,
+                    to: npr::Mode::Input,
+                },
+            });
             CommandAction::Continue
         }
     }
 
     #[test]
     fn command_handler_can_submit_events() {
-        // Given a bus where Quit handler submits ApplicationReady.
-        let (event_handler, event_calls) = FakeEventHandler::<ApplicationReady, TestState>::new();
+        // Given a bus where Quit handler submits ModeChanged.
+        let (event_handler, event_calls) = FakeEventHandler::<ModeChanged, TestState>::new();
         let mut bus: Bus<TestState> = Bus::new();
         bus.register_command_handler::<Quit, _>(CommandToEventHandler);
-        bus.register_event_handler::<ApplicationReady, _>(event_handler);
+        bus.register_event_handler::<ModeChanged, _>(event_handler);
 
         // When processing a command that submits an event.
         bus.submit_command(Command::Quit);
@@ -817,29 +829,39 @@ mod tests {
     #[test]
     fn drain_processed_events_returns_dispatched_events() {
         // Given a bus with an event handler.
-        let (handler, _calls) = FakeEventHandler::<ApplicationReady, TestState>::new();
+        let (handler, _calls) = FakeEventHandler::<ModeChanged, TestState>::new();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_event_handler::<ApplicationReady, _>(handler);
+        bus.register_event_handler::<ModeChanged, _>(handler);
 
         // When processing an event.
-        bus.submit_event(Event::ApplicationReady);
+        bus.submit_event(Event::ModeChanged {
+            payload: ModeChanged {
+                from: npr::Mode::Normal,
+                to: npr::Mode::Input,
+            },
+        });
         let mut state = TestState;
         bus.process_events(&mut state);
 
         // Then drain_processed_events returns the dispatched event with no source.
         let processed = bus.drain_processed_events();
         assert_eq!(processed.len(), 1);
-        assert!(matches!(processed[0].event, Event::ApplicationReady));
+        assert!(matches!(processed[0].event, Event::ModeChanged { .. }));
         assert!(processed[0].source.is_none());
     }
 
     #[test]
     fn drain_processed_events_clears_buffer() {
         // Given a bus with a processed event.
-        let (handler, _calls) = FakeEventHandler::<ApplicationReady, TestState>::new();
+        let (handler, _calls) = FakeEventHandler::<ModeChanged, TestState>::new();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_event_handler::<ApplicationReady, _>(handler);
-        bus.submit_event(Event::ApplicationReady);
+        bus.register_event_handler::<ModeChanged, _>(handler);
+        bus.submit_event(Event::ModeChanged {
+            payload: ModeChanged {
+                from: npr::Mode::Normal,
+                to: npr::Mode::Input,
+            },
+        });
         let mut state = TestState;
         bus.process_events(&mut state);
 
@@ -915,12 +937,20 @@ mod tests {
     #[test]
     fn submit_event_from_preserves_source() {
         // Given a bus with an event handler.
-        let (handler, _calls) = FakeEventHandler::<ApplicationReady, TestState>::new();
+        let (handler, _calls) = FakeEventHandler::<ModeChanged, TestState>::new();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_event_handler::<ApplicationReady, _>(handler);
+        bus.register_event_handler::<ModeChanged, _>(handler);
 
         // When submitting an event with a source.
-        bus.submit_event_from(Event::ApplicationReady, Some(ActorName::new("ext-test")));
+        bus.submit_event_from(
+            Event::ModeChanged {
+                payload: ModeChanged {
+                    from: npr::Mode::Normal,
+                    to: npr::Mode::Input,
+                },
+            },
+            Some(ActorName::new("ext-test")),
+        );
         let mut state = TestState;
         bus.process_events(&mut state);
 

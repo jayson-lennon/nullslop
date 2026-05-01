@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use error_stack::Report;
-use nullslop_actor::{Actor, ActorContext, ActorEnvelope, ActorRef};
+use nullslop_actor::{Actor, ActorContext, ActorEnvelope, ActorRef, SystemMessage};
 use nullslop_protocol::{ActorName, Command, CommandMsg, CommandName, Event, EventTypeName};
 use parking_lot::Mutex;
 
@@ -62,9 +62,11 @@ where
 
     let ref_for_event = actor_ref.clone();
     let ref_for_command = actor_ref.clone();
+    let ref_for_system = actor_ref.clone();
     let ref_for_shutdown = actor_ref.clone();
     let name_for_event_log = name.to_string();
     let name_for_command_log = name.to_string();
+    let name_for_system_log = name.to_string();
     let name_for_shutdown_log = name.to_string();
 
     let send_event: Box<dyn Fn(Event) + Send + Sync> = Box::new(move |event| {
@@ -76,6 +78,12 @@ where
     let send_command: Box<dyn Fn(Command) + Send + Sync> = Box::new(move |command| {
         if let Err(e) = ref_for_command.send_command(command) {
             tracing::error!(name = %name_for_command_log, err = ?e, "failed to route command to actor");
+        }
+    });
+
+    let send_system: Box<dyn Fn(SystemMessage) + Send + Sync> = Box::new(move |msg| {
+        if let Err(e) = ref_for_system.send_system(msg) {
+            tracing::error!(name = %name_for_system_log, err = ?e, "failed to route system message to actor");
         }
     });
 
@@ -91,6 +99,7 @@ where
         commands,
         send_event,
         send_command,
+        send_system,
         send_shutdown,
     };
 
@@ -100,7 +109,7 @@ where
         while let Ok(envelope) = async_rx.recv().await {
             match envelope {
                 ActorEnvelope::Shutdown => break,
-                other => actor.handle(other, &ctx).await,
+                _ => actor.handle(envelope, &ctx).await,
             }
         }
         actor.shutdown().await;
@@ -120,7 +129,7 @@ struct RoutingTables {
     /// Command name → routing entries for registered actors.
     command_routes: HashMap<CommandName, Vec<Arc<RoutingEntry>>>,
 
-    /// All routing entries — used for broadcasting `ApplicationShuttingDown`.
+    /// All routing entries — used for broadcasting system messages.
     all_entries: Vec<Arc<RoutingEntry>>,
 }
 
@@ -227,18 +236,6 @@ impl ActorHost for InMemoryActorHost {
     }
 
     fn send_event(&self, event: &Event, source: Option<&ActorName>) {
-        // ApplicationShuttingDown is broadcast to every actor, not just those subscribed.
-        if event.is_lifecycle_broadcast() {
-            for entry in &self.routing.all_entries {
-                // Skip the originating actor to prevent echo loops.
-                if source.is_some_and(|s| &**s == entry.name.as_str()) {
-                    continue;
-                }
-                (entry.send_event)(event.clone());
-            }
-            return;
-        }
-
         // Look up subscribed actors by event type name.
         let Some(event_type) = event.type_name() else {
             return; // Not a routable event.
@@ -265,6 +262,12 @@ impl ActorHost for InMemoryActorHost {
                 }
                 (entry.send_command)(command.clone());
             }
+        }
+    }
+
+    fn send_system(&self, msg: SystemMessage) {
+        for entry in &self.routing.all_entries {
+            (entry.send_system)(msg);
         }
     }
 
@@ -383,6 +386,12 @@ mod tests {
                 ActorEnvelope::Shutdown => {
                     self.received.lock().unwrap().push("shutdown".to_string());
                 }
+                ActorEnvelope::System(msg) => {
+                    self.received
+                        .lock()
+                        .unwrap()
+                        .push(format!("system:{msg:?}"));
+                }
             }
         }
 
@@ -462,8 +471,8 @@ mod tests {
     }
 
     #[test]
-    fn broadcast_application_ready_to_all() {
-        // Given two actors with different subscriptions (neither subscribing to ApplicationReady).
+    fn system_message_delivered_to_all() {
+        // Given two actors with different subscriptions.
         let runtime = rt();
         let _guard = runtime.enter();
         let sink = Arc::new(TestSink::new());
@@ -484,8 +493,8 @@ mod tests {
         let host =
             InMemoryActorHost::from_actors_with_handle(vec![r1, r2], runtime.handle().clone());
 
-        // When sending ApplicationReady.
-        host.send_event(&Event::ApplicationReady, None);
+        // When sending SystemMessage::ApplicationReady.
+        host.send_system(SystemMessage::ApplicationReady);
         std::thread::sleep(Duration::from_millis(50));
 
         // Then both actors receive it regardless of subscriptions.
@@ -493,11 +502,11 @@ mod tests {
         let msgs_b = received2.lock().unwrap().clone();
         assert!(
             !msgs_a.is_empty(),
-            "actor-a should receive ApplicationReady broadcast"
+            "actor-a should receive system message"
         );
         assert!(
             !msgs_b.is_empty(),
-            "actor-b should receive ApplicationReady broadcast"
+            "actor-b should receive system message"
         );
 
         host.shutdown_with_timeout(Duration::from_millis(200))
@@ -613,7 +622,7 @@ mod tests {
     }
 
     #[test]
-    fn broadcast_shutdown_to_all() {
+    fn system_shutdown_delivered_to_all() {
         // Given two actors with different subscriptions.
         let runtime = rt();
         let _guard = runtime.enter();
@@ -628,15 +637,15 @@ mod tests {
         let (r2, received2) = spawn_recording_actor(
             "actor-b",
             sink.clone(),
-            &["system::ApplicationReady"],
+            &["system::KeyDown"],
             &[],
             runtime.handle(),
         );
         let host =
             InMemoryActorHost::from_actors_with_handle(vec![r1, r2], runtime.handle().clone());
 
-        // When sending EventApplicationShuttingDown.
-        host.send_event(&Event::ApplicationShuttingDown, None);
+        // When sending SystemMessage::ApplicationShuttingDown.
+        host.send_system(SystemMessage::ApplicationShuttingDown);
         std::thread::sleep(Duration::from_millis(50));
 
         // Then both actors receive it regardless of subscriptions.
@@ -644,11 +653,11 @@ mod tests {
         let msgs_b = received2.lock().unwrap().clone();
         assert!(
             !msgs_a.is_empty(),
-            "actor-a should receive shutdown broadcast"
+            "actor-a should receive system shutdown message"
         );
         assert!(
             !msgs_b.is_empty(),
-            "actor-b should receive shutdown broadcast"
+            "actor-b should receive system shutdown message"
         );
 
         host.shutdown_with_timeout(Duration::from_millis(200))
