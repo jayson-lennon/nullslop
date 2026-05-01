@@ -189,9 +189,7 @@ impl AppCore {
         timeout: Duration,
     ) {
         // 1. Mark shutdown active.
-        {
-            self.state.write().shutdown_tracker.begin_shutdown();
-        }
+        self.state.write().shutdown_tracker.begin_shutdown();
 
         // 2. Send ApplicationShuttingDown to all actors.
         actor_host.send_system(SystemMessage::ApplicationShuttingDown);
