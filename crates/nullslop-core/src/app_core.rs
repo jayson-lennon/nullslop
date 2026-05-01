@@ -7,8 +7,8 @@
 
 use std::time::{Duration, Instant};
 
-use nullslop_actor_host::ActorHostService;
 use nullslop_actor::SystemMessage;
+use nullslop_actor_host::ActorHostService;
 use nullslop_component::AppState;
 use nullslop_component_core::Bus;
 
@@ -189,7 +189,9 @@ impl AppCore {
         timeout: Duration,
     ) {
         // 1. Mark shutdown active.
-        self.state.write().shutdown_tracker.begin_shutdown();
+        {
+            self.state.write().shutdown_tracker.begin_shutdown();
+        }
 
         // 2. Send ApplicationShuttingDown to all actors.
         actor_host.send_system(SystemMessage::ApplicationShuttingDown);
