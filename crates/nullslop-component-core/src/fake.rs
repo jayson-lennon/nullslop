@@ -8,8 +8,8 @@
 //! # Usage
 //!
 //! ```ignore
-//! let (handler, calls) = FakeCommandHandler::<AppQuit, TestState>::continuing();
-//! bus.register_command_handler::<AppQuit, _>(handler);
+//! let (handler, calls) = FakeCommandHandler::<Quit, TestState>::continuing();
+//! bus.register_command_handler::<Quit, _>(handler);
 //! bus.process_commands(&mut state);
 //! assert_eq!(calls.borrow().len(), 1);
 //! ```
@@ -101,7 +101,7 @@ impl<E: Clone + 'static, S> EventHandler<E, S> for FakeEventHandler<E, S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use npr::command::AppQuit;
+    use npr::system::Quit;
     use nullslop_protocol as npr;
 
     /// Simple state type for testing fake handlers.
@@ -111,12 +111,12 @@ mod tests {
     #[test]
     fn fake_command_handler_records_call() {
         // Given a continuing fake handler.
-        let (handler, calls) = FakeCommandHandler::<AppQuit, TestState>::continuing();
+        let (handler, calls) = FakeCommandHandler::<Quit, TestState>::continuing();
         let mut state = TestState;
         let mut out = Out::new();
 
         // When handling a command.
-        let action = handler.handle(&AppQuit, &mut state, &mut out);
+        let action = handler.handle(&Quit, &mut state, &mut out);
 
         // Then the action is Continue and the call was recorded.
         assert_eq!(action, CommandAction::Continue);
@@ -126,12 +126,12 @@ mod tests {
     #[test]
     fn fake_command_handler_stopping() {
         // Given a stopping fake handler.
-        let (handler, calls) = FakeCommandHandler::<AppQuit, TestState>::stopping();
+        let (handler, calls) = FakeCommandHandler::<Quit, TestState>::stopping();
         let mut state = TestState;
         let mut out = Out::new();
 
         // When handling a command.
-        let action = handler.handle(&AppQuit, &mut state, &mut out);
+        let action = handler.handle(&Quit, &mut state, &mut out);
 
         // Then the action is Stop.
         assert_eq!(action, CommandAction::Stop);
@@ -141,7 +141,7 @@ mod tests {
     #[test]
     fn fake_command_handler_shared_call_log() {
         // Given a handler whose call_log is cloned.
-        let (handler, calls) = FakeCommandHandler::<AppQuit, TestState>::continuing();
+        let (handler, calls) = FakeCommandHandler::<Quit, TestState>::continuing();
         let calls_clone = Rc::clone(&calls);
 
         // When moving the handler (simulating bus registration).
@@ -154,13 +154,13 @@ mod tests {
     #[test]
     fn fake_event_handler_records_call() {
         // Given a fake event handler.
-        use npr::event::EventApplicationReady;
-        let (handler, calls) = FakeEventHandler::<EventApplicationReady, TestState>::new();
+        use npr::system::ApplicationReady;
+        let (handler, calls) = FakeEventHandler::<ApplicationReady, TestState>::new();
         let mut state = TestState;
         let mut out = Out::new();
 
         // When handling an event.
-        handler.handle(&EventApplicationReady, &mut state, &mut out);
+        handler.handle(&ApplicationReady, &mut state, &mut out);
 
         // Then the call was recorded.
         assert_eq!(calls.borrow().len(), 1);

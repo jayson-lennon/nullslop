@@ -1,6 +1,6 @@
 //! Macro for declaring a message-handling component.
 //!
-//! The [`define_handler!`] macro lets extension authors declare which commands
+//! The [`define_handler!`] macro lets actor authors declare which commands
 //! and events a component handles in a single block. It produces the handler
 //! struct, the trait implementations, and a `register` method that wires
 //! everything into the bus. Authors write the actual handler methods in a

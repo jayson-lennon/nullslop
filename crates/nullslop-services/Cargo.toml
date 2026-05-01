@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-nullslop-core = { workspace = true }
+nullslop-actor-host = { workspace = true }
 tokio = { workspace = true }
 derive_more = { workspace = true }
 

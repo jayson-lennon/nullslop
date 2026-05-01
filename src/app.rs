@@ -7,8 +7,13 @@
 use std::sync::Arc;
 
 use error_stack::{Report, ResultExt};
+use nullslop_actor::{Actor, ActorContext, ActorEnvelope, ActorRef, MessageSink};
+use nullslop_actor_host::{ActorHostService, InMemoryActorHost, spawn_actor};
 use nullslop_cli::Cli;
-use nullslop_core::{AppCore, CoreExtSender, ExtensionHostService};
+use nullslop_core::{ActorMessageSink, AppCore};
+use nullslop_echo::EchoActor;
+use nullslop_protocol::Event;
+use nullslop_protocol::actor::{ActorStarted, ActorStarting};
 use tokio::runtime::Runtime;
 use wherror::Error;
 
@@ -59,16 +64,16 @@ impl App {
 
         match cli.command.unwrap_or(Commands::Tui) {
             Commands::Tui => {
-                let (core, ext_arc) = create_core_with_ext_host(&self.handle());
-                let services = nullslop_services::Services::new(self.handle(), ext_arc);
+                let (core, host_arc) = create_core_with_actor_host(&self.handle());
+                let services = nullslop_services::Services::new(self.handle(), host_arc);
                 let runner = Runner::Tui(Box::new(nullslop_tui::TuiApp::new_with_core(
                     services, core,
                 )));
                 runner.run().change_context(AppError)?;
             }
-            Commands::Headless { command } => {
-                let (core, ext_arc) = create_core_with_ext_host(&self.handle());
-                let services = nullslop_services::Services::new(self.handle(), ext_arc);
+            Commands::Headless { command, .. } => {
+                let (core, host_arc) = create_core_with_actor_host(&self.handle());
+                let services = nullslop_services::Services::new(self.handle(), host_arc);
                 let mut headless = HeadlessApp::new(core, services);
                 match command {
                     Some(HeadlessCommands::SendChat { message }) => {
@@ -97,30 +102,64 @@ impl Default for App {
     }
 }
 
-/// Creates an `AppCore` with all components registered and the extension host started.
-fn create_core_with_ext_host(
+/// Creates an `AppCore` with all components registered and the actor host started.
+fn create_core_with_actor_host(
     handle: &tokio::runtime::Handle,
-) -> (AppCore, Arc<dyn nullslop_core::ExtensionHost>) {
+) -> (AppCore, Arc<dyn nullslop_actor_host::ActorHost>) {
     let mut core = AppCore::new();
     let mut registry = nullslop_component::AppUiRegistry::new();
     nullslop_component::register_all(&mut core.bus, &mut registry);
 
-    let sender = CoreExtSender::new(core.sender());
-    let echo_ext: Box<dyn nullslop_extension::InMemoryExtension> =
-        Box::new(nullslop_echo::EchoExtension);
-    let ext_host =
-        nullslop_ext_host::InMemoryExtensionHost::start(Arc::new(sender), vec![echo_ext], handle);
-    let ext_arc: Arc<dyn nullslop_core::ExtensionHost> = Arc::new(ext_host);
-    core.set_ext_host(ExtensionHostService::new(ext_arc.clone()));
+    // Create the message sink that bridges actor output to AppCore's channel.
+    let sink = Arc::new(ActorMessageSink::new(core.sender()));
 
-    (core, ext_arc)
+    // Create echo actor using two-phase startup.
+    let (echo_tx, echo_rx) = kanal::unbounded::<ActorEnvelope<nullslop_echo::EchoDirectMsg>>();
+    let echo_ref = ActorRef::new(echo_tx);
+    let mut echo_ctx = ActorContext::new("nullslop-echo", sink.clone());
+    let echo_actor = EchoActor::activate(&mut echo_ctx);
+    let echo_result = spawn_actor(
+        "nullslop-echo",
+        echo_actor,
+        &echo_ref,
+        echo_rx,
+        echo_ctx,
+        handle,
+    );
+
+    // Emit lifecycle events for the echo actor.
+    let _ = sink.send_event(Event::ActorStarting {
+        payload: ActorStarting {
+            name: "nullslop-echo".to_string(),
+        },
+    });
+    let _ = sink.send_event(Event::ActorStarted {
+        payload: ActorStarted {
+            name: "nullslop-echo".to_string(),
+        },
+    });
+
+    let host = InMemoryActorHost::from_actors_with_handle(vec![echo_result], handle.clone());
+    let host_arc: Arc<dyn nullslop_actor_host::ActorHost> = Arc::new(host);
+    core.set_actor_host(ActorHostService::new(host_arc.clone()));
+
+    (core, host_arc)
 }
 
 #[cfg(test)]
 mod tests {
+    use clap_verbosity_flag::Verbosity;
     use nullslop_cli::cli::{Cli, Commands, HeadlessCommands};
 
     use super::*;
+
+    fn test_cli(command: Option<Commands>) -> Cli {
+        Cli {
+            verbosity: Verbosity::new(0, 0),
+            log_dir: None,
+            command,
+        }
+    }
 
     #[test]
     fn dispatch_headless_script_completes_successfully() {
@@ -130,13 +169,12 @@ mod tests {
         std::fs::write(&script_path, "q").expect("write script");
 
         let mut app = App::new().expect("create app");
-        let cli = Cli {
-            command: Some(Commands::Headless {
-                command: Some(HeadlessCommands::Script {
-                    path: script_path.to_str().expect("path to str").to_string(),
-                }),
+        let cli = test_cli(Some(Commands::Headless {
+            log_file: None,
+            command: Some(HeadlessCommands::Script {
+                path: script_path.to_str().expect("path to str").to_string(),
             }),
-        };
+        }));
 
         // When dispatching the headless script command.
         let result = app.dispatch(cli);
@@ -149,13 +187,12 @@ mod tests {
     fn dispatch_headless_script_returns_error_for_missing_file() {
         // Given a nonexistent script path.
         let mut app = App::new().expect("create app");
-        let cli = Cli {
-            command: Some(Commands::Headless {
-                command: Some(HeadlessCommands::Script {
-                    path: "/no/such/file.script".to_string(),
-                }),
+        let cli = test_cli(Some(Commands::Headless {
+            log_file: None,
+            command: Some(HeadlessCommands::Script {
+                path: "/no/such/file.script".to_string(),
             }),
-        };
+        }));
 
         // When dispatching the headless script command.
         let result = app.dispatch(cli);

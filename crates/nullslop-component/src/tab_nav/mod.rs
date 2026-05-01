@@ -1,6 +1,6 @@
 //! Tab navigation — handles switching between application tabs.
 //!
-//! Listens for the [`AppSwitchTab`] command and updates the active tab in state.
+//! Listens for the [`SwitchTab`] command and updates the active tab in state.
 
 pub(crate) mod handler;
 

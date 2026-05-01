@@ -1,11 +1,11 @@
-//! Dashboard handler — listens to extension lifecycle events.
+//! Dashboard handler — listens to actor lifecycle events.
 //!
-//! Tracks which extensions are starting up and which have finished starting,
+//! Tracks which actors are starting up and which have finished starting,
 //! updating the dashboard state accordingly.
 
 use crate::AppState;
 use nullslop_component_core::{Out, define_handler};
-use nullslop_protocol::event::{ExtensionStarted, ExtensionStarting};
+use nullslop_protocol::actor::{ActorStarted, ActorStarting};
 
 define_handler! {
     pub(crate) struct DashboardHandler;
@@ -13,17 +13,17 @@ define_handler! {
     commands {}
 
     events {
-        ExtensionStarting: on_extension_starting,
-        ExtensionStarted: on_extension_started,
+        ActorStarting: on_actor_starting,
+        ActorStarted: on_actor_started,
     }
 }
 
 impl DashboardHandler {
-    fn on_extension_starting(evt: &ExtensionStarting, state: &mut AppState, _out: &mut Out) {
+    fn on_actor_starting(evt: &ActorStarting, state: &mut AppState, _out: &mut Out) {
         state.dashboard.mark_starting(&evt.name);
     }
 
-    fn on_extension_started(evt: &ExtensionStarted, state: &mut AppState, _out: &mut Out) {
+    fn on_actor_started(evt: &ActorStarted, state: &mut AppState, _out: &mut Out) {
         state.dashboard.mark_started(&evt.name);
     }
 }
@@ -31,74 +31,74 @@ impl DashboardHandler {
 #[cfg(test)]
 mod tests {
     use crate::AppState;
-    use crate::dashboard::state::ExtensionStatus;
+    use crate::dashboard::state::ActorStatus;
     use nullslop_component_core::Bus;
     use nullslop_protocol::Event;
-    use nullslop_protocol::event::{ExtensionStarted, ExtensionStarting};
+    use nullslop_protocol::actor::{ActorStarted, ActorStarting};
 
     use super::*;
 
     #[test]
-    fn extension_starting_adds_with_starting_status() {
+    fn actor_starting_adds_with_starting_status() {
         // Given a bus with DashboardHandler registered.
         let mut bus: Bus<AppState> = Bus::new();
         DashboardHandler.register(&mut bus);
 
-        // When an ExtensionStarting event is processed.
-        bus.submit_event(Event::EventExtensionStarting {
-            payload: ExtensionStarting {
-                name: "ext-a".into(),
+        // When an ActorStarting event is processed.
+        bus.submit_event(Event::ActorStarting {
+            payload: ActorStarting {
+                name: "actor-a".into(),
             },
         });
         let mut state = AppState::new();
         bus.process_events(&mut state);
 
-        // Then the extension is tracked with Starting status.
-        let exts = state.dashboard.extensions();
-        assert_eq!(exts.len(), 1);
-        assert_eq!(exts[0], ("ext-a", ExtensionStatus::Starting));
+        // Then the actor is tracked with Starting status.
+        let actors = state.dashboard.actors();
+        assert_eq!(actors.len(), 1);
+        assert_eq!(actors[0], ("actor-a", ActorStatus::Starting));
     }
 
     #[test]
-    fn extension_started_updates_to_started() {
-        // Given a bus with DashboardHandler registered and an extension that has started.
+    fn actor_started_updates_to_started() {
+        // Given a bus with DashboardHandler registered and an actor that has started.
         let mut bus: Bus<AppState> = Bus::new();
         DashboardHandler.register(&mut bus);
         let mut state = AppState::new();
-        state.dashboard.mark_starting("ext-a");
+        state.dashboard.mark_starting("actor-a");
 
-        // When an ExtensionStarted event is processed.
-        bus.submit_event(Event::EventExtensionStarted {
-            payload: ExtensionStarted {
-                name: "ext-a".into(),
+        // When an ActorStarted event is processed.
+        bus.submit_event(Event::ActorStarted {
+            payload: ActorStarted {
+                name: "actor-a".into(),
             },
         });
         bus.process_events(&mut state);
 
-        // Then the extension is updated to Started status.
-        let exts = state.dashboard.extensions();
-        assert_eq!(exts[0], ("ext-a", ExtensionStatus::Started));
+        // Then the actor is updated to Started status.
+        let actors = state.dashboard.actors();
+        assert_eq!(actors[0], ("actor-a", ActorStatus::Started));
     }
 
     #[test]
-    fn multiple_extensions_tracked_in_order() {
+    fn multiple_actors_tracked_in_order() {
         // Given a bus with DashboardHandler registered.
         let mut bus: Bus<AppState> = Bus::new();
         DashboardHandler.register(&mut bus);
 
-        // When two extensions start in sequence.
-        bus.submit_event(Event::EventExtensionStarting {
-            payload: ExtensionStarting {
+        // When two actors start in sequence.
+        bus.submit_event(Event::ActorStarting {
+            payload: ActorStarting {
                 name: "alpha".into(),
             },
         });
-        bus.submit_event(Event::EventExtensionStarted {
-            payload: ExtensionStarted {
+        bus.submit_event(Event::ActorStarted {
+            payload: ActorStarted {
                 name: "alpha".into(),
             },
         });
-        bus.submit_event(Event::EventExtensionStarting {
-            payload: ExtensionStarting {
+        bus.submit_event(Event::ActorStarting {
+            payload: ActorStarting {
                 name: "beta".into(),
             },
         });
@@ -106,9 +106,9 @@ mod tests {
         bus.process_events(&mut state);
 
         // Then both are tracked in order with correct statuses.
-        let exts = state.dashboard.extensions();
-        assert_eq!(exts.len(), 2);
-        assert_eq!(exts[0], ("alpha", ExtensionStatus::Started));
-        assert_eq!(exts[1], ("beta", ExtensionStatus::Starting));
+        let actors = state.dashboard.actors();
+        assert_eq!(actors.len(), 2);
+        assert_eq!(actors[0], ("alpha", ActorStatus::Started));
+        assert_eq!(actors[1], ("beta", ActorStatus::Starting));
     }
 }

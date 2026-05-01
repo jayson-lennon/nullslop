@@ -18,7 +18,7 @@ pub use app::TuiApp;
 pub use app_state::AppStatus;
 pub use keymap::KeyCategory;
 pub use msg::handler::MsgHandler;
-pub use nullslop_core::{AppCore, AppMsg, ExtensionError, ExtensionHost, ExtensionHostService};
+pub use nullslop_core::{ActorHost, ActorHostService, AppCore, AppMsg};
 pub use nullslop_services::Services;
 pub use run::{TuiRunError, run};
 pub use scope::Scope;

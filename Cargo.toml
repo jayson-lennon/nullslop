@@ -6,7 +6,7 @@ resolver = "3"
 default-run = "nullslop"
 
 [workspace]
-members = ["crates/*", "extensions/*"]
+members = ["crates/*", "actors/*"]
 
 [lib]
 path = "src/lib.rs"
@@ -17,15 +17,17 @@ nullslop-tui = { workspace = true }
 nullslop-core = { workspace = true }
 nullslop-services = { workspace = true }
 nullslop-component = { workspace = true }
-nullslop-ext-host = { workspace = true }
-nullslop-extension = { workspace = true }
+nullslop-actor-host = { workspace = true }
+nullslop-actor = { workspace = true }
 nullslop-echo = { workspace = true }
 tokio = { workspace = true }
+kanal = { workspace = true }
 wherror = { workspace = true }
 error-stack = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 clap = { workspace = true }
+clap-verbosity-flag = { workspace = true }
 ratatui-which-key = { workspace = true }
 nullslop-protocol = { workspace = true, features = ["which-key"] }
 tempfile = { workspace = true }
@@ -35,14 +37,15 @@ tempfile = { workspace = true }
 nullslop-protocol = { path = "crates/nullslop-protocol" }
 nullslop-core = { path = "crates/nullslop-core" }
 nullslop-tui = { path = "crates/nullslop-tui" }
-nullslop-extension = { path = "crates/nullslop-extension" }
 nullslop-component-core = { path = "crates/nullslop-component-core" }
 nullslop-component-ui = { path = "crates/nullslop-component-ui" }
 nullslop-component = { path = "crates/nullslop-component" }
-nullslop-ext-host = { path = "crates/nullslop-ext-host" }
 nullslop-cli = { path = "crates/nullslop-cli" }
 nullslop-services = { path = "crates/nullslop-services" }
-nullslop-echo = { path = "extensions/nullslop-echo" }
+nullslop-echo = { path = "actors/nullslop-echo" }
+nullslop-actor = { path = "crates/nullslop-actor" }
+nullslop-actor-host = { path = "crates/nullslop-actor-host" }
+nullslop-protocol-derive = { path = "crates/nullslop-protocol-derive" }
 
 # Error handling
 wherror = "2.3.1"
@@ -77,6 +80,7 @@ tempfile = "3"
 
 # CLI
 clap = { version = "4", features = ["derive"] }
+clap-verbosity-flag = "3"
 
 # Other
 dirs = "6"

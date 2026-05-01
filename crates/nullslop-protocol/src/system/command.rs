@@ -2,31 +2,28 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::CommandMsg;
 use crate::Mode;
-use crate::custom::CommandMsg;
 
 /// Set the application interaction mode.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppSetMode {
+#[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
+#[cmd("system")]
+pub struct SetMode {
     /// The mode to switch to.
     pub mode: Mode,
 }
 
 /// Quit the application.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppQuit;
+#[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
+#[cmd("system")]
+pub struct Quit;
 
 /// Open an external editor for the input buffer.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppEditInput;
+#[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
+#[cmd("system")]
+pub struct EditInput;
 
 /// Toggle the which-key popup.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppToggleWhichKey;
-
-/// The echo command.
-pub struct EchoCommand;
-
-impl CommandMsg for EchoCommand {
-    const NAME: &'static str = "echo";
-}
+#[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
+#[cmd("system")]
+pub struct ToggleWhichKey;

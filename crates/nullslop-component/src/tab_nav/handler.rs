@@ -2,21 +2,21 @@
 
 use crate::AppState;
 use nullslop_component_core::{Out, define_handler};
+use nullslop_protocol::tab::SwitchTab;
 use nullslop_protocol::{CommandAction, TabDirection};
-use nullslop_protocol::command::AppSwitchTab;
 
 define_handler! {
     pub(crate) struct TabNavHandler;
 
     commands {
-        AppSwitchTab: on_switch_tab,
+        SwitchTab: on_switch_tab,
     }
 
     events {}
 }
 
 impl TabNavHandler {
-    fn on_switch_tab(cmd: &AppSwitchTab, state: &mut AppState, _out: &mut Out) -> CommandAction {
+    fn on_switch_tab(cmd: &SwitchTab, state: &mut AppState, _out: &mut Out) -> CommandAction {
         state.active_tab = match cmd.direction {
             TabDirection::Next => state.active_tab.next(),
             TabDirection::Prev => state.active_tab.prev(),
@@ -39,9 +39,9 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         TabNavHandler.register(&mut bus);
 
-        // When processing an AppSwitchTab(Next) command.
-        bus.submit_command(Command::AppSwitchTab {
-            payload: AppSwitchTab {
+        // When processing an SwitchTab(Next) command.
+        bus.submit_command(Command::SwitchTab {
+            payload: SwitchTab {
                 direction: TabDirection::Next,
             },
         });
@@ -60,9 +60,9 @@ mod tests {
         let mut state = AppState::new();
         state.active_tab = ActiveTab::Dashboard;
 
-        // When processing an AppSwitchTab(Next) command.
-        bus.submit_command(Command::AppSwitchTab {
-            payload: AppSwitchTab {
+        // When processing an SwitchTab(Next) command.
+        bus.submit_command(Command::SwitchTab {
+            payload: SwitchTab {
                 direction: TabDirection::Next,
             },
         });
@@ -78,9 +78,9 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         TabNavHandler.register(&mut bus);
 
-        // When processing an AppSwitchTab(Prev) command.
-        bus.submit_command(Command::AppSwitchTab {
-            payload: AppSwitchTab {
+        // When processing an SwitchTab(Prev) command.
+        bus.submit_command(Command::SwitchTab {
+            payload: SwitchTab {
                 direction: TabDirection::Prev,
             },
         });

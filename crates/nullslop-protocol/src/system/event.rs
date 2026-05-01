@@ -2,27 +2,30 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::EventMsg;
 use crate::Mode;
-use crate::custom::EventMsg;
 use crate::key::KeyEvent;
 
 /// A key was pressed down.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventKeyDown {
+#[derive(Debug, Clone, Serialize, Deserialize, EventMsg)]
+#[event_msg("system")]
+pub struct KeyDown {
     /// The key event.
     pub key: KeyEvent,
 }
 
 /// A key was released.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventKeyUp {
+#[derive(Debug, Clone, Serialize, Deserialize, EventMsg)]
+#[event_msg("system")]
+pub struct KeyUp {
     /// The key event.
     pub key: KeyEvent,
 }
 
 /// The application mode changed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventModeChanged {
+#[derive(Debug, Clone, Serialize, Deserialize, EventMsg)]
+#[event_msg("system")]
+pub struct ModeChanged {
     /// The previous mode.
     pub from: Mode,
     /// The new mode.
@@ -30,17 +33,11 @@ pub struct EventModeChanged {
 }
 
 /// The application has finished starting up.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventApplicationReady;
+#[derive(Debug, Clone, Serialize, Deserialize, EventMsg)]
+#[event_msg("system")]
+pub struct ApplicationReady;
 
 /// The application is shutting down.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventApplicationShuttingDown;
-
-impl EventMsg for EventApplicationReady {
-    const TYPE_NAME: &'static str = "EventApplicationReady";
-}
-
-impl EventMsg for EventApplicationShuttingDown {
-    const TYPE_NAME: &'static str = "EventApplicationShuttingDown";
-}
+#[derive(Debug, Clone, Serialize, Deserialize, EventMsg)]
+#[event_msg("system")]
+pub struct ApplicationShuttingDown;

@@ -1,22 +1,17 @@
-//! Extension command routing infrastructure.
+//! Actor command routing infrastructure.
 
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+/// The name used for command routing.
+///
+/// Used as `HashMap` keys, `Vec` elements, and function params in the
+/// routing/subscription system. Backed by `String` so both static literals
+/// and dynamically-constructed names work without restriction.
+pub type CommandName = String;
 
-/// Marker trait for extension commands that provides compile-time-checked names.
+/// Marker trait for actor commands that provides compile-time-checked names.
 ///
 /// Each implementation provides a [`NAME`](CommandMsg::NAME) constant
-/// used for command routing and `CustomCommand` construction.
+/// used for command routing.
 pub trait CommandMsg: Send + Sync + 'static {
     /// The command name used for routing.
     const NAME: &'static str;
-}
-
-/// A custom command from an extension.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CustomCommand {
-    /// The command name.
-    pub name: String,
-    /// The command arguments.
-    pub args: Value,
 }

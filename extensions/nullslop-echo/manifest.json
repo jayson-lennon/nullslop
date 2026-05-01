@@ -1,8 +1,0 @@
-{
-    "name": "nullslop-echo",
-    "version": "0.1.0",
-    "binary": "nullslop-echo",
-    "activation_events": ["onStartup"],
-    "commands": ["echo"],
-    "events": ["EventChatMessageSubmitted"]
-}

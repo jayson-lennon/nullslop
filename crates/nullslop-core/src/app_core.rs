@@ -1,14 +1,23 @@
 //! Application core: bus, state, and processing loop.
 //!
 //! [`AppCore`] owns the processing pipeline — the bus, shared state,
-//! an internal message channel for [`AppMsg`], and an optional extension host.
+//! an internal message channel for [`AppMsg`], and an optional actor host.
 //! The caller (TUI or headless runner) feeds messages into [`AppCore`] and
 //! drives the processing loop.
 
+use std::time::{Duration, Instant};
+
+use nullslop_actor_host::ActorHostService;
 use nullslop_component::AppState;
 use nullslop_component_core::Bus;
 
-use crate::{AppMsg, ExtensionHostService, State};
+use crate::{AppMsg, State};
+
+/// How long to wait between ticks during coordinated shutdown.
+const SHUTDOWN_TICK_INTERVAL: Duration = Duration::from_millis(50);
+
+/// Default timeout for coordinated shutdown.
+pub const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Result of a [`AppCore::tick`] call.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -32,15 +41,15 @@ pub struct AppCore {
     sender: kanal::Sender<AppMsg>,
     /// Receiver half of the internal message channel.
     receiver: kanal::Receiver<AppMsg>,
-    /// Optional extension host for forwarding processed messages.
-    ext_host: Option<ExtensionHostService>,
+    /// Optional actor host for forwarding processed messages.
+    actor_host: Option<ActorHostService>,
 }
 
 impl std::fmt::Debug for AppCore {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AppCore")
             .field("state", &self.state)
-            .field("ext_host", &self.ext_host)
+            .field("actor_host", &self.actor_host)
             .finish_non_exhaustive()
     }
 }
@@ -50,7 +59,7 @@ impl AppCore {
     ///
     /// The caller registers components on the returned bus via
     /// [`Bus::register_command_handler`] / [`Bus::register_event_handler`],
-    /// and optionally sets the extension host via [`Self::set_ext_host`].
+    /// and optionally sets the actor host via [`Self::set_actor_host`].
     #[must_use]
     pub fn new() -> Self {
         let (sender, receiver) = kanal::unbounded();
@@ -59,7 +68,7 @@ impl AppCore {
             state: State::new(AppState::new()),
             sender,
             receiver,
-            ext_host: None,
+            actor_host: None,
         }
     }
 
@@ -69,18 +78,18 @@ impl AppCore {
         self.sender.clone()
     }
 
-    /// Sets the extension host service.
+    /// Sets the actor host service.
     ///
-    /// `AppCore` holds its own [`ExtensionHostService`] so that [`tick()`](Self::tick)
+    /// `AppCore` holds its own [`ActorHostService`] so that [`tick()`](Self::tick)
     /// can forward processed messages without depending on the [`Services`](nullslop_services::Services) container.
-    pub fn set_ext_host(&mut self, svc: ExtensionHostService) {
-        self.ext_host = Some(svc);
+    pub fn set_actor_host(&mut self, svc: ActorHostService) {
+        self.actor_host = Some(svc);
     }
 
-    /// Returns a reference to the extension host, if set.
+    /// Returns a reference to the actor host, if set.
     #[must_use]
-    pub fn ext_host(&self) -> Option<&ExtensionHostService> {
-        self.ext_host.as_ref()
+    pub fn actor_host(&self) -> Option<&ActorHostService> {
+        self.actor_host.as_ref()
     }
 
     /// Submits a command to the core's message channel.
@@ -98,7 +107,7 @@ impl AppCore {
     ///
     /// Drains all available [`AppMsg`] values from the internal channel,
     /// routes them, processes the bus (commands then events), and forwards
-    /// processed events to the extension host.
+    /// processed events to the actor host.
     ///
     /// Returns a [`TickResult`] indicating whether quit was requested and
     /// whether any work was performed.
@@ -115,12 +124,6 @@ impl AppCore {
                 AppMsg::Event { event, source } => {
                     self.bus.submit_event_from(event, source);
                 }
-                AppMsg::ExtensionsReady(registrations) => {
-                    for reg in registrations {
-                        self.state.write().extensions_mut().register(reg);
-                    }
-                    tracing::info!("extensions ready");
-                }
             }
         }
 
@@ -134,10 +137,10 @@ impl AppCore {
             self.bus.process_events(&mut guard);
         }
 
-        // Forward processed items to extension host.
+        // Forward processed items to actor host.
         let (events, commands) = self.bus.drain_all();
-        self.forward_events_to_ext_host(&events);
-        self.forward_commands_to_ext_host(&commands);
+        self.forward_events_to_actor_host(&events);
+        self.forward_commands_to_actor_host(&commands);
 
         TickResult {
             should_quit: self.state.read().should_quit,
@@ -145,31 +148,67 @@ impl AppCore {
         }
     }
 
-    /// Forwards drained bus items to the extension host via `forward`.
+    /// Forwards drained events to the actor host.
     ///
-    /// No-op when no extension host is set or `items` is empty.
-    /// Forwards drained events to the extension host.
-    ///
-    /// No-op when no extension host is set.
-    fn forward_events_to_ext_host(&self, items: &[nullslop_component_core::bus::ProcessedEvent]) {
-        if let Some(ext) = &self.ext_host {
+    /// No-op when no actor host is set.
+    fn forward_events_to_actor_host(&self, items: &[nullslop_component_core::bus::ProcessedEvent]) {
+        if let Some(host) = &self.actor_host {
             for item in items {
-                ext.send_event(&item.event, item.source.as_ref());
+                host.send_event(&item.event, item.source.as_ref());
             }
         }
     }
 
-    /// Forwards drained commands to the extension host.
+    /// Forwards drained commands to the actor host.
     ///
-    /// No-op when no extension host is set.
-    fn forward_commands_to_ext_host(
+    /// No-op when no actor host is set.
+    fn forward_commands_to_actor_host(
         &self,
         items: &[nullslop_component_core::bus::ProcessedCommand],
     ) {
-        if let Some(ext) = &self.ext_host {
+        if let Some(host) = &self.actor_host {
             for item in items {
-                ext.send_command(&item.command, item.source.as_ref());
+                host.send_command(&item.command, item.source.as_ref());
             }
+        }
+    }
+
+    /// Runs coordinated shutdown of the actor system.
+    ///
+    /// 1. Marks shutdown active on the tracker.
+    /// 2. Sends `EventApplicationShuttingDown` to all actors.
+    /// 3. Tick loop: drains actor events through the bus until the shutdown
+    ///    tracker reports complete or the timeout expires.
+    /// 4. Joins actor tasks via the host.
+    ///
+    /// Pass the default timeout with [`SHUTDOWN_TIMEOUT`] or a custom duration.
+    pub fn coordinated_shutdown(
+        &mut self,
+        actor_host: &dyn nullslop_actor_host::ActorHost,
+        timeout: Duration,
+    ) {
+        // 1. Mark shutdown active.
+        self.state.write().shutdown_tracker.shutdown_active = true;
+
+        // 2. Send ApplicationShuttingDown to all actors.
+        actor_host.send_event(&nullslop_protocol::Event::ApplicationShuttingDown, None);
+
+        // 3. Tick loop: drain actor events through bus until tracker complete or timeout.
+        let start = Instant::now();
+        loop {
+            self.tick();
+            if self.state.read().shutdown_tracker.is_complete() {
+                break;
+            }
+            if start.elapsed() > timeout {
+                break;
+            }
+            std::thread::sleep(SHUTDOWN_TICK_INTERVAL);
+        }
+
+        // 4. Join actor tasks.
+        if let Err(e) = actor_host.shutdown() {
+            tracing::error!(err = ?e, "actor host shutdown error");
         }
     }
 
@@ -177,7 +216,7 @@ impl AppCore {
     fn route_command(
         &mut self,
         cmd: nullslop_protocol::Command,
-        source: Option<nullslop_protocol::ExtensionName>,
+        source: Option<nullslop_protocol::ActorName>,
     ) {
         self.bus.submit_command_from(cmd, source);
     }
@@ -213,32 +252,12 @@ mod tests {
         nullslop_component::register_all(&mut core.bus, &mut registry);
 
         // When submitting a quit command and ticking.
-        core.submit_command(nullslop_protocol::Command::AppQuit);
+        core.submit_command(nullslop_protocol::Command::Quit);
         let result = core.tick();
 
         // Then should_quit is true and work was done.
         assert!(result.should_quit);
         assert!(result.did_work);
-    }
-
-    #[test]
-    fn tick_processes_extensions_ready() {
-        // Given an AppCore.
-        let mut core = AppCore::new();
-
-        // When sending ExtensionsReady with a registration.
-        let _ = core
-            .sender()
-            .send(AppMsg::ExtensionsReady(vec![crate::RegisteredExtension {
-                name: "test-ext".to_string(),
-                commands: vec!["echo".to_string()],
-                subscriptions: vec![],
-            }]));
-        core.tick();
-
-        // Then the extension is registered in state.
-        let guard = core.state.read();
-        assert_eq!(guard.extensions().extensions().len(), 1);
     }
 
     #[test]
@@ -262,9 +281,9 @@ mod tests {
         nullslop_component::register_all(&mut core.bus, &mut registry);
         core.state.write().mode = Mode::Input;
 
-        // When submitting ChatBoxInsertChar and ticking.
-        core.submit_command(nullslop_protocol::Command::ChatBoxInsertChar {
-            payload: nullslop_protocol::command::ChatBoxInsertChar { ch: 'x' },
+        // When submitting InsertChar and ticking.
+        core.submit_command(nullslop_protocol::Command::InsertChar {
+            payload: nullslop_protocol::chat_input::InsertChar { ch: 'x' },
         });
         core.tick();
 

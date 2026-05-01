@@ -6,7 +6,7 @@ mod command;
 use serde::{Deserialize, Serialize};
 
 pub use active_tab::ActiveTab;
-pub use command::AppSwitchTab;
+pub use command::SwitchTab;
 
 /// Direction for tab cycling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -1,10 +1,11 @@
 //! Command types for the component command pipeline.
 //!
 //! The [`Command`] enum is the unified type the host uses to receive and
-//! dispatch instructions from both internal handlers and extensions.
+//! dispatch instructions from both internal handlers and actors.
 //!
 //! Individual command structs live in domain modules ([`chat_input`], [`system`],
-//! [`custom`], [`extension`], [`provider`], [`tab`]). This module re-exports them for convenience.
+//! [`custom`], [`actor`], [`provider`], [`tab`]). Consumers import structs
+//! directly from those modules — this facade only re-exports infrastructure types.
 //!
 //! # When adding a new command
 //!
@@ -14,23 +15,19 @@
 
 use serde::{Deserialize, Serialize};
 
-// Re-export command structs and trait from domain modules.
-pub use crate::chat_input::{
-    ChatBoxClear, ChatBoxDeleteGrapheme, ChatBoxDeleteGraphemeForward, ChatBoxInsertChar,
-    ChatBoxMoveCursorLeft, ChatBoxMoveCursorRight, ChatBoxMoveCursorToEnd,
-    ChatBoxMoveCursorToStart, ChatBoxMoveCursorWordLeft, ChatBoxMoveCursorWordRight,
-    ChatBoxSubmitMessage,
-};
-pub use crate::custom::{CommandMsg, CustomCommand};
-pub use crate::system::EchoCommand;
-pub use crate::extension::ProceedWithShutdown;
-pub use crate::provider::{ProviderCancelStream, ProviderSendMessage};
-pub use crate::system::{AppEditInput, AppQuit, AppSetMode, AppToggleWhichKey};
-pub use crate::tab::{AppSwitchTab, TabDirection};
+// Re-export infrastructure types only. Domain structs are imported from their modules.
+pub use crate::custom::CommandMsg;
+
+// Internal imports for enum definition and Display impl.
+use crate::actor::ProceedWithShutdown;
+use crate::chat_input::{InsertChar, PushChatEntry, SubmitMessage};
+use crate::provider::SendMessage;
+use crate::system::SetMode;
+use crate::tab::SwitchTab;
 
 /// Every command the host can receive.
 ///
-/// Extensions and internal handlers produce these; the host dispatches
+/// Actors and internal handlers produce these; the host dispatches
 /// them to the appropriate domain handler.
 ///
 /// **When adding a new command struct**, you must add a corresponding variant to
@@ -40,90 +37,90 @@ pub use crate::tab::{AppSwitchTab, TabDirection};
 #[serde(tag = "type")]
 pub enum Command {
     /// Insert a character into the chat input buffer.
-    #[serde(rename = "chat_box_insert_char")]
-    ChatBoxInsertChar {
+    #[serde(rename = "insert_char")]
+    InsertChar {
         /// Details of the character to insert.
         #[serde(flatten)]
-        payload: ChatBoxInsertChar,
+        payload: InsertChar,
     },
     /// Delete the last grapheme from the chat input buffer.
-    #[serde(rename = "chat_box_delete_grapheme")]
-    ChatBoxDeleteGrapheme,
+    #[serde(rename = "delete_grapheme")]
+    DeleteGrapheme,
     /// Submit the chat input buffer as a message.
-    #[serde(rename = "chat_box_submit_message")]
-    ChatBoxSubmitMessage {
+    #[serde(rename = "submit_message")]
+    SubmitMessage {
         /// The message being submitted.
         #[serde(flatten)]
-        payload: ChatBoxSubmitMessage,
+        payload: SubmitMessage,
     },
     /// Clear the chat input buffer.
-    #[serde(rename = "chat_box_clear")]
-    ChatBoxClear,
+    #[serde(rename = "clear")]
+    Clear,
     /// Move the cursor one grapheme to the left.
-    #[serde(rename = "chat_box_move_cursor_left")]
-    ChatBoxMoveCursorLeft,
+    #[serde(rename = "move_cursor_left")]
+    MoveCursorLeft,
     /// Move the cursor one grapheme to the right.
-    #[serde(rename = "chat_box_move_cursor_right")]
-    ChatBoxMoveCursorRight,
+    #[serde(rename = "move_cursor_right")]
+    MoveCursorRight,
     /// Move the cursor to the beginning of the input buffer.
-    #[serde(rename = "chat_box_move_cursor_to_start")]
-    ChatBoxMoveCursorToStart,
+    #[serde(rename = "move_cursor_to_start")]
+    MoveCursorToStart,
     /// Move the cursor to the end of the input buffer.
-    #[serde(rename = "chat_box_move_cursor_to_end")]
-    ChatBoxMoveCursorToEnd,
+    #[serde(rename = "move_cursor_to_end")]
+    MoveCursorToEnd,
     /// Delete the grapheme after the cursor (forward delete).
-    #[serde(rename = "chat_box_delete_grapheme_forward")]
-    ChatBoxDeleteGraphemeForward,
+    #[serde(rename = "delete_grapheme_forward")]
+    DeleteGraphemeForward,
     /// Move the cursor one word to the left.
-    #[serde(rename = "chat_box_move_cursor_word_left")]
-    ChatBoxMoveCursorWordLeft,
+    #[serde(rename = "move_cursor_word_left")]
+    MoveCursorWordLeft,
     /// Move the cursor one word to the right.
-    #[serde(rename = "chat_box_move_cursor_word_right")]
-    ChatBoxMoveCursorWordRight,
+    #[serde(rename = "move_cursor_word_right")]
+    MoveCursorWordRight,
     /// Set the application interaction mode.
-    #[serde(rename = "app_set_mode")]
-    AppSetMode {
+    #[serde(rename = "set_mode")]
+    SetMode {
         /// The target mode.
         #[serde(flatten)]
-        payload: AppSetMode,
+        payload: SetMode,
     },
     /// Quit the application.
-    #[serde(rename = "app_quit")]
-    AppQuit,
+    #[serde(rename = "quit")]
+    Quit,
     /// Open an external editor for the input buffer.
-    #[serde(rename = "app_edit_input")]
-    AppEditInput,
+    #[serde(rename = "edit_input")]
+    EditInput,
     /// Toggle the which-key popup.
-    #[serde(rename = "app_toggle_which_key")]
-    AppToggleWhichKey,
+    #[serde(rename = "toggle_which_key")]
+    ToggleWhichKey,
     /// Switch to a different tab.
-    #[serde(rename = "app_switch_tab")]
-    AppSwitchTab {
+    #[serde(rename = "switch_tab")]
+    SwitchTab {
         /// The tab to switch to.
         #[serde(flatten)]
-        payload: AppSwitchTab,
+        payload: SwitchTab,
     },
     /// Send a message to the AI provider.
-    #[serde(rename = "provider_send_message")]
-    ProviderSendMessage {
+    #[serde(rename = "send_message")]
+    SendMessage {
         /// The message to send.
         #[serde(flatten)]
-        payload: ProviderSendMessage,
+        payload: SendMessage,
     },
     /// Cancel the active provider stream.
-    #[serde(rename = "provider_cancel_stream")]
-    ProviderCancelStream,
-    /// A custom command from an extension.
-    #[serde(rename = "custom_command")]
-    CustomCommand {
-        /// The extension-defined command name and arguments.
+    #[serde(rename = "cancel_stream")]
+    CancelStream,
+    /// Push a chat entry into the conversation history.
+    #[serde(rename = "push_chat_entry")]
+    PushChatEntry {
+        /// The chat entry to add.
         #[serde(flatten)]
-        payload: CustomCommand,
+        payload: PushChatEntry,
     },
-    /// Proceed with shutdown after extension coordination.
+    /// Proceed with shutdown after actor coordination.
     #[serde(rename = "proceed_with_shutdown")]
     ProceedWithShutdown {
-        /// Which extensions finished or timed out.
+        /// Which actors finished or timed out.
         #[serde(flatten)]
         payload: ProceedWithShutdown,
     },
@@ -132,25 +129,25 @@ pub enum Command {
 impl std::fmt::Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Command::ChatBoxInsertChar { payload } => write!(f, "insert '{}'", payload.ch),
-            Command::ChatBoxDeleteGrapheme => write!(f, "delete"),
-            Command::ChatBoxSubmitMessage { .. } => write!(f, "submit chat"),
-            Command::ChatBoxClear => write!(f, "clear"),
-            Command::ChatBoxMoveCursorLeft => write!(f, "cursor left"),
-            Command::ChatBoxMoveCursorRight => write!(f, "cursor right"),
-            Command::ChatBoxMoveCursorToStart => write!(f, "cursor home"),
-            Command::ChatBoxMoveCursorToEnd => write!(f, "cursor end"),
-            Command::ChatBoxDeleteGraphemeForward => write!(f, "forward delete"),
-            Command::ChatBoxMoveCursorWordLeft => write!(f, "cursor word left"),
-            Command::ChatBoxMoveCursorWordRight => write!(f, "cursor word right"),
-            Command::AppSetMode { payload } => write!(f, "set mode {:?}", payload.mode),
-            Command::AppQuit => write!(f, "quit"),
-            Command::AppEditInput => write!(f, "edit in $EDITOR"),
-            Command::AppToggleWhichKey => write!(f, "toggle which-key"),
-            Command::AppSwitchTab { payload } => write!(f, "switch tab {:?}", payload.direction),
-            Command::ProviderSendMessage { .. } => write!(f, "send message"),
-            Command::ProviderCancelStream => write!(f, "cancel stream"),
-            Command::CustomCommand { payload } => write!(f, "{}", payload.name),
+            Command::InsertChar { payload } => write!(f, "insert '{}'", payload.ch),
+            Command::DeleteGrapheme => write!(f, "delete"),
+            Command::SubmitMessage { .. } => write!(f, "submit chat"),
+            Command::Clear => write!(f, "clear"),
+            Command::MoveCursorLeft => write!(f, "cursor left"),
+            Command::MoveCursorRight => write!(f, "cursor right"),
+            Command::MoveCursorToStart => write!(f, "cursor home"),
+            Command::MoveCursorToEnd => write!(f, "cursor end"),
+            Command::DeleteGraphemeForward => write!(f, "forward delete"),
+            Command::MoveCursorWordLeft => write!(f, "cursor word left"),
+            Command::MoveCursorWordRight => write!(f, "cursor word right"),
+            Command::SetMode { payload } => write!(f, "set mode {:?}", payload.mode),
+            Command::Quit => write!(f, "quit"),
+            Command::EditInput => write!(f, "edit in $EDITOR"),
+            Command::ToggleWhichKey => write!(f, "toggle which-key"),
+            Command::SwitchTab { payload } => write!(f, "switch tab {:?}", payload.direction),
+            Command::SendMessage { .. } => write!(f, "send message"),
+            Command::CancelStream => write!(f, "cancel stream"),
+            Command::PushChatEntry { .. } => write!(f, "push chat entry"),
             Command::ProceedWithShutdown { payload } => {
                 write!(
                     f,
@@ -170,73 +167,52 @@ mod tests {
 
     #[test]
     fn command_insert_char_serialization() {
-        // Given a ChatBoxInsertChar command.
-        let cmd = Command::ChatBoxInsertChar {
-            payload: ChatBoxInsertChar { ch: 'a' },
+        // Given an InsertChar command.
+        let cmd = Command::InsertChar {
+            payload: InsertChar { ch: 'a' },
         };
 
         // When serialized.
         let json = serde_json::to_string(&cmd).expect("serialize");
 
         // Then it contains the type tag and the character.
-        assert!(json.contains(r#""type":"chat_box_insert_char""#));
+        assert!(json.contains(r#""type":"insert_char""#));
         assert!(json.contains(r#""ch":"a""#));
     }
 
     #[test]
     fn command_app_quit_serialization() {
-        // Given an AppQuit command.
-        let cmd = Command::AppQuit;
+        // Given a Quit command.
+        let cmd = Command::Quit;
 
         // When serialized.
         let json = serde_json::to_string(&cmd).expect("serialize");
 
-        // Then it is {"type":"app_quit"}.
-        assert_eq!(json, r#"{"type":"app_quit"}"#);
-    }
-
-    #[test]
-    fn command_custom_serialization() {
-        // Given a CustomCommand.
-        let cmd = Command::CustomCommand {
-            payload: CustomCommand {
-                name: "echo".to_string(),
-                args: serde_json::json!({"text": "hi"}),
-            },
-        };
-
-        // When serialized and deserialized.
-        let json = serde_json::to_string(&cmd).expect("serialize");
-        let back: Command = serde_json::from_str(&json).expect("deserialize");
-
-        // Then name is preserved.
-        match back {
-            Command::CustomCommand { payload } => assert_eq!(payload.name, "echo"),
-            other => panic!("expected CustomCommand, got {other:?}"),
-        }
+        // Then it is {"type":"quit"}.
+        assert_eq!(json, r#"{"type":"quit"}"#);
     }
 
     #[rstest::rstest]
-    #[case::insert_char(Command::ChatBoxInsertChar { payload: ChatBoxInsertChar { ch: 'x' } })]
-    #[case::delete_grapheme(Command::ChatBoxDeleteGrapheme)]
-    #[case::submit_message(Command::ChatBoxSubmitMessage { payload: ChatBoxSubmitMessage { text: "hello".into() } })]
-    #[case::clear(Command::ChatBoxClear)]
-    #[case::set_mode(Command::AppSetMode { payload: AppSetMode { mode: Mode::Input } })]
-    #[case::quit(Command::AppQuit)]
-    #[case::edit_input(Command::AppEditInput)]
-    #[case::toggle_which_key(Command::AppToggleWhichKey)]
-    #[case::switch_tab(Command::AppSwitchTab { payload: AppSwitchTab { direction: crate::TabDirection::Next } })]
-    #[case::send_message(Command::ProviderSendMessage { payload: ProviderSendMessage { text: "hi".into() } })]
-    #[case::cancel_stream(Command::ProviderCancelStream)]
-    #[case::custom(Command::CustomCommand { payload: CustomCommand { name: "echo".into(), args: serde_json::json!({}) } })]
+    #[case::insert_char(Command::InsertChar { payload: InsertChar { ch: 'x' } })]
+    #[case::delete_grapheme(Command::DeleteGrapheme)]
+    #[case::submit_message(Command::SubmitMessage { payload: SubmitMessage { text: "hello".into() } })]
+    #[case::clear(Command::Clear)]
+    #[case::set_mode(Command::SetMode { payload: SetMode { mode: Mode::Input } })]
+    #[case::quit(Command::Quit)]
+    #[case::edit_input(Command::EditInput)]
+    #[case::toggle_which_key(Command::ToggleWhichKey)]
+    #[case::switch_tab(Command::SwitchTab { payload: SwitchTab { direction: crate::TabDirection::Next } })]
+    #[case::send_message(Command::SendMessage { payload: SendMessage { text: "hi".into() } })]
+    #[case::cancel_stream(Command::CancelStream)]
+    #[case::push_chat_entry(Command::PushChatEntry { payload: PushChatEntry { entry: crate::ChatEntry::user("hi") } })]
     #[case::proceed_with_shutdown(Command::ProceedWithShutdown { payload: ProceedWithShutdown { completed: vec!["ext-a".into()], timed_out: vec!["ext-b".into()] } })]
-    #[case::move_cursor_left(Command::ChatBoxMoveCursorLeft)]
-    #[case::move_cursor_right(Command::ChatBoxMoveCursorRight)]
-    #[case::move_cursor_to_start(Command::ChatBoxMoveCursorToStart)]
-    #[case::move_cursor_to_end(Command::ChatBoxMoveCursorToEnd)]
-    #[case::delete_forward(Command::ChatBoxDeleteGraphemeForward)]
-    #[case::move_cursor_word_left(Command::ChatBoxMoveCursorWordLeft)]
-    #[case::move_cursor_word_right(Command::ChatBoxMoveCursorWordRight)]
+    #[case::move_cursor_left(Command::MoveCursorLeft)]
+    #[case::move_cursor_right(Command::MoveCursorRight)]
+    #[case::move_cursor_to_start(Command::MoveCursorToStart)]
+    #[case::move_cursor_to_end(Command::MoveCursorToEnd)]
+    #[case::delete_forward(Command::DeleteGraphemeForward)]
+    #[case::move_cursor_word_left(Command::MoveCursorWordLeft)]
+    #[case::move_cursor_word_right(Command::MoveCursorWordRight)]
     fn command_roundtrip_all_variants(#[case] cmd: Command) {
         // Given a command variant.
         let json = serde_json::to_string(&cmd).expect("serialize");

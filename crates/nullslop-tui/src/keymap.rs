@@ -5,9 +5,9 @@
 //! [`nullslop_protocol::KeyEvent`] so the keymap works in both TUI and headless modes.
 
 use derive_more::Display;
-use nullslop_protocol::command::{
-    AppSetMode, AppSwitchTab, ChatBoxInsertChar, ChatBoxSubmitMessage,
-};
+use nullslop_protocol::chat_input::{InsertChar, SubmitMessage};
+use nullslop_protocol::system::SetMode;
+use nullslop_protocol::tab::SwitchTab;
 use nullslop_protocol::{Command, Mode, TabDirection};
 use nullslop_protocol::{Key, KeyEvent};
 use ratatui_which_key::Keymap;
@@ -33,31 +33,31 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
     keymap
         // Normal scope: navigation and commands
         .scope(Scope::Normal, |b| {
-            b.bind("i", Command::AppSetMode { payload: AppSetMode { mode: Mode::Input } }, KeyCategory::General)
-            .bind("q", Command::AppQuit, KeyCategory::General)
-            .bind("?", Command::AppToggleWhichKey, KeyCategory::General)
-            .bind("<c-e>", Command::AppEditInput, KeyCategory::Input)
-            .bind("<c-h>", Command::AppSwitchTab { payload: AppSwitchTab { direction: TabDirection::Prev } }, KeyCategory::General)
-            .bind("<c-l>", Command::AppSwitchTab { payload: AppSwitchTab { direction: TabDirection::Next } }, KeyCategory::General);
+            b.bind("i", Command::SetMode { payload: SetMode { mode: Mode::Input } }, KeyCategory::General)
+            .bind("q", Command::Quit, KeyCategory::General)
+            .bind("?", Command::ToggleWhichKey, KeyCategory::General)
+            .bind("<c-e>", Command::EditInput, KeyCategory::Input)
+            .bind("<c-h>", Command::SwitchTab { payload: SwitchTab { direction: TabDirection::Prev } }, KeyCategory::General)
+            .bind("<c-l>", Command::SwitchTab { payload: SwitchTab { direction: TabDirection::Next } }, KeyCategory::General);
         })
         // Input scope: typing into the input buffer
         .scope(Scope::Input, |b| {
-            b.bind("<enter>", Command::ChatBoxSubmitMessage { payload: ChatBoxSubmitMessage { text: String::new() } }, KeyCategory::Input)
-            .bind("<esc>", Command::AppSetMode { payload: AppSetMode { mode: Mode::Normal } }, KeyCategory::General)
-            .bind("<c-e>", Command::AppEditInput, KeyCategory::Input)
-            .bind("<f1>", Command::AppToggleWhichKey, KeyCategory::General)
-            .bind("<backspace>", Command::ChatBoxDeleteGrapheme, KeyCategory::Input)
-            .bind("<left>", Command::ChatBoxMoveCursorLeft, KeyCategory::Input)
-            .bind("<right>", Command::ChatBoxMoveCursorRight, KeyCategory::Input)
-            .bind("<home>", Command::ChatBoxMoveCursorToStart, KeyCategory::Input)
-            .bind("<end>", Command::ChatBoxMoveCursorToEnd, KeyCategory::Input)
-            .bind("<delete>", Command::ChatBoxDeleteGraphemeForward, KeyCategory::Input)
-            .bind("<c-left>", Command::ChatBoxMoveCursorWordLeft, KeyCategory::Input)
-            .bind("<c-right>", Command::ChatBoxMoveCursorWordRight, KeyCategory::Input)
+            b.bind("<enter>", Command::SubmitMessage { payload: SubmitMessage { text: String::new() } }, KeyCategory::Input)
+            .bind("<esc>", Command::SetMode { payload: SetMode { mode: Mode::Normal } }, KeyCategory::General)
+            .bind("<c-e>", Command::EditInput, KeyCategory::Input)
+            .bind("<f1>", Command::ToggleWhichKey, KeyCategory::General)
+            .bind("<backspace>", Command::DeleteGrapheme, KeyCategory::Input)
+            .bind("<left>", Command::MoveCursorLeft, KeyCategory::Input)
+            .bind("<right>", Command::MoveCursorRight, KeyCategory::Input)
+            .bind("<home>", Command::MoveCursorToStart, KeyCategory::Input)
+            .bind("<end>", Command::MoveCursorToEnd, KeyCategory::Input)
+            .bind("<delete>", Command::DeleteGraphemeForward, KeyCategory::Input)
+            .bind("<c-left>", Command::MoveCursorWordLeft, KeyCategory::Input)
+            .bind("<c-right>", Command::MoveCursorWordRight, KeyCategory::Input)
             .catch_all(|key: KeyEvent| {
                 if let Key::Char(c) = key.key {
-                    Some(Command::ChatBoxInsertChar {
-                        payload: ChatBoxInsertChar { ch: c },
+                    Some(Command::InsertChar {
+                        payload: InsertChar { ch: c },
                     })
                 } else {
                     None

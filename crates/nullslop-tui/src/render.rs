@@ -4,7 +4,7 @@ use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::widgets::{Paragraph, Wrap};
-use ratatui_tabs::{TabsBar, TabsStyle, TabManager};
+use ratatui_tabs::{TabManager, TabsBar, TabsStyle};
 use ratatui_which_key::{PopupPosition, WhichKey};
 
 use crate::TuiApp;

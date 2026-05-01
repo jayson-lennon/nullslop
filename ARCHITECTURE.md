@@ -1,6 +1,6 @@
 # Architecture
 
-nullslop is a TUI chat application built on a component system with an extension bridge. Components are synchronous and have direct access to shared state. Extensions are asynchronous processes that communicate only via messages.
+nullslop is a TUI chat application built on a component system with an actor bridge. Components are synchronous and have direct access to shared state. Actors are asynchronous processes that communicate only via messages.
 
 ## Data Flow
 
@@ -11,7 +11,7 @@ nullslop is a TUI chat application built on a component system with an extension
   +---- Bus (sync loop) ----------------------+    +-- AppState (single source of truth) --+
   |                                           |    |                                       |
   |  dispatch --> component handlers          |    |  component handlers read/write here   |
-  |                extension host             |    |              |                        |
+  |                actor host                 |    |              |                        |
   |                    |                      |    |              v                        |
   |                    v                      |    |         state mutated                 |
   |               Out buffer                  |    |              |                        |
@@ -86,27 +86,27 @@ pub struct AppState {
 }
 ```
 
-`State` (in `nullslop-core`) wraps `AppState` and the extension registry in an `RwLock` for cross-thread access. The processing loop acquires a write lock, processes all pending commands and events, then releases it.
+`State` (in `nullslop-core`) wraps `AppState` and the actor registry in an `RwLock` for cross-thread access. The processing loop acquires a write lock, processes all pending commands and events, then releases it.
 
 ### Rendering
 
 UI elements implement `UiElement<AppState>` from `nullslop-component-ui`. They read `AppState` and draw to a ratatui `Frame`. Elements don't know about the bus or handlers — they just read state and draw stuff.
 
-## Extensions
+## Actors
 
-Extensions run asynchronously on separate threads or processes. They cannot access `AppState` — they communicate only through the command/event message protocol.
+Actors run asynchronously on separate threads or processes. They cannot access `AppState` — they communicate only through the command/event message protocol.
 
 ```
-Host (nullslop)                                  Extension process
-────────────────                                 ─────────────────
-Extension host  ---> JSON over stdin/stdout -->  Extension SDK
-(nullslop-ext-host)                              (nullslop-extension)
+Host (nullslop)                                  Actor process
+────────────────                                 ──────────────
+Actor host      ---> JSON over stdin/stdout -->  Actor SDK
+(nullslop-actor-host)                            (nullslop-actor)
 ```
 
-- **`nullslop-ext-host`** — host side: discovers extensions, manages lifecycle, bridges messages between the bus and extension processes
-- **`nullslop-extension`** — SDK for authors: provides the `Extension` trait, JSON codec, and a `run!` macro
+- **`nullslop-actor-host`** — host side: discovers actors, manages lifecycle, bridges messages between the bus and actor processes
+- **`nullslop-actor`** — SDK for authors: provides the `Actor` trait, JSON codec, and a `run!` macro
 
-Two host implementations exist: `ProcessExtensionHost` (subprocess, JSON over stdio) and `InMemoryExtensionHost` (OS thread, no serialization).
+Two host implementations exist: `ProcessActorHost` (subprocess, JSON over stdio) and `InMemoryActorHost` (OS thread, no serialization).
 
 ## Crate Structure
 
@@ -116,11 +116,11 @@ Two host implementations exist: `ProcessExtensionHost` (subprocess, JSON over st
 | `nullslop-component-core` | `CommandHandler`, `EventHandler`, `Bus`, `Out`, `define_handler!`       |
 | `nullslop-component-ui`   | `UiElement` trait, `UiRegistry` — renderable element infrastructure     |
 | `nullslop-component`      | Built-in components (chat input, chat log, quit, shutdown tracking)     |
-| `nullslop-core`           | `State` (RwLock wrapper), `AppCore` processing loop, extension registry |
+| `nullslop-core`           | `State` (RwLock wrapper), `AppCore` processing loop, actor registry |
 | `nullslop-services`       | `Services` container — runtime services shared across the application   |
 | `nullslop-tui`            | Terminal setup, event loop, keymap, renderer, top-level `TuiApp`        |
-| `nullslop-ext-host`       | Extension host implementations (process-based, in-memory)               |
-| `nullslop-extension`      | SDK for extension authors (`Extension` trait, codec, `run!` macro)      |
+| `nullslop-actor-host`    | Actor host implementations (process-based, in-memory)                    |
+| `nullslop-actor`         | SDK for actor authors (`Actor` trait, codec, `run!` macro)               |
 | `nullslop-cli`            | CLI argument parsing                                                    |
 
 ## Keymap

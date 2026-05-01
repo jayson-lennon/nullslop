@@ -5,7 +5,7 @@
 
 use crate::AppState;
 use npr::CommandAction;
-use npr::command::AppQuit;
+use npr::system::Quit;
 use nullslop_component_core::{Out, define_handler};
 use nullslop_protocol as npr;
 
@@ -13,14 +13,14 @@ define_handler! {
     pub(crate) struct AppQuitHandler;
 
     commands {
-        AppQuit: on_quit,
+        Quit: on_quit,
     }
 
     events {}
 }
 
 impl AppQuitHandler {
-    fn on_quit(_cmd: &AppQuit, state: &mut AppState, _out: &mut Out) -> CommandAction {
+    fn on_quit(_cmd: &Quit, state: &mut AppState, _out: &mut Out) -> CommandAction {
         state.should_quit = true;
         CommandAction::Stop
     }
@@ -41,8 +41,8 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         AppQuitHandler.register(&mut bus);
 
-        // When processing AppQuit.
-        bus.submit_command(Command::AppQuit);
+        // When processing Quit.
+        bus.submit_command(Command::Quit);
         let mut state = AppState::new();
         bus.process_commands(&mut state);
 

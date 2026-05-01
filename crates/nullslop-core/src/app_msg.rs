@@ -1,8 +1,6 @@
 //! Application message type for the processing loop.
 
-use nullslop_protocol::{Command, Event, ExtensionName};
-
-use crate::RegisteredExtension;
+use nullslop_protocol::{ActorName, Command, Event};
 
 /// An application message for the core processing loop.
 #[derive(Debug)]
@@ -11,16 +9,14 @@ pub enum AppMsg {
     Command {
         /// The command payload.
         command: Command,
-        /// The extension that submitted this command, if any.
-        source: Option<ExtensionName>,
+        /// The actor that submitted this command, if any.
+        source: Option<ActorName>,
     },
-    /// An event from an extension (routed through the bus).
+    /// An event from an actor (routed through the bus).
     Event {
         /// The event payload.
         event: Event,
-        /// The extension that submitted this event, if any.
-        source: Option<ExtensionName>,
+        /// The actor that submitted this event, if any.
+        source: Option<ActorName>,
     },
-    /// Extensions have completed discovery and registration.
-    ExtensionsReady(Vec<RegisteredExtension>),
 }

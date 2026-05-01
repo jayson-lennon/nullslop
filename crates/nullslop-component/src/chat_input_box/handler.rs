@@ -9,12 +9,11 @@
 
 use crate::AppState;
 use npr::CommandAction;
-use npr::command::{
-    AppSetMode, ChatBoxClear, ChatBoxDeleteGrapheme, ChatBoxDeleteGraphemeForward,
-    ChatBoxInsertChar, ChatBoxMoveCursorLeft, ChatBoxMoveCursorRight, ChatBoxMoveCursorToEnd,
-    ChatBoxMoveCursorToStart, ChatBoxMoveCursorWordLeft, ChatBoxMoveCursorWordRight,
-    ChatBoxSubmitMessage,
+use npr::chat_input::{
+    Clear, DeleteGrapheme, DeleteGraphemeForward, InsertChar, MoveCursorLeft, MoveCursorRight,
+    MoveCursorToEnd, MoveCursorToStart, MoveCursorWordLeft, MoveCursorWordRight, SubmitMessage,
 };
+use npr::system::SetMode;
 use nullslop_component_core::{Out, define_handler};
 use nullslop_protocol as npr;
 
@@ -22,35 +21,31 @@ define_handler! {
     pub(crate) struct ChatInputBoxHandler;
 
     commands {
-        ChatBoxInsertChar: on_insert_char,
-        ChatBoxDeleteGrapheme: on_delete_grapheme,
-        ChatBoxDeleteGraphemeForward: on_delete_grapheme_forward,
-        ChatBoxSubmitMessage: on_submit_message,
-        ChatBoxClear: on_clear,
-        ChatBoxMoveCursorLeft: on_move_cursor_left,
-        ChatBoxMoveCursorRight: on_move_cursor_right,
-        ChatBoxMoveCursorToStart: on_move_cursor_to_start,
-        ChatBoxMoveCursorToEnd: on_move_cursor_to_end,
-        ChatBoxMoveCursorWordLeft: on_move_cursor_word_left,
-        ChatBoxMoveCursorWordRight: on_move_cursor_word_right,
-        AppSetMode: on_set_mode,
+        InsertChar: on_insert_char,
+        DeleteGrapheme: on_delete_grapheme,
+        DeleteGraphemeForward: on_delete_grapheme_forward,
+        SubmitMessage: on_submit_message,
+        Clear: on_clear,
+        MoveCursorLeft: on_move_cursor_left,
+        MoveCursorRight: on_move_cursor_right,
+        MoveCursorToStart: on_move_cursor_to_start,
+        MoveCursorToEnd: on_move_cursor_to_end,
+        MoveCursorWordLeft: on_move_cursor_word_left,
+        MoveCursorWordRight: on_move_cursor_word_right,
+        SetMode: on_set_mode,
     }
 
     events {}
 }
 
 impl ChatInputBoxHandler {
-    fn on_insert_char(
-        cmd: &ChatBoxInsertChar,
-        state: &mut AppState,
-        _out: &mut Out,
-    ) -> CommandAction {
+    fn on_insert_char(cmd: &InsertChar, state: &mut AppState, _out: &mut Out) -> CommandAction {
         state.chat_input.insert_grapheme_at_cursor(cmd.ch);
         CommandAction::Continue
     }
 
     fn on_delete_grapheme(
-        _cmd: &ChatBoxDeleteGrapheme,
+        _cmd: &DeleteGrapheme,
         state: &mut AppState,
         _out: &mut Out,
     ) -> CommandAction {
@@ -59,35 +54,34 @@ impl ChatInputBoxHandler {
     }
 
     fn on_submit_message(
-        _cmd: &ChatBoxSubmitMessage,
+        _cmd: &SubmitMessage,
         state: &mut AppState,
         out: &mut Out,
     ) -> CommandAction {
         let text = state.chat_input.text().to_string();
         if !text.is_empty() {
             let entry = npr::ChatEntry::user(&text);
-            state.push_entry(entry.clone());
             state.chat_input.reset();
 
-            out.submit_event(npr::Event::EventChatMessageSubmitted {
-                payload: npr::event::EventChatMessageSubmitted { entry },
+            out.submit_command(npr::Command::PushChatEntry {
+                payload: npr::chat_input::PushChatEntry { entry },
             });
         }
         CommandAction::Continue
     }
 
-    fn on_clear(_cmd: &ChatBoxClear, state: &mut AppState, _out: &mut Out) -> CommandAction {
+    fn on_clear(_cmd: &Clear, state: &mut AppState, _out: &mut Out) -> CommandAction {
         state.chat_input.reset();
         CommandAction::Continue
     }
 
-    fn on_set_mode(cmd: &AppSetMode, state: &mut AppState, _out: &mut Out) -> CommandAction {
+    fn on_set_mode(cmd: &SetMode, state: &mut AppState, _out: &mut Out) -> CommandAction {
         state.mode = cmd.mode;
         CommandAction::Continue
     }
 
     fn on_move_cursor_left(
-        _cmd: &ChatBoxMoveCursorLeft,
+        _cmd: &MoveCursorLeft,
         state: &mut AppState,
         _out: &mut Out,
     ) -> CommandAction {
@@ -96,7 +90,7 @@ impl ChatInputBoxHandler {
     }
 
     fn on_move_cursor_right(
-        _cmd: &ChatBoxMoveCursorRight,
+        _cmd: &MoveCursorRight,
         state: &mut AppState,
         _out: &mut Out,
     ) -> CommandAction {
@@ -105,7 +99,7 @@ impl ChatInputBoxHandler {
     }
 
     fn on_move_cursor_to_start(
-        _cmd: &ChatBoxMoveCursorToStart,
+        _cmd: &MoveCursorToStart,
         state: &mut AppState,
         _out: &mut Out,
     ) -> CommandAction {
@@ -114,7 +108,7 @@ impl ChatInputBoxHandler {
     }
 
     fn on_move_cursor_to_end(
-        _cmd: &ChatBoxMoveCursorToEnd,
+        _cmd: &MoveCursorToEnd,
         state: &mut AppState,
         _out: &mut Out,
     ) -> CommandAction {
@@ -123,7 +117,7 @@ impl ChatInputBoxHandler {
     }
 
     fn on_delete_grapheme_forward(
-        _cmd: &ChatBoxDeleteGraphemeForward,
+        _cmd: &DeleteGraphemeForward,
         state: &mut AppState,
         _out: &mut Out,
     ) -> CommandAction {
@@ -132,7 +126,7 @@ impl ChatInputBoxHandler {
     }
 
     fn on_move_cursor_word_left(
-        _cmd: &ChatBoxMoveCursorWordLeft,
+        _cmd: &MoveCursorWordLeft,
         state: &mut AppState,
         _out: &mut Out,
     ) -> CommandAction {
@@ -141,7 +135,7 @@ impl ChatInputBoxHandler {
     }
 
     fn on_move_cursor_word_right(
-        _cmd: &ChatBoxMoveCursorWordRight,
+        _cmd: &MoveCursorWordRight,
         state: &mut AppState,
         _out: &mut Out,
     ) -> CommandAction {
@@ -154,7 +148,8 @@ impl ChatInputBoxHandler {
 mod tests {
     use crate::AppState;
     use npr::Command;
-    use npr::command::{AppSetMode, ChatBoxInsertChar, ChatBoxSubmitMessage};
+    use npr::chat_input::{InsertChar, SubmitMessage};
+    use npr::system::SetMode;
     use nullslop_component_core::Bus;
     use nullslop_protocol as npr;
 
@@ -166,9 +161,9 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
-        // When processing ChatBoxInsertChar('x').
-        bus.submit_command(Command::ChatBoxInsertChar {
-            payload: ChatBoxInsertChar { ch: 'x' },
+        // When processing InsertChar('x').
+        bus.submit_command(Command::InsertChar {
+            payload: InsertChar { ch: 'x' },
         });
         let mut state = AppState::new();
         bus.process_commands(&mut state);
@@ -184,14 +179,14 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
-        // When processing ChatBoxInsertChar('a') then ChatBoxInsertChar('b') then ChatBoxDeleteGrapheme.
-        bus.submit_command(Command::ChatBoxInsertChar {
-            payload: ChatBoxInsertChar { ch: 'a' },
+        // When processing InsertChar('a') then InsertChar('b') then DeleteGrapheme.
+        bus.submit_command(Command::InsertChar {
+            payload: InsertChar { ch: 'a' },
         });
-        bus.submit_command(Command::ChatBoxInsertChar {
-            payload: ChatBoxInsertChar { ch: 'b' },
+        bus.submit_command(Command::InsertChar {
+            payload: InsertChar { ch: 'b' },
         });
-        bus.submit_command(Command::ChatBoxDeleteGrapheme);
+        bus.submit_command(Command::DeleteGrapheme);
         let mut state = AppState::new();
         bus.process_commands(&mut state);
 
@@ -202,18 +197,19 @@ mod tests {
 
     #[test]
     fn submit_message_adds_entry_and_clears_buffer() {
-        // Given a bus with ChatInputBoxHandler registered and "hello" in buffer.
+        // Given a bus with ChatInputBoxHandler and ChatLogHandler registered and "hello" in buffer.
         let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
+        crate::chat_log::ChatLogHandler.register(&mut bus);
 
         let mut state = AppState::new();
         for ch in "hello".chars() {
             state.chat_input.insert_grapheme_at_cursor(ch);
         }
 
-        // When processing ChatBoxSubmitMessage.
-        bus.submit_command(Command::ChatBoxSubmitMessage {
-            payload: ChatBoxSubmitMessage {
+        // When processing SubmitMessage.
+        bus.submit_command(Command::SubmitMessage {
+            payload: SubmitMessage {
                 text: String::new(),
             },
         });
@@ -235,9 +231,9 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
-        // When processing ChatBoxSubmitMessage with empty buffer.
-        bus.submit_command(Command::ChatBoxSubmitMessage {
-            payload: ChatBoxSubmitMessage {
+        // When processing SubmitMessage with empty buffer.
+        bus.submit_command(Command::SubmitMessage {
+            payload: SubmitMessage {
                 text: String::new(),
             },
         });
@@ -252,18 +248,19 @@ mod tests {
 
     #[test]
     fn submit_message_emits_event() {
-        // Given a bus with ChatInputBoxHandler registered and "hello" in buffer.
+        // Given a bus with ChatInputBoxHandler and ChatLogHandler registered and "hello" in buffer.
         let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
+        crate::chat_log::ChatLogHandler.register(&mut bus);
 
         let mut state = AppState::new();
         for ch in "hello".chars() {
             state.chat_input.insert_grapheme_at_cursor(ch);
         }
 
-        // When processing ChatBoxSubmitMessage.
-        bus.submit_command(Command::ChatBoxSubmitMessage {
-            payload: ChatBoxSubmitMessage {
+        // When processing SubmitMessage.
+        bus.submit_command(Command::SubmitMessage {
+            payload: SubmitMessage {
                 text: String::new(),
             },
         });
@@ -280,7 +277,7 @@ mod tests {
         assert_eq!(processed.len(), 1);
         assert!(matches!(
             &processed[0].event,
-            npr::Event::EventChatMessageSubmitted { .. }
+            npr::Event::ChatEntrySubmitted { .. }
         ));
     }
 
@@ -295,8 +292,8 @@ mod tests {
             state.chat_input.insert_grapheme_at_cursor(ch);
         }
 
-        // When processing ChatBoxClear.
-        bus.submit_command(Command::ChatBoxClear);
+        // When processing Clear.
+        bus.submit_command(Command::Clear);
         bus.process_commands(&mut state);
 
         // Then the input buffer is empty and cursor is at 0.
@@ -310,9 +307,9 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
-        // When processing AppSetMode(Input).
-        bus.submit_command(Command::AppSetMode {
-            payload: AppSetMode {
+        // When processing SetMode(Input).
+        bus.submit_command(Command::SetMode {
+            payload: SetMode {
                 mode: npr::Mode::Input,
             },
         });
@@ -331,13 +328,13 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
-        bus.submit_command(Command::ChatBoxInsertChar {
-            payload: ChatBoxInsertChar { ch: 'a' },
+        bus.submit_command(Command::InsertChar {
+            payload: InsertChar { ch: 'a' },
         });
-        bus.submit_command(Command::ChatBoxInsertChar {
-            payload: ChatBoxInsertChar { ch: 'b' },
+        bus.submit_command(Command::InsertChar {
+            payload: InsertChar { ch: 'b' },
         });
-        bus.submit_command(Command::ChatBoxMoveCursorLeft);
+        bus.submit_command(Command::MoveCursorLeft);
 
         let mut state = AppState::new();
         bus.process_commands(&mut state);
@@ -353,14 +350,14 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
-        bus.submit_command(Command::ChatBoxInsertChar {
-            payload: ChatBoxInsertChar { ch: 'a' },
+        bus.submit_command(Command::InsertChar {
+            payload: InsertChar { ch: 'a' },
         });
-        bus.submit_command(Command::ChatBoxInsertChar {
-            payload: ChatBoxInsertChar { ch: 'b' },
+        bus.submit_command(Command::InsertChar {
+            payload: InsertChar { ch: 'b' },
         });
-        bus.submit_command(Command::ChatBoxMoveCursorLeft);
-        bus.submit_command(Command::ChatBoxMoveCursorRight);
+        bus.submit_command(Command::MoveCursorLeft);
+        bus.submit_command(Command::MoveCursorRight);
 
         let mut state = AppState::new();
         bus.process_commands(&mut state);
@@ -376,11 +373,11 @@ mod tests {
         ChatInputBoxHandler.register(&mut bus);
 
         for ch in "abc".chars() {
-            bus.submit_command(Command::ChatBoxInsertChar {
-                payload: ChatBoxInsertChar { ch },
+            bus.submit_command(Command::InsertChar {
+                payload: InsertChar { ch },
             });
         }
-        bus.submit_command(Command::ChatBoxMoveCursorToStart);
+        bus.submit_command(Command::MoveCursorToStart);
 
         let mut state = AppState::new();
         bus.process_commands(&mut state);
@@ -396,12 +393,12 @@ mod tests {
         ChatInputBoxHandler.register(&mut bus);
 
         for ch in "abc".chars() {
-            bus.submit_command(Command::ChatBoxInsertChar {
-                payload: ChatBoxInsertChar { ch },
+            bus.submit_command(Command::InsertChar {
+                payload: InsertChar { ch },
             });
         }
-        bus.submit_command(Command::ChatBoxMoveCursorToStart);
-        bus.submit_command(Command::ChatBoxMoveCursorToEnd);
+        bus.submit_command(Command::MoveCursorToStart);
+        bus.submit_command(Command::MoveCursorToEnd);
 
         let mut state = AppState::new();
         bus.process_commands(&mut state);
@@ -416,14 +413,14 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
-        bus.submit_command(Command::ChatBoxInsertChar {
-            payload: ChatBoxInsertChar { ch: 'a' },
+        bus.submit_command(Command::InsertChar {
+            payload: InsertChar { ch: 'a' },
         });
-        bus.submit_command(Command::ChatBoxInsertChar {
-            payload: ChatBoxInsertChar { ch: 'b' },
+        bus.submit_command(Command::InsertChar {
+            payload: InsertChar { ch: 'b' },
         });
-        bus.submit_command(Command::ChatBoxMoveCursorLeft);
-        bus.submit_command(Command::ChatBoxDeleteGraphemeForward);
+        bus.submit_command(Command::MoveCursorLeft);
+        bus.submit_command(Command::DeleteGraphemeForward);
 
         let mut state = AppState::new();
         bus.process_commands(&mut state);
@@ -439,10 +436,10 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
-        bus.submit_command(Command::ChatBoxInsertChar {
-            payload: ChatBoxInsertChar { ch: 'a' },
+        bus.submit_command(Command::InsertChar {
+            payload: InsertChar { ch: 'a' },
         });
-        bus.submit_command(Command::ChatBoxDeleteGraphemeForward);
+        bus.submit_command(Command::DeleteGraphemeForward);
 
         let mut state = AppState::new();
         bus.process_commands(&mut state);
@@ -458,11 +455,11 @@ mod tests {
         ChatInputBoxHandler.register(&mut bus);
 
         for ch in "hello world".chars() {
-            bus.submit_command(Command::ChatBoxInsertChar {
-                payload: ChatBoxInsertChar { ch },
+            bus.submit_command(Command::InsertChar {
+                payload: InsertChar { ch },
             });
         }
-        bus.submit_command(Command::ChatBoxMoveCursorWordLeft);
+        bus.submit_command(Command::MoveCursorWordLeft);
 
         let mut state = AppState::new();
         bus.process_commands(&mut state);
@@ -478,12 +475,12 @@ mod tests {
         ChatInputBoxHandler.register(&mut bus);
 
         for ch in "hello world".chars() {
-            bus.submit_command(Command::ChatBoxInsertChar {
-                payload: ChatBoxInsertChar { ch },
+            bus.submit_command(Command::InsertChar {
+                payload: InsertChar { ch },
             });
         }
-        bus.submit_command(Command::ChatBoxMoveCursorToStart);
-        bus.submit_command(Command::ChatBoxMoveCursorWordRight);
+        bus.submit_command(Command::MoveCursorToStart);
+        bus.submit_command(Command::MoveCursorWordRight);
 
         let mut state = AppState::new();
         bus.process_commands(&mut state);

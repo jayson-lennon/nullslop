@@ -8,7 +8,7 @@
 //!
 //! The components in this crate together provide the core chat experience:
 //! accepting user input, displaying conversation history, counting characters,
-//! processing extension commands, and coordinating a clean shutdown.
+//! processing actor commands, and coordinating a clean shutdown.
 //!
 //! # Type aliases
 //!
@@ -20,7 +20,6 @@ pub mod app_state;
 pub mod char_counter;
 pub mod chat_input_box;
 pub mod chat_log;
-pub mod custom_command;
 pub mod dashboard;
 pub mod shutdown_tracker;
 pub mod tab_nav;
@@ -45,7 +44,6 @@ pub type AppUiRegistry = UiRegistry<AppState>;
 pub fn register_all(bus: &mut AppBus, registry: &mut AppUiRegistry) {
     app_quit::register(bus, registry);
     shutdown_tracker::register(bus, registry);
-    custom_command::register(bus, registry);
     chat_input_box::register(bus, registry);
     chat_log::register(bus, registry);
     char_counter::register(bus, registry);
@@ -67,8 +65,8 @@ pub fn register_tui_elements(registry: &mut AppUiRegistry) {
 
 #[cfg(test)]
 mod macro_tests {
-    use npr::command::{AppQuit, ChatBoxInsertChar};
-    use npr::event::EventApplicationReady;
+    use npr::chat_input::InsertChar;
+    use npr::system::{ApplicationReady, Quit};
     use npr::{Command, CommandAction, Event};
     use nullslop_component_core::fake::FakeCommandHandler;
     use nullslop_component_core::{Bus, Out};
@@ -82,18 +80,14 @@ mod macro_tests {
         struct ContinueHandler;
 
         commands {
-            ChatBoxInsertChar: on_insert_char,
+            InsertChar: on_insert_char,
         }
 
         events {}
     }
 
     impl ContinueHandler {
-        fn on_insert_char(
-            cmd: &ChatBoxInsertChar,
-            state: &mut AppState,
-            _out: &mut Out,
-        ) -> CommandAction {
+        fn on_insert_char(cmd: &InsertChar, state: &mut AppState, _out: &mut Out) -> CommandAction {
             state.chat_input.insert_grapheme_at_cursor(cmd.ch);
             CommandAction::Continue
         }
@@ -105,9 +99,9 @@ mod macro_tests {
         let mut bus: Bus<AppState> = Bus::new();
         ContinueHandler.register(&mut bus);
 
-        // When submitting a ChatBoxInsertChar command.
-        bus.submit_command(Command::ChatBoxInsertChar {
-            payload: ChatBoxInsertChar { ch: 'x' },
+        // When submitting an InsertChar command.
+        bus.submit_command(Command::InsertChar {
+            payload: InsertChar { ch: 'x' },
         });
         let mut state = AppState::new();
         bus.process_commands(&mut state);
@@ -122,14 +116,14 @@ mod macro_tests {
         struct StopHandler;
 
         commands {
-            AppQuit: on_quit,
+            Quit: on_quit,
         }
 
         events {}
     }
 
     impl StopHandler {
-        fn on_quit(_cmd: &AppQuit, state: &mut AppState, _out: &mut Out) -> CommandAction {
+        fn on_quit(_cmd: &Quit, state: &mut AppState, _out: &mut Out) -> CommandAction {
             state.should_quit = true;
             CommandAction::Stop
         }
@@ -137,14 +131,14 @@ mod macro_tests {
 
     #[test]
     fn command_handler_returning_stop_prevents_later_handlers() {
-        // Given a StopHandler and a fake handler both registered for AppQuit.
+        // Given a StopHandler and a fake handler both registered for Quit.
         let mut bus: Bus<AppState> = Bus::new();
         StopHandler.register(&mut bus);
-        let (fake, fake_calls) = FakeCommandHandler::<AppQuit, AppState>::continuing();
-        bus.register_command_handler::<AppQuit, _>(fake);
+        let (fake, fake_calls) = FakeCommandHandler::<Quit, AppState>::continuing();
+        bus.register_command_handler::<Quit, _>(fake);
 
-        // When processing an AppQuit command.
-        bus.submit_command(Command::AppQuit);
+        // When processing a Quit command.
+        bus.submit_command(Command::Quit);
         let mut state = AppState::new();
         bus.process_commands(&mut state);
 
@@ -161,12 +155,12 @@ mod macro_tests {
         commands {}
 
         events {
-            EventApplicationReady: on_ready,
+            ApplicationReady: on_ready,
         }
     }
 
     impl EventHandlerTest {
-        fn on_ready(_evt: &EventApplicationReady, state: &mut AppState, _out: &mut Out) {
+        fn on_ready(_evt: &ApplicationReady, state: &mut AppState, _out: &mut Out) {
             state.should_quit = true;
         }
     }
@@ -177,8 +171,8 @@ mod macro_tests {
         let mut bus: Bus<AppState> = Bus::new();
         EventHandlerTest.register(&mut bus);
 
-        // When processing an EventApplicationReady event.
-        bus.submit_event(Event::EventApplicationReady);
+        // When processing an ApplicationReady event.
+        bus.submit_event(Event::ApplicationReady);
         let mut state = AppState::new();
         bus.process_events(&mut state);
 
@@ -193,31 +187,27 @@ mod macro_tests {
         struct MultiHandler;
 
         commands {
-            ChatBoxInsertChar: on_insert_char,
-            AppQuit: on_quit,
+            InsertChar: on_insert_char,
+            Quit: on_quit,
         }
 
         events {
-            EventApplicationReady: on_ready,
+            ApplicationReady: on_ready,
         }
     }
 
     impl MultiHandler {
-        fn on_insert_char(
-            cmd: &ChatBoxInsertChar,
-            state: &mut AppState,
-            _out: &mut Out,
-        ) -> CommandAction {
+        fn on_insert_char(cmd: &InsertChar, state: &mut AppState, _out: &mut Out) -> CommandAction {
             state.chat_input.insert_grapheme_at_cursor(cmd.ch);
             CommandAction::Continue
         }
 
-        fn on_quit(_cmd: &AppQuit, state: &mut AppState, _out: &mut Out) -> CommandAction {
+        fn on_quit(_cmd: &Quit, state: &mut AppState, _out: &mut Out) -> CommandAction {
             state.should_quit = true;
             CommandAction::Continue
         }
 
-        fn on_ready(_evt: &EventApplicationReady, state: &mut AppState, _out: &mut Out) {
+        fn on_ready(_evt: &ApplicationReady, state: &mut AppState, _out: &mut Out) {
             state.chat_input.insert_grapheme_at_cursor('!');
         }
     }
@@ -228,9 +218,9 @@ mod macro_tests {
         let mut bus: Bus<AppState> = Bus::new();
         MultiHandler.register(&mut bus);
 
-        // When processing a ChatBoxInsertChar command.
-        bus.submit_command(Command::ChatBoxInsertChar {
-            payload: ChatBoxInsertChar { ch: 'h' },
+        // When processing an InsertChar command.
+        bus.submit_command(Command::InsertChar {
+            payload: InsertChar { ch: 'h' },
         });
         let mut state = AppState::new();
         bus.process_commands(&mut state);
@@ -239,15 +229,15 @@ mod macro_tests {
         assert_eq!(state.chat_input.text(), "h");
         assert!(!state.should_quit);
 
-        // When also processing AppQuit.
-        bus.submit_command(Command::AppQuit);
+        // When also processing Quit.
+        bus.submit_command(Command::Quit);
         bus.process_commands(&mut state);
 
         // Then should_quit is now true.
         assert!(state.should_quit);
 
-        // When processing an EventApplicationReady.
-        bus.submit_event(Event::EventApplicationReady);
+        // When processing an ApplicationReady.
+        bus.submit_event(Event::ApplicationReady);
         bus.process_events(&mut state);
 
         // Then the event handler ran (chat_input.text() has "h!").

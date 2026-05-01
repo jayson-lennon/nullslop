@@ -13,6 +13,7 @@ serde_json = { workspace = true }
 jiff = { workspace = true }
 derive_more = { workspace = true }
 ratatui-which-key = { workspace = true, optional = true }
+nullslop-protocol-derive = { workspace = true }
 
 [dev-dependencies]
 rstest = { workspace = true }

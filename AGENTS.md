@@ -73,13 +73,13 @@ use std::sync::Arc;
 use derive_more::Debug;
 
 #[derive(Debug, Clone)]
-pub struct ExtensionHostService {
-    #[debug("ExtensionHost<{}>", self.backend.name())]
-    host: Arc<dyn ExtensionHost>,
+pub struct ActorHostService {
+    #[debug("ActorHost<{}>", self.backend.name())]
+    host: Arc<dyn ActorHost>,
 }
 
-impl ExtensionHostService {
-    pub fn new(host: Arc<dyn ExtensionHost>) -> Self {
+impl ActorHostService {
+    pub fn new(host: Arc<dyn ActorHost>) -> Self {
         Self { host }
     }
 }
@@ -96,7 +96,7 @@ impl ExtensionHostService {
 **Workspace organization:**
 
 ```
-Cargo.toml          # Workspace with members = ["crates/*", "extensions/*"]
+Cargo.toml          # Workspace with members = ["crates/*", "actors/*"]
 crates/
   nullslop/            # Main binary crate
     src/
@@ -107,14 +107,14 @@ crates/
   nullslop-component-core/  # Bus, handler traits, define_handler! macro
   nullslop-component-ui/    # UiElement trait, UiRegistry
   nullslop-component/       # Built-in components (chat input, chat log, quit, etc.)
-  nullslop-core/       # State wrapper, AppCore loop, extension registry
+  nullslop-core/       # State wrapper, AppCore loop, actor registry
   nullslop-services/   # Services container (runtime dependencies)
   nullslop-tui/        # Terminal, renderer, keymap, event loop
-  nullslop-ext-host/   # Extension host implementations
-  nullslop-extension/  # Extension author SDK
+  nullslop-actor-host/   # Actor host implementations
+  nullslop-actor/        # Actor author SDK
   nullslop-cli/        # CLI argument parsing
-extensions/
-  nullslop-echo/       # Example echo extension
+actors/
+  nullslop-echo/       # Example echo actor
 ```
 
 **Component module pattern (under `nullslop-component/src/`):**
@@ -137,7 +137,7 @@ Not every component needs all four files. A display-only component (like chat lo
 #[derive(Debug, Clone)]
 pub struct Services {
     handle: Handle,
-    ext_host: ExtensionHostService,
+    actor_host: ActorHostService,
 }
 ```
 
@@ -217,11 +217,11 @@ For edge cases that don't easily fit into "expected", prefer a BDD-styled test i
 
 ```rust
 #[tokio::test]
-async fn extension_host_loads_manifest() {
-    // Given an in-memory extension host.
-    let host = InMemoryExtensionHost::new();
+async fn actor_host_loads_manifest() {
+    // Given an in-memory actor host.
+    let host = InMemoryActorHost::new();
 
-    // When loading extensions.
+    // When loading actors.
     let result = host.discover().await;
 
     // Then discovery succeeds.

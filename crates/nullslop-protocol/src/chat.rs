@@ -1,7 +1,7 @@
 //! Conversation data model for the chat log.
 //!
 //! Each [`ChatEntry`] records a timestamped message from the user,
-//! the system, or an extension.
+//! the system, or an actor.
 
 use serde::{Deserialize, Serialize};
 
@@ -21,9 +21,9 @@ pub enum ChatEntryKind {
     User(String),
     /// A system-generated message (status updates, etc.).
     System(String),
-    /// A message from an extension, identified by source name.
-    Extension {
-        /// The name of the extension that produced this entry.
+    /// A message from an actor, identified by source name.
+    Actor {
+        /// The name of the actor that produced this entry.
         source: String,
         /// The message text.
         text: String,
@@ -49,12 +49,12 @@ impl ChatEntry {
         }
     }
 
-    /// Create a new extension chat entry with the current timestamp.
+    /// Create a new actor chat entry with the current timestamp.
     #[must_use]
-    pub fn extension(source: impl Into<String>, text: impl Into<String>) -> Self {
+    pub fn actor(source: impl Into<String>, text: impl Into<String>) -> Self {
         Self {
             timestamp: jiff::Timestamp::now(),
-            kind: ChatEntryKind::Extension {
+            kind: ChatEntryKind::Actor {
                 source: source.into(),
                 text: text.into(),
             },
@@ -119,18 +119,18 @@ mod tests {
     }
 
     #[test]
-    fn extension_entry_has_extension_kind() {
+    fn actor_entry_has_actor_kind() {
         // Given source "nullslop-echo" and text "HELLO".
         let source = "nullslop-echo";
         let text = "HELLO";
 
-        // When creating an extension entry.
-        let entry = ChatEntry::extension(source, text);
+        // When creating an actor entry.
+        let entry = ChatEntry::actor(source, text);
 
-        // Then kind is Extension with correct source and text.
+        // Then kind is Actor with correct source and text.
         assert_eq!(
             entry.kind,
-            ChatEntryKind::Extension {
+            ChatEntryKind::Actor {
                 source: "nullslop-echo".to_string(),
                 text: "HELLO".to_string(),
             }
@@ -138,9 +138,9 @@ mod tests {
     }
 
     #[test]
-    fn extension_entry_serialization_roundtrip() {
-        // Given an extension ChatEntry.
-        let entry = ChatEntry::extension("nullslop-echo", "hello");
+    fn actor_entry_serialization_roundtrip() {
+        // Given an actor ChatEntry.
+        let entry = ChatEntry::actor("nullslop-echo", "hello");
 
         // When serialized and deserialized.
         let json = serde_json::to_string(&entry).expect("serialize");

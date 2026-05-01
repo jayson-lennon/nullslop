@@ -53,7 +53,7 @@ impl Out {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use npr::command::ChatBoxInsertChar;
+    use npr::chat_input::InsertChar;
     use nullslop_protocol as npr;
 
     #[test]
@@ -71,8 +71,8 @@ mod tests {
         let mut out = Out::new();
 
         // When submitting a command.
-        out.submit_command(Command::ChatBoxInsertChar {
-            payload: ChatBoxInsertChar { ch: 'a' },
+        out.submit_command(Command::InsertChar {
+            payload: InsertChar { ch: 'a' },
         });
 
         // Then it is not empty and has one command.
@@ -86,7 +86,7 @@ mod tests {
         let mut out = Out::new();
 
         // When submitting an event.
-        out.submit_event(Event::EventApplicationReady);
+        out.submit_event(Event::ApplicationReady);
 
         // Then it is not empty and has one event.
         assert!(!out.is_empty());
@@ -97,7 +97,7 @@ mod tests {
     fn drain_commands_takes_and_clears() {
         // Given an Out with a command.
         let mut out = Out::new();
-        out.submit_command(Command::AppQuit);
+        out.submit_command(Command::Quit);
 
         // When draining commands.
         let cmds = out.drain_commands();
@@ -111,7 +111,7 @@ mod tests {
     fn drain_events_takes_and_clears() {
         // Given an Out with an event.
         let mut out = Out::new();
-        out.submit_event(Event::EventApplicationReady);
+        out.submit_event(Event::ApplicationReady);
 
         // When draining events.
         let evts = out.drain_events();
@@ -141,9 +141,9 @@ mod tests {
         let mut out = Out::new();
 
         // When submitting both commands and events.
-        out.submit_command(Command::AppQuit);
-        out.submit_event(Event::EventApplicationReady);
-        out.submit_command(Command::ChatBoxDeleteGrapheme);
+        out.submit_command(Command::Quit);
+        out.submit_event(Event::ApplicationReady);
+        out.submit_command(Command::DeleteGrapheme);
 
         // Then both buffers contain their items.
         assert_eq!(out.commands.len(), 2);

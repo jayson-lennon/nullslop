@@ -1,23 +1,16 @@
-# System
-.env
+*
 
-# AI
-.kilo/
-.plans/
-.opencode/
+!.gitignore
 
-# Packaging
-/.build
-*.zst
-/pkg
+# whitelist `src` directories and their children, regardless of place
+!actors/**/*.rs
+!crates/**/*.rs
+!src/
+!src/**/
+!src/**/*.rs
+!Cargo.{toml,lock}#
 
-# Rust
-/target
-
-# Code analysis
-coverage.lcov
-debt.json
-/mutants.out
-/mutants.out.old
-
-# App
+!justfile
+!LICENSE
+!AGENTS.md
+!ARCHITECTURE.md

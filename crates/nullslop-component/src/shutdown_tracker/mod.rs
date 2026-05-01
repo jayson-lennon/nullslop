@@ -1,8 +1,8 @@
-//! Graceful shutdown coordination for extensions.
+//! Graceful shutdown coordination for actors.
 //!
-//! Ensures the application doesn't exit until every running extension has had a
+//! Ensures the application doesn't exit until every running actor has had a
 //! chance to clean up. When shutdown is triggered, this component waits for each
-//! extension to report completion before allowing the application to proceed with
+//! actor to report completion before allowing the application to proceed with
 //! exiting.
 
 pub mod handler;

@@ -180,6 +180,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "clap-verbosity-flag"
+version = "3.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d92b1fab272fe943881b77cc6e920d6543e5b1bfadbd5ed81c7c5a755742394"
+dependencies = [
+ "clap",
+ "log",
+]
+
+[[package]]
 name = "clap_builder"
 version = "4.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -993,13 +1003,15 @@ name = "nullslop"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "clap-verbosity-flag",
  "error-stack",
+ "kanal",
+ "nullslop-actor",
+ "nullslop-actor-host",
  "nullslop-cli",
  "nullslop-component",
  "nullslop-core",
  "nullslop-echo",
- "nullslop-ext-host",
- "nullslop-extension",
  "nullslop-protocol",
  "nullslop-services",
  "nullslop-tui",
@@ -1012,10 +1024,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "nullslop-actor"
+version = "0.1.0"
+dependencies = [
+ "error-stack",
+ "kanal",
+ "nullslop-protocol",
+ "parking_lot",
+ "rstest",
+ "tokio",
+ "tracing",
+ "wherror",
+]
+
+[[package]]
+name = "nullslop-actor-host"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "error-stack",
+ "kanal",
+ "nullslop-actor",
+ "nullslop-protocol",
+ "parking_lot",
+ "rstest",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "wherror",
+]
+
+[[package]]
 name = "nullslop-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "clap-verbosity-flag",
 ]
 
 [[package]]
@@ -1057,6 +1101,8 @@ dependencies = [
  "error-stack",
  "jiff",
  "kanal",
+ "nullslop-actor",
+ "nullslop-actor-host",
  "nullslop-component",
  "nullslop-component-core",
  "nullslop-component-ui",
@@ -1073,46 +1119,11 @@ dependencies = [
 name = "nullslop-echo"
 version = "0.1.0"
 dependencies = [
- "nullslop-core",
- "nullslop-extension",
+ "nullslop-actor",
  "nullslop-protocol",
  "serde_json",
- "tracing",
-]
-
-[[package]]
-name = "nullslop-ext-host"
-version = "0.1.0"
-dependencies = [
- "error-stack",
- "kanal",
- "nullslop-component",
- "nullslop-component-ui",
- "nullslop-core",
- "nullslop-extension",
- "nullslop-protocol",
- "rstest",
- "serde_json",
- "tempfile",
  "tokio",
  "tracing",
- "wherror",
-]
-
-[[package]]
-name = "nullslop-extension"
-version = "0.1.0"
-dependencies = [
- "derive_more",
- "error-stack",
- "kanal",
- "nullslop-core",
- "nullslop-protocol",
- "rstest",
- "serde",
- "serde_json",
- "tokio",
- "wherror",
 ]
 
 [[package]]
@@ -1121,6 +1132,7 @@ version = "0.1.0"
 dependencies = [
  "derive_more",
  "jiff",
+ "nullslop-protocol-derive",
  "ratatui-which-key",
  "rstest",
  "serde",
@@ -1128,11 +1140,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "nullslop-protocol-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
 name = "nullslop-services"
 version = "0.1.0"
 dependencies = [
  "derive_more",
- "nullslop-core",
+ "nullslop-actor-host",
  "tokio",
 ]
 
@@ -1146,11 +1167,11 @@ dependencies = [
  "error-stack",
  "futures",
  "kanal",
+ "nullslop-actor-host",
  "nullslop-component",
  "nullslop-component-core",
  "nullslop-component-ui",
  "nullslop-core",
- "nullslop-ext-host",
  "nullslop-protocol",
  "nullslop-services",
  "parking_lot",

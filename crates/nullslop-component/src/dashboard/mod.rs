@@ -1,8 +1,8 @@
-//! Dashboard component — displays registered extensions and their status.
+//! Dashboard component — displays registered actors and their status.
 //!
-//! Shows a list of all extensions known to the application along with their
+//! Shows a list of all actors known to the application along with their
 //! startup lifecycle status ("Starting" or "Started"). The dashboard updates
-//! in real-time as extensions progress through the startup sequence.
+//! in real-time as actors progress through the startup sequence.
 
 pub(crate) mod element;
 pub(crate) mod handler;

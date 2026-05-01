@@ -5,7 +5,7 @@
 //!
 //! - **User messages** appear bold with a `>` prefix.
 //! - **System messages** appear muted with indentation.
-//! - **Extension messages** appear highlighted with the extension's name and content.
+//! - **Actor messages** appear highlighted with the actor's name and content.
 //!
 //! Text wraps within the available space.
 
@@ -40,8 +40,8 @@ impl UiElement<AppState> for ChatLogElement {
                     format!("  {text}"),
                     Style::default().fg(Color::DarkGray),
                 )),
-                ChatEntryKind::Extension { source, text } => Line::from(Span::styled(
-                    format!("[ext] {source}: {text}"),
+                ChatEntryKind::Actor { source, text } => Line::from(Span::styled(
+                    format!("[actor] {source}: {text}"),
                     Style::default().fg(Color::Yellow),
                 )),
             })
@@ -156,13 +156,13 @@ mod tests {
     }
 
     #[test]
-    fn render_extension_entry() {
-        // Given a ChatLogElement with an extension entry.
+    fn render_actor_entry() {
+        // Given a ChatLogElement with an actor entry.
         let mut element = ChatLogElement;
         let state = {
             let mut s = AppState::new();
             s.chat_history
-                .push(ChatEntry::extension("nullslop-echo", "HELLO"));
+                .push(ChatEntry::actor("nullslop-echo", "HELLO"));
             s
         };
 
@@ -177,7 +177,7 @@ mod tests {
             })
             .unwrap();
 
-        // Then the text starts with "[" (from "[ext]") and is yellow.
+        // Then the text starts with "[" (from "[actor]") and is yellow.
         let buffer = terminal.backend().buffer().clone();
         let cell = buffer.cell((0, 0)).expect("cell should exist");
         assert_eq!(cell.symbol(), "[");
@@ -186,14 +186,14 @@ mod tests {
 
     #[test]
     fn render_mixed_entries() {
-        // Given a ChatLogElement with user, system, and extension entries.
+        // Given a ChatLogElement with user, system, and actor entries.
         let mut element = ChatLogElement;
         let state = {
             let mut s = AppState::new();
             s.chat_history.push(ChatEntry::system("welcome"));
             s.chat_history.push(ChatEntry::user("hello"));
             s.chat_history
-                .push(ChatEntry::extension("nullslop-echo", "HELLO"));
+                .push(ChatEntry::actor("nullslop-echo", "HELLO"));
             s
         };
 
@@ -219,7 +219,7 @@ mod tests {
         assert_eq!(line1_cell.symbol(), ">");
         assert!(line1_cell.style().add_modifier.contains(Modifier::BOLD));
 
-        // And line 2 is extension (yellow, "[" from "[ext]").
+        // And line 2 is actor (yellow, "[" from "[actor]").
         let line2_cell = buffer.cell((0, 2)).expect("cell should exist");
         assert_eq!(line2_cell.symbol(), "[");
         assert_eq!(line2_cell.style().fg, Some(Color::Yellow));

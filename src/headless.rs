@@ -2,14 +2,14 @@
 //!
 //! [`HeadlessApp`] owns the processing pipeline for non-interactive mode.
 //! It receives commands, runs the core tick loop until settled, and
-//! shuts down the extension host.
+//! shuts down the actor host.
 
 use std::time::{Duration, Instant};
 
 use error_stack::{Report, ResultExt};
 use nullslop_core::{AppCore, AppMsg, TickResult};
 use nullslop_protocol::Command;
-use nullslop_protocol::command::ChatBoxSubmitMessage;
+use nullslop_protocol::chat_input::SubmitMessage;
 use wherror::Error;
 
 /// Error type for headless operations.
@@ -54,8 +54,8 @@ impl HeadlessApp {
         self.core
             .sender()
             .send(AppMsg::Command {
-                command: Command::ChatBoxSubmitMessage {
-                    payload: ChatBoxSubmitMessage {
+                command: Command::SubmitMessage {
+                    payload: SubmitMessage {
                         text: message.to_string(),
                     },
                 },
@@ -161,12 +161,12 @@ impl HeadlessApp {
         }
     }
 
-    /// Shuts down the extension host gracefully.
+    /// Shuts down the actor host gracefully.
     pub fn shutdown(&mut self) {
-        let ext = self.services.ext_host().clone();
-        if let Err(e) = ext.shutdown(&mut self.core) {
-            tracing::error!(err = ?e, "extension host shutdown error");
-        }
+        self.core.coordinated_shutdown(
+            self.services.actor_host().backend(),
+            nullslop_core::SHUTDOWN_TIMEOUT,
+        );
     }
 }
 
@@ -192,6 +192,7 @@ mod tests {
     use std::io::Cursor;
     use std::sync::Arc;
 
+    use nullslop_actor_host::FakeActorHost;
     use nullslop_protocol::{Key, KeyEvent, Modifiers};
 
     use super::*;
@@ -306,11 +307,9 @@ mod tests {
         let mut registry = nullslop_component::AppUiRegistry::new();
         nullslop_component::register_all(&mut core.bus, &mut registry);
 
-        let ext_host: Arc<dyn nullslop_core::ExtensionHost> =
-            Arc::new(nullslop_ext_host::fake::FakeExtensionHost::new());
-        core.set_ext_host(nullslop_core::ExtensionHostService::new(ext_host.clone()));
+        let actor_host: Arc<dyn nullslop_actor_host::ActorHost> = Arc::new(FakeActorHost::new());
 
-        let services = nullslop_services::Services::new(handle, ext_host);
+        let services = nullslop_services::Services::new(handle, actor_host);
         HeadlessApp::new(core, services)
     }
 

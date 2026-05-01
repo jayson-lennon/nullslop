@@ -13,7 +13,7 @@ pub use sender::MsgSender;
 /// A unified message from any source.
 ///
 /// Merges crossterm terminal events, periodic tick messages,
-/// and commands (from key handling or extensions) into a single stream
+/// and commands (from key handling or actors) into a single stream
 /// consumed by the main event loop.
 #[derive(Debug)]
 pub enum Msg {
@@ -21,48 +21,33 @@ pub enum Msg {
     Tick,
     /// A crossterm terminal event (key press, resize, etc.).
     Input(crossterm::event::Event),
-    /// A command from key handling or an extension.
+    /// A command from key handling or an actor.
     Command(npr::Command),
-    /// All extensions have been discovered, spawned, and registered.
-    /// Contains the list of registered extensions to add to state.
-    ExtensionsReady(Vec<nullslop_core::RegisteredExtension>),
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use npr::command::CustomCommand;
+    use npr::chat_input::PushChatEntry;
 
     #[test]
     fn command_message_carries_command() {
-        // Given a Command message with a custom command.
-        let msg = Msg::Command(npr::Command::CustomCommand {
-            payload: CustomCommand {
-                name: "echo".to_string(),
-                args: serde_json::json!({"text": "hello"}),
+        // Given a Command message with a PushChatEntry.
+        let msg = Msg::Command(npr::Command::PushChatEntry {
+            payload: PushChatEntry {
+                entry: npr::ChatEntry::user("hello"),
             },
         });
 
-        // Then it matches and the name is accessible.
+        // Then it matches and the entry is accessible.
         match msg {
-            Msg::Command(npr::Command::CustomCommand { payload }) => {
-                assert_eq!(payload.name, "echo");
+            Msg::Command(npr::Command::PushChatEntry { payload }) => {
+                assert_eq!(
+                    payload.entry.kind,
+                    npr::ChatEntryKind::User("hello".to_string())
+                );
             }
             _ => panic!("expected Command"),
-        }
-    }
-
-    #[test]
-    fn extensions_ready_carries_registrations() {
-        // Given an ExtensionsReady message with empty registrations.
-        let msg = Msg::ExtensionsReady(vec![]);
-
-        // Then it matches.
-        match msg {
-            Msg::ExtensionsReady(regs) => {
-                assert!(regs.is_empty());
-            }
-            _ => panic!("expected ExtensionsReady"),
         }
     }
 

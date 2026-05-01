@@ -58,10 +58,11 @@ pub fn run(mut app: TuiApp) -> Result<(), Report<TuiRunError>> {
         task.abort();
     }
 
-    // Shut down extension host.
-    if let Err(e) = app.services.ext_host().shutdown(&mut app.core) {
-        tracing::error!(err = ?e, "extension host shutdown error");
-    }
+    // Shut down actor host — coordinated shutdown.
+    app.core.coordinated_shutdown(
+        app.services.actor_host().backend(),
+        nullslop_core::SHUTDOWN_TIMEOUT,
+    );
 
     // Restore terminal.
     if let Err(e) = disable_raw_mode() {

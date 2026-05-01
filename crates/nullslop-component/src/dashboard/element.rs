@@ -1,10 +1,10 @@
-//! Renders the dashboard view — a list of extensions with their startup status.
+//! Renders the dashboard view — a list of actors with their startup status.
 //!
-//! Each extension is displayed as a row with its name and status badge.
+//! Each actor is displayed as a row with its name and status badge.
 //! "Starting" appears yellow, "Started" appears green.
 
 use crate::AppState;
-use crate::dashboard::state::ExtensionStatus;
+use crate::dashboard::state::ActorStatus;
 use nullslop_component_ui::UiElement;
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -12,7 +12,7 @@ use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 
-/// Display element for the extension dashboard.
+/// Display element for the actor dashboard.
 #[derive(Debug)]
 pub struct DashboardElement;
 
@@ -22,19 +22,19 @@ impl UiElement<AppState> for DashboardElement {
     }
 
     fn render(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppState) {
-        let lines: Vec<Line> = if state.dashboard.extensions().is_empty() {
+        let lines: Vec<Line> = if state.dashboard.actors().is_empty() {
             vec![Line::from(Span::styled(
-                "No extensions registered.",
+                "No actors registered.",
                 Style::default().fg(Color::DarkGray),
             ))]
         } else {
             let mut lines = Vec::new();
 
             // Compute the widest name for column alignment (header or data).
-            let header_name = "Extension";
+            let header_name = "Actor";
             let max_name_len = state
                 .dashboard
-                .extensions()
+                .actors()
                 .into_iter()
                 .map(|(name, _)| name.len())
                 .chain(std::iter::once(header_name.len()))
@@ -43,15 +43,18 @@ impl UiElement<AppState> for DashboardElement {
 
             // Header row.
             lines.push(Line::from(vec![
-                Span::styled(format!(" {header_name:<max_name_len$} "), Style::default().fg(Color::Gray).bold()),
+                Span::styled(
+                    format!(" {header_name:<max_name_len$} "),
+                    Style::default().fg(Color::Gray).bold(),
+                ),
                 Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
                 Span::styled("Status", Style::default().fg(Color::Gray).bold()),
             ]));
 
-            for (name, status) in state.dashboard.extensions() {
+            for (name, status) in state.dashboard.actors() {
                 let (label, color) = match status {
-                    ExtensionStatus::Starting => ("Starting", Color::Yellow),
-                    ExtensionStatus::Started => ("Started", Color::Green),
+                    ActorStatus::Starting => ("Starting", Color::Yellow),
+                    ActorStatus::Started => ("Started", Color::Green),
                 };
                 let padded_name = format!(" {name:<max_name_len$} ");
                 lines.push(Line::from(vec![
@@ -65,10 +68,7 @@ impl UiElement<AppState> for DashboardElement {
         };
 
         let widget = Paragraph::new(lines)
-            .block(
-                Block::default()
-                    .borders(Borders::NONE),
-            )
+            .block(Block::default().borders(Borders::NONE))
             .wrap(Wrap { trim: true });
         frame.render_widget(widget, area);
     }
@@ -96,7 +96,11 @@ mod tests {
         (0..10)
             .map(|y| {
                 (0..40)
-                    .map(|x| buffer.cell((x, y)).map_or(" ", ratatui::buffer::Cell::symbol))
+                    .map(|x| {
+                        buffer
+                            .cell((x, y))
+                            .map_or(" ", ratatui::buffer::Cell::symbol)
+                    })
                     .collect()
             })
             .collect()
@@ -115,52 +119,52 @@ mod tests {
     }
 
     #[test]
-    fn render_empty_shows_no_extensions() {
-        // Given a DashboardElement with no extensions.
+    fn render_empty_shows_no_actors() {
+        // Given a DashboardElement with no actors.
         let mut element = DashboardElement;
         let state = AppState::new();
 
         // When rendering.
         let rows = render_rows(&mut element, &state);
 
-        // Then "No extensions registered." appears.
-        assert!(rows[0].contains("No extensions registered."));
+        // Then "No actors registered." appears.
+        assert!(rows[0].contains("No actors registered."));
     }
 
     #[test]
-    fn render_extension_with_starting_status() {
-        // Given a DashboardElement with an extension in Starting status.
+    fn render_actor_with_starting_status() {
+        // Given a DashboardElement with an actor in Starting status.
         let mut element = DashboardElement;
         let state = {
             let mut s = AppState::new();
-            s.dashboard.mark_starting("ext-a");
+            s.dashboard.mark_starting("actor-a");
             s
         };
 
         // When rendering.
         let rows = render_rows(&mut element, &state);
 
-        // Then the extension name and status appear.
-        assert!(rows[1].contains("ext-a"));
+        // Then the actor name and status appear.
+        assert!(rows[1].contains("actor-a"));
         assert!(rows[1].contains("Starting"));
     }
 
     #[test]
-    fn render_extension_with_started_status() {
-        // Given a DashboardElement with an extension in Started status.
+    fn render_actor_with_started_status() {
+        // Given a DashboardElement with an actor in Started status.
         let mut element = DashboardElement;
         let state = {
             let mut s = AppState::new();
-            s.dashboard.mark_starting("ext-a");
-            s.dashboard.mark_started("ext-a");
+            s.dashboard.mark_starting("actor-a");
+            s.dashboard.mark_started("actor-a");
             s
         };
 
         // When rendering.
         let rows = render_rows(&mut element, &state);
 
-        // Then the extension name and status appear.
-        assert!(rows[1].contains("ext-a"));
+        // Then the actor name and status appear.
+        assert!(rows[1].contains("actor-a"));
         assert!(rows[1].contains("Started"));
     }
 }

@@ -22,10 +22,10 @@ pub struct AppState {
     /// The user's in-progress message and input buffer.
     pub chat_input: ChatInputBoxState,
 
-    /// Bookkeeping for which extensions are still running during shutdown.
+    /// Bookkeeping for which actors are still running during shutdown.
     pub shutdown_tracker: ShutdownTrackerState,
 
-    /// Extension dashboard — tracks registered extensions and their status.
+    /// Actor dashboard — tracks registered actors and their status.
     pub dashboard: DashboardState,
 
     /// The currently active tab.

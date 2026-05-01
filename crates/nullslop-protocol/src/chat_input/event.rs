@@ -1,17 +1,14 @@
-//! Events produced when the chat input box emits a completed message.
+//! Events produced when a chat entry is added to the conversation.
 
 use serde::{Deserialize, Serialize};
 
 use crate::ChatEntry;
-use crate::custom::EventMsg;
+use crate::EventMsg;
 
-/// A chat message was submitted by the user.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventChatMessageSubmitted {
-    /// The chat entry that was submitted.
+/// A chat entry was added to the conversation history.
+#[derive(Debug, Clone, Serialize, Deserialize, EventMsg)]
+#[event_msg("chat_input")]
+pub struct ChatEntrySubmitted {
+    /// The chat entry that was added.
     pub entry: ChatEntry,
-}
-
-impl EventMsg for EventChatMessageSubmitted {
-    const TYPE_NAME: &'static str = "EventChatMessageSubmitted";
 }

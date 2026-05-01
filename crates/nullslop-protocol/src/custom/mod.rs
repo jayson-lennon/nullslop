@@ -1,12 +1,11 @@
-//! Extension command and event routing infrastructure.
+//! Actor command and event routing infrastructure.
 //!
-//! Extensions register their own commands and events through the
-//! [`CommandMsg`] and [`EventMsg`] traits. This domain provides the
-//! routing infrastructure ([`CustomCommand`], [`EventCustom`]) for
-//! extension-defined message types.
+//! The [`CommandMsg`] and [`EventMsg`] traits provide compile-time routing
+//! strings used by the derive macros in domain modules.
 
 mod command;
+mod derive_tests;
 mod event;
 
-pub use command::{CommandMsg, CustomCommand};
-pub use event::{EventCustom, EventMsg};
+pub use command::{CommandMsg, CommandName};
+pub use event::{EventMsg, EventTypeName};

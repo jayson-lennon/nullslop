@@ -18,35 +18,34 @@
 //! submitted by handlers are only queued after all handlers for the current item
 //! have finished, ensuring a consistent state snapshot per dispatch.
 
-/// A processed event ready for forwarding, with its source extension.
+/// A processed event ready for forwarding, with its source actor.
 pub struct ProcessedEvent {
     /// The dispatched event.
     pub event: Event,
-    /// The extension that originated this event, if any.
-    pub source: Option<ExtensionName>,
+    /// The actor that originated this event, if any.
+    pub source: Option<ActorName>,
 }
 
-/// A processed command ready for forwarding, with its source extension.
+/// A processed command ready for forwarding, with its source actor.
 pub struct ProcessedCommand {
     /// The dispatched command.
     pub command: Command,
-    /// The extension that originated this command, if any.
-    pub source: Option<ExtensionName>,
+    /// The actor that originated this command, if any.
+    pub source: Option<ActorName>,
 }
 
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
-use nullslop_protocol::{
-    Command, CommandAction, Event, ExtensionName,
-    command::{
-        AppEditInput, AppQuit, AppToggleWhichKey, ChatBoxClear, ChatBoxDeleteGrapheme,
-        ChatBoxDeleteGraphemeForward, ChatBoxMoveCursorLeft, ChatBoxMoveCursorRight,
-        ChatBoxMoveCursorToEnd, ChatBoxMoveCursorToStart, ChatBoxMoveCursorWordLeft,
-        ChatBoxMoveCursorWordRight, ProviderCancelStream,
-    },
-    event::{EventApplicationReady, EventApplicationShuttingDown},
+use nullslop_protocol::chat_input::{
+    Clear, DeleteGrapheme, DeleteGraphemeForward, MoveCursorLeft, MoveCursorRight, MoveCursorToEnd,
+    MoveCursorToStart, MoveCursorWordLeft, MoveCursorWordRight,
 };
+use nullslop_protocol::provider::CancelStream;
+use nullslop_protocol::system::{
+    ApplicationReady, ApplicationShuttingDown, EditInput, Quit, ToggleWhichKey,
+};
+use nullslop_protocol::{ActorName, Command, CommandAction, Event};
 
 use crate::handler::{CommandHandler, EventHandler};
 use crate::out::Out;
@@ -93,13 +92,13 @@ where
 /// A queued command together with its origin.
 struct QueuedCommand {
     command: Command,
-    source: Option<ExtensionName>,
+    source: Option<ActorName>,
 }
 
 /// A queued event together with its origin.
 struct QueuedEvent {
     event: Event,
-    source: Option<ExtensionName>,
+    source: Option<ActorName>,
 }
 
 /// Central message router that dispatches commands and events to registered handlers.
@@ -192,15 +191,15 @@ impl<S> Bus<S> {
     /// Submit a command to the bus queue.
     ///
     /// The command will be dispatched when [`process_commands`](Self::process_commands) is called.
-    /// The source is `None` (originated from the user or host, not an extension).
+    /// The source is `None` (originated from the user or host, not an actor).
     pub fn submit_command(&mut self, cmd: Command) {
         self.submit_command_from(cmd, None);
     }
 
-    /// Submit a command to the bus queue with an optional source extension name.
+    /// Submit a command to the bus queue with an optional source actor name.
     ///
     /// The command will be dispatched when [`process_commands`](Self::process_commands) is called.
-    pub fn submit_command_from(&mut self, cmd: Command, source: Option<ExtensionName>) {
+    pub fn submit_command_from(&mut self, cmd: Command, source: Option<ActorName>) {
         self.command_queue.push(QueuedCommand {
             command: cmd,
             source,
@@ -210,15 +209,15 @@ impl<S> Bus<S> {
     /// Submit an event to the bus queue.
     ///
     /// The event will be dispatched when [`process_events`](Self::process_events) is called.
-    /// The source is `None` (originated from the user or host, not an extension).
+    /// The source is `None` (originated from the user or host, not an actor).
     pub fn submit_event(&mut self, evt: Event) {
         self.submit_event_from(evt, None);
     }
 
-    /// Submit an event to the bus queue with an optional source extension name.
+    /// Submit an event to the bus queue with an optional source actor name.
     ///
     /// The event will be dispatched when [`process_events`](Self::process_events) is called.
-    pub fn submit_event_from(&mut self, evt: Event, source: Option<ExtensionName>) {
+    pub fn submit_event_from(&mut self, evt: Event, source: Option<ActorName>) {
         self.event_queue.push(QueuedEvent { event: evt, source });
     }
 
@@ -266,7 +265,7 @@ impl<S> Bus<S> {
     ///
     /// Returns tuples of `(event, source)` and clears the internal buffer.
     /// Useful for forwarding processed events to external systems
-    /// (e.g., extension host) after bus processing completes.
+    /// (e.g., actor host) after bus processing completes.
     pub fn drain_processed_events(&mut self) -> Vec<ProcessedEvent> {
         std::mem::take(&mut self.processed_events)
     }
@@ -275,7 +274,7 @@ impl<S> Bus<S> {
     ///
     /// Returns tuples of `(command, source)` and clears the internal buffer.
     /// Useful for forwarding processed commands to external systems
-    /// (e.g., extension host) after bus processing.
+    /// (e.g., actor host) after bus processing.
     pub fn drain_processed_commands(&mut self) -> Vec<ProcessedCommand> {
         std::mem::take(&mut self.processed_commands)
     }
@@ -292,7 +291,7 @@ impl<S> Bus<S> {
     }
 
     /// Dispatch a single command to its registered handlers.
-    fn dispatch_command(&mut self, cmd: Command, source: Option<ExtensionName>, state: &mut S) {
+    fn dispatch_command(&mut self, cmd: Command, source: Option<ActorName>, state: &mut S) {
         // Record the command before dispatching so consumers can drain it later.
         self.processed_commands.push(ProcessedCommand {
             command: cmd.clone(),
@@ -300,74 +299,74 @@ impl<S> Bus<S> {
         });
         let mut out = Out::new();
         match cmd {
-            Command::ChatBoxInsertChar { payload } => {
+            Command::InsertChar { payload } => {
                 self.dispatch_command_to_handlers(&payload, state, &mut out);
             }
-            Command::ChatBoxDeleteGrapheme => {
-                let cmd = ChatBoxDeleteGrapheme;
+            Command::DeleteGrapheme => {
+                let cmd = DeleteGrapheme;
                 self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
-            Command::ChatBoxSubmitMessage { payload } => {
+            Command::SubmitMessage { payload } => {
                 self.dispatch_command_to_handlers(&payload, state, &mut out);
             }
-            Command::ChatBoxClear => {
-                let cmd = ChatBoxClear;
+            Command::Clear => {
+                let cmd = Clear;
                 self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
-            Command::ChatBoxMoveCursorLeft => {
-                let cmd = ChatBoxMoveCursorLeft;
+            Command::MoveCursorLeft => {
+                let cmd = MoveCursorLeft;
                 self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
-            Command::ChatBoxMoveCursorRight => {
-                let cmd = ChatBoxMoveCursorRight;
+            Command::MoveCursorRight => {
+                let cmd = MoveCursorRight;
                 self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
-            Command::ChatBoxMoveCursorToStart => {
-                let cmd = ChatBoxMoveCursorToStart;
+            Command::MoveCursorToStart => {
+                let cmd = MoveCursorToStart;
                 self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
-            Command::ChatBoxMoveCursorToEnd => {
-                let cmd = ChatBoxMoveCursorToEnd;
+            Command::MoveCursorToEnd => {
+                let cmd = MoveCursorToEnd;
                 self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
-            Command::ChatBoxDeleteGraphemeForward => {
-                let cmd = ChatBoxDeleteGraphemeForward;
+            Command::DeleteGraphemeForward => {
+                let cmd = DeleteGraphemeForward;
                 self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
-            Command::ChatBoxMoveCursorWordLeft => {
-                let cmd = ChatBoxMoveCursorWordLeft;
+            Command::MoveCursorWordLeft => {
+                let cmd = MoveCursorWordLeft;
                 self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
-            Command::ChatBoxMoveCursorWordRight => {
-                let cmd = ChatBoxMoveCursorWordRight;
+            Command::MoveCursorWordRight => {
+                let cmd = MoveCursorWordRight;
                 self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
-            Command::AppSetMode { payload } => {
+            Command::SetMode { payload } => {
                 self.dispatch_command_to_handlers(&payload, state, &mut out);
             }
-            Command::AppQuit => {
-                let cmd = AppQuit;
+            Command::Quit => {
+                let cmd = Quit;
                 self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
-            Command::AppEditInput => {
-                let cmd = AppEditInput;
+            Command::EditInput => {
+                let cmd = EditInput;
                 self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
-            Command::AppToggleWhichKey => {
-                let cmd = AppToggleWhichKey;
+            Command::ToggleWhichKey => {
+                let cmd = ToggleWhichKey;
                 self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
-            Command::AppSwitchTab { payload } => {
+            Command::SwitchTab { payload } => {
                 self.dispatch_command_to_handlers(&payload, state, &mut out);
             }
-            Command::ProviderSendMessage { payload } => {
+            Command::SendMessage { payload } => {
                 self.dispatch_command_to_handlers(&payload, state, &mut out);
             }
-            Command::ProviderCancelStream => {
-                let cmd = ProviderCancelStream;
+            Command::CancelStream => {
+                let cmd = CancelStream;
                 self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
-            Command::CustomCommand { payload } => {
+            Command::PushChatEntry { payload } => {
                 self.dispatch_command_to_handlers(&payload, state, &mut out);
             }
             Command::ProceedWithShutdown { payload } => {
@@ -391,7 +390,7 @@ impl<S> Bus<S> {
     }
 
     /// Dispatch a single event to its registered handlers.
-    fn dispatch_event(&mut self, evt: Event, source: Option<ExtensionName>, state: &mut S) {
+    fn dispatch_event(&mut self, evt: Event, source: Option<ActorName>, state: &mut S) {
         // Record the event before dispatching so consumers can drain it later.
         self.processed_events.push(ProcessedEvent {
             event: evt.clone(),
@@ -399,37 +398,34 @@ impl<S> Bus<S> {
         });
         let mut out = Out::new();
         match evt {
-            Event::EventKeyDown { payload } => {
+            Event::KeyDown { payload } => {
                 self.dispatch_event_to_handlers(&payload, state, &mut out);
             }
-            Event::EventKeyUp { payload } => {
+            Event::KeyUp { payload } => {
                 self.dispatch_event_to_handlers(&payload, state, &mut out);
             }
-            Event::EventChatMessageSubmitted { payload } => {
+            Event::ChatEntrySubmitted { payload } => {
                 self.dispatch_event_to_handlers(&payload, state, &mut out);
             }
-            Event::EventModeChanged { payload } => {
+            Event::ModeChanged { payload } => {
                 self.dispatch_event_to_handlers(&payload, state, &mut out);
             }
-            Event::EventApplicationReady => {
-                let cmd = EventApplicationReady;
-                self.dispatch_event_to_handlers(&cmd, state, &mut out);
+            Event::ApplicationReady => {
+                let evt = ApplicationReady;
+                self.dispatch_event_to_handlers(&evt, state, &mut out);
             }
-            Event::EventCustom { payload } => {
+            Event::ActorStarting { payload } => {
                 self.dispatch_event_to_handlers(&payload, state, &mut out);
             }
-            Event::EventExtensionStarting { payload } => {
+            Event::ActorStarted { payload } => {
                 self.dispatch_event_to_handlers(&payload, state, &mut out);
             }
-            Event::EventExtensionStarted { payload } => {
+            Event::ActorShutdownCompleted { payload } => {
                 self.dispatch_event_to_handlers(&payload, state, &mut out);
             }
-            Event::EventExtensionShutdownCompleted { payload } => {
-                self.dispatch_event_to_handlers(&payload, state, &mut out);
-            }
-            Event::EventApplicationShuttingDown => {
-                let cmd = EventApplicationShuttingDown;
-                self.dispatch_event_to_handlers(&cmd, state, &mut out);
+            Event::ApplicationShuttingDown => {
+                let evt = ApplicationShuttingDown;
+                self.dispatch_event_to_handlers(&evt, state, &mut out);
             }
         }
         self.flush_out(out);
@@ -472,8 +468,9 @@ impl<S> Default for Bus<S> {
 mod tests {
     use super::*;
     use crate::fake::{FakeCommandHandler, FakeEventHandler};
-    use npr::command::{AppSetMode, ChatBoxDeleteGrapheme, ChatBoxInsertChar, ProviderSendMessage};
-    use npr::event::{EventApplicationReady, EventKeyDown};
+    use npr::chat_input::{DeleteGrapheme, InsertChar};
+    use npr::provider::SendMessage;
+    use npr::system::{ApplicationReady, KeyDown, Quit, SetMode};
     use nullslop_protocol as npr;
 
     /// Simple state type for testing bus dispatch.
@@ -484,14 +481,14 @@ mod tests {
 
     #[test]
     fn command_dispatch_reaches_handler() {
-        // Given a bus with a handler for ChatBoxInsertChar.
-        let (handler, calls) = FakeCommandHandler::<ChatBoxInsertChar, TestState>::continuing();
+        // Given a bus with a handler for InsertChar.
+        let (handler, calls) = FakeCommandHandler::<InsertChar, TestState>::continuing();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_command_handler::<ChatBoxInsertChar, _>(handler);
+        bus.register_command_handler::<InsertChar, _>(handler);
 
         // When submitting and processing the command.
-        bus.submit_command(Command::ChatBoxInsertChar {
-            payload: ChatBoxInsertChar { ch: 'x' },
+        bus.submit_command(Command::InsertChar {
+            payload: InsertChar { ch: 'x' },
         });
         let mut state = TestState;
         bus.process_commands(&mut state);
@@ -504,14 +501,14 @@ mod tests {
     #[test]
     fn multiple_command_handlers_all_run() {
         // Given a bus with two handlers for the same command type.
-        let (h1, calls1) = FakeCommandHandler::<AppQuit, TestState>::continuing();
-        let (h2, calls2) = FakeCommandHandler::<AppQuit, TestState>::continuing();
+        let (h1, calls1) = FakeCommandHandler::<Quit, TestState>::continuing();
+        let (h2, calls2) = FakeCommandHandler::<Quit, TestState>::continuing();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_command_handler::<AppQuit, _>(h1);
-        bus.register_command_handler::<AppQuit, _>(h2);
+        bus.register_command_handler::<Quit, _>(h1);
+        bus.register_command_handler::<Quit, _>(h2);
 
         // When processing a command.
-        bus.submit_command(Command::AppQuit);
+        bus.submit_command(Command::Quit);
         let mut state = TestState;
         bus.process_commands(&mut state);
 
@@ -523,14 +520,14 @@ mod tests {
     #[test]
     fn stop_halts_propagation() {
         // Given a bus where the first handler returns Stop.
-        let (stopper, stopper_calls) = FakeCommandHandler::<AppQuit, TestState>::stopping();
-        let (continuer, continuer_calls) = FakeCommandHandler::<AppQuit, TestState>::continuing();
+        let (stopper, stopper_calls) = FakeCommandHandler::<Quit, TestState>::stopping();
+        let (continuer, continuer_calls) = FakeCommandHandler::<Quit, TestState>::continuing();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_command_handler::<AppQuit, _>(stopper);
-        bus.register_command_handler::<AppQuit, _>(continuer);
+        bus.register_command_handler::<Quit, _>(stopper);
+        bus.register_command_handler::<Quit, _>(continuer);
 
         // When processing a command.
-        bus.submit_command(Command::AppQuit);
+        bus.submit_command(Command::Quit);
         let mut state = TestState;
         bus.process_commands(&mut state);
 
@@ -542,14 +539,14 @@ mod tests {
     #[test]
     fn continue_allows_propagation() {
         // Given a bus where the first handler returns Continue.
-        let (c1, calls1) = FakeCommandHandler::<AppQuit, TestState>::continuing();
-        let (c2, calls2) = FakeCommandHandler::<AppQuit, TestState>::continuing();
+        let (c1, calls1) = FakeCommandHandler::<Quit, TestState>::continuing();
+        let (c2, calls2) = FakeCommandHandler::<Quit, TestState>::continuing();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_command_handler::<AppQuit, _>(c1);
-        bus.register_command_handler::<AppQuit, _>(c2);
+        bus.register_command_handler::<Quit, _>(c1);
+        bus.register_command_handler::<Quit, _>(c2);
 
         // When processing a command.
-        bus.submit_command(Command::AppQuit);
+        bus.submit_command(Command::Quit);
         let mut state = TestState;
         bus.process_commands(&mut state);
 
@@ -564,7 +561,7 @@ mod tests {
         let mut bus: Bus<TestState> = Bus::new();
 
         // When submitting a command.
-        bus.submit_command(Command::AppQuit);
+        bus.submit_command(Command::Quit);
         let mut state = TestState;
         bus.process_commands(&mut state);
 
@@ -574,13 +571,13 @@ mod tests {
 
     #[test]
     fn unit_command_dispatches_correctly() {
-        // Given a bus with a handler for ChatBoxDeleteGrapheme (unit struct).
-        let (handler, calls) = FakeCommandHandler::<ChatBoxDeleteGrapheme, TestState>::continuing();
+        // Given a bus with a handler for DeleteGrapheme (unit struct).
+        let (handler, calls) = FakeCommandHandler::<DeleteGrapheme, TestState>::continuing();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_command_handler::<ChatBoxDeleteGrapheme, _>(handler);
+        bus.register_command_handler::<DeleteGrapheme, _>(handler);
 
         // When processing a unit command.
-        bus.submit_command(Command::ChatBoxDeleteGrapheme);
+        bus.submit_command(Command::DeleteGrapheme);
         let mut state = TestState;
         bus.process_commands(&mut state);
 
@@ -592,18 +589,18 @@ mod tests {
 
     #[test]
     fn event_dispatch_reaches_handler() {
-        // Given a bus with a handler for EventKeyDown.
-        let (handler, calls) = FakeEventHandler::<EventKeyDown, TestState>::new();
+        // Given a bus with a handler for KeyDown.
+        let (handler, calls) = FakeEventHandler::<KeyDown, TestState>::new();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_event_handler::<EventKeyDown, _>(handler);
+        bus.register_event_handler::<KeyDown, _>(handler);
 
         // When processing an event.
         let key = npr::KeyEvent {
             key: npr::Key::Char('a'),
             modifiers: npr::Modifiers::none(),
         };
-        bus.submit_event(Event::EventKeyDown {
-            payload: EventKeyDown { key },
+        bus.submit_event(Event::KeyDown {
+            payload: KeyDown { key },
         });
         let mut state = TestState;
         bus.process_events(&mut state);
@@ -614,13 +611,13 @@ mod tests {
 
     #[test]
     fn unit_event_dispatches_correctly() {
-        // Given a bus with a handler for EventApplicationReady (unit struct).
-        let (handler, calls) = FakeEventHandler::<EventApplicationReady, TestState>::new();
+        // Given a bus with a handler for ApplicationReady (unit struct).
+        let (handler, calls) = FakeEventHandler::<ApplicationReady, TestState>::new();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_event_handler::<EventApplicationReady, _>(handler);
+        bus.register_event_handler::<ApplicationReady, _>(handler);
 
         // When processing a unit event.
-        bus.submit_event(Event::EventApplicationReady);
+        bus.submit_event(Event::ApplicationReady);
         let mut state = TestState;
         bus.process_events(&mut state);
 
@@ -631,14 +628,14 @@ mod tests {
     #[test]
     fn all_event_handlers_run() {
         // Given a bus with two event handlers.
-        let (h1, calls1) = FakeEventHandler::<EventApplicationReady, TestState>::new();
-        let (h2, calls2) = FakeEventHandler::<EventApplicationReady, TestState>::new();
+        let (h1, calls1) = FakeEventHandler::<ApplicationReady, TestState>::new();
+        let (h2, calls2) = FakeEventHandler::<ApplicationReady, TestState>::new();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_event_handler::<EventApplicationReady, _>(h1);
-        bus.register_event_handler::<EventApplicationReady, _>(h2);
+        bus.register_event_handler::<ApplicationReady, _>(h1);
+        bus.register_event_handler::<ApplicationReady, _>(h2);
 
         // When processing an event.
-        bus.submit_event(Event::EventApplicationReady);
+        bus.submit_event(Event::ApplicationReady);
         let mut state = TestState;
         bus.process_events(&mut state);
 
@@ -649,52 +646,52 @@ mod tests {
 
     // --- Out / cascading tests ---
 
-    /// Handler that submits an `AppQuit` command when it sees `ChatBoxInsertChar`.
+    /// Handler that submits an `AppQuit` command when it sees `InsertChar`.
     struct CascadeHandler;
 
-    impl CommandHandler<ChatBoxInsertChar, TestState> for CascadeHandler {
+    impl CommandHandler<InsertChar, TestState> for CascadeHandler {
         fn handle(
             &self,
-            _cmd: &ChatBoxInsertChar,
+            _cmd: &InsertChar,
             _state: &mut TestState,
             out: &mut Out,
         ) -> CommandAction {
-            out.submit_command(Command::AppQuit);
+            out.submit_command(Command::Quit);
             CommandAction::Continue
         }
     }
 
     #[test]
     fn cascading_commands_are_processed() {
-        // Given a bus where ChatBoxInsertChar handler submits AppQuit.
-        let (quit_handler, quit_calls) = FakeCommandHandler::<AppQuit, TestState>::continuing();
+        // Given a bus where InsertChar handler submits AppQuit.
+        let (quit_handler, quit_calls) = FakeCommandHandler::<Quit, TestState>::continuing();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_command_handler::<ChatBoxInsertChar, _>(CascadeHandler);
-        bus.register_command_handler::<AppQuit, _>(quit_handler);
+        bus.register_command_handler::<InsertChar, _>(CascadeHandler);
+        bus.register_command_handler::<Quit, _>(quit_handler);
 
         // When processing the initial command.
-        bus.submit_command(Command::ChatBoxInsertChar {
-            payload: ChatBoxInsertChar { ch: 'x' },
+        bus.submit_command(Command::InsertChar {
+            payload: InsertChar { ch: 'x' },
         });
         let mut state = TestState;
         bus.process_commands(&mut state);
 
-        // Then the cascaded AppQuit was also processed.
+        // Then the cascaded Quit was also processed.
         assert_eq!(quit_calls.borrow().len(), 1);
     }
 
     /// Handler that resubmits itself, creating a potential infinite loop.
     struct LoopHandler;
 
-    impl CommandHandler<ChatBoxInsertChar, TestState> for LoopHandler {
+    impl CommandHandler<InsertChar, TestState> for LoopHandler {
         fn handle(
             &self,
-            _cmd: &ChatBoxInsertChar,
+            _cmd: &InsertChar,
             _state: &mut TestState,
             out: &mut Out,
         ) -> CommandAction {
-            out.submit_command(Command::ChatBoxInsertChar {
-                payload: ChatBoxInsertChar { ch: 'x' },
+            out.submit_command(Command::InsertChar {
+                payload: InsertChar { ch: 'x' },
             });
             CommandAction::Continue
         }
@@ -704,11 +701,11 @@ mod tests {
     fn max_iterations_prevents_infinite_loop() {
         // Given a bus where the handler resubmits itself, with a low max_iterations.
         let mut bus: Bus<TestState> = Bus::new().with_max_iterations(3);
-        bus.register_command_handler::<ChatBoxInsertChar, _>(LoopHandler);
+        bus.register_command_handler::<InsertChar, _>(LoopHandler);
 
         // When processing commands.
-        bus.submit_command(Command::ChatBoxInsertChar {
-            payload: ChatBoxInsertChar { ch: 'x' },
+        bus.submit_command(Command::InsertChar {
+            payload: InsertChar { ch: 'x' },
         });
         let mut state = TestState;
         bus.process_commands(&mut state);
@@ -725,7 +722,7 @@ mod tests {
         assert!(!bus.has_pending());
 
         // When submitting a command.
-        bus.submit_command(Command::AppQuit);
+        bus.submit_command(Command::Quit);
         assert!(bus.has_pending());
 
         // When processing commands.
@@ -741,7 +738,7 @@ mod tests {
         assert!(!bus.has_pending());
 
         // When submitting an event.
-        bus.submit_event(Event::EventApplicationReady);
+        bus.submit_event(Event::ApplicationReady);
         assert!(bus.has_pending());
 
         // When processing events.
@@ -756,21 +753,20 @@ mod tests {
     fn struct_command_with_payload_dispatches() {
         // Given a bus with handlers for multiple struct commands.
         let (set_mode_handler, set_mode_calls) =
-            FakeCommandHandler::<AppSetMode, TestState>::continuing();
-        let (send_handler, send_calls) =
-            FakeCommandHandler::<ProviderSendMessage, TestState>::continuing();
+            FakeCommandHandler::<SetMode, TestState>::continuing();
+        let (send_handler, send_calls) = FakeCommandHandler::<SendMessage, TestState>::continuing();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_command_handler::<AppSetMode, _>(set_mode_handler);
-        bus.register_command_handler::<ProviderSendMessage, _>(send_handler);
+        bus.register_command_handler::<SetMode, _>(set_mode_handler);
+        bus.register_command_handler::<SendMessage, _>(send_handler);
 
         // When submitting multiple commands.
-        bus.submit_command(Command::AppSetMode {
-            payload: AppSetMode {
+        bus.submit_command(Command::SetMode {
+            payload: SetMode {
                 mode: npr::Mode::Input,
             },
         });
-        bus.submit_command(Command::ProviderSendMessage {
-            payload: ProviderSendMessage {
+        bus.submit_command(Command::SendMessage {
+            payload: SendMessage {
                 text: "hello".into(),
             },
         });
@@ -786,24 +782,23 @@ mod tests {
     /// Handler that submits an event when processing a command.
     struct CommandToEventHandler;
 
-    impl CommandHandler<AppQuit, TestState> for CommandToEventHandler {
-        fn handle(&self, _cmd: &AppQuit, _state: &mut TestState, out: &mut Out) -> CommandAction {
-            out.submit_event(Event::EventApplicationReady);
+    impl CommandHandler<Quit, TestState> for CommandToEventHandler {
+        fn handle(&self, _cmd: &Quit, _state: &mut TestState, out: &mut Out) -> CommandAction {
+            out.submit_event(Event::ApplicationReady);
             CommandAction::Continue
         }
     }
 
     #[test]
     fn command_handler_can_submit_events() {
-        // Given a bus where AppQuit handler submits EventApplicationReady.
-        let (event_handler, event_calls) =
-            FakeEventHandler::<EventApplicationReady, TestState>::new();
+        // Given a bus where Quit handler submits ApplicationReady.
+        let (event_handler, event_calls) = FakeEventHandler::<ApplicationReady, TestState>::new();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_command_handler::<AppQuit, _>(CommandToEventHandler);
-        bus.register_event_handler::<EventApplicationReady, _>(event_handler);
+        bus.register_command_handler::<Quit, _>(CommandToEventHandler);
+        bus.register_event_handler::<ApplicationReady, _>(event_handler);
 
         // When processing a command that submits an event.
-        bus.submit_command(Command::AppQuit);
+        bus.submit_command(Command::Quit);
         let mut state = TestState;
         bus.process_commands(&mut state);
 
@@ -822,29 +817,29 @@ mod tests {
     #[test]
     fn drain_processed_events_returns_dispatched_events() {
         // Given a bus with an event handler.
-        let (handler, _calls) = FakeEventHandler::<EventApplicationReady, TestState>::new();
+        let (handler, _calls) = FakeEventHandler::<ApplicationReady, TestState>::new();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_event_handler::<EventApplicationReady, _>(handler);
+        bus.register_event_handler::<ApplicationReady, _>(handler);
 
         // When processing an event.
-        bus.submit_event(Event::EventApplicationReady);
+        bus.submit_event(Event::ApplicationReady);
         let mut state = TestState;
         bus.process_events(&mut state);
 
         // Then drain_processed_events returns the dispatched event with no source.
         let processed = bus.drain_processed_events();
         assert_eq!(processed.len(), 1);
-        assert!(matches!(processed[0].event, Event::EventApplicationReady));
+        assert!(matches!(processed[0].event, Event::ApplicationReady));
         assert!(processed[0].source.is_none());
     }
 
     #[test]
     fn drain_processed_events_clears_buffer() {
         // Given a bus with a processed event.
-        let (handler, _calls) = FakeEventHandler::<EventApplicationReady, TestState>::new();
+        let (handler, _calls) = FakeEventHandler::<ApplicationReady, TestState>::new();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_event_handler::<EventApplicationReady, _>(handler);
-        bus.submit_event(Event::EventApplicationReady);
+        bus.register_event_handler::<ApplicationReady, _>(handler);
+        bus.submit_event(Event::ApplicationReady);
         let mut state = TestState;
         bus.process_events(&mut state);
 
@@ -862,29 +857,29 @@ mod tests {
     #[test]
     fn drain_processed_commands_returns_dispatched_commands() {
         // Given a bus with a command handler.
-        let (handler, _calls) = FakeCommandHandler::<AppQuit, TestState>::continuing();
+        let (handler, _calls) = FakeCommandHandler::<Quit, TestState>::continuing();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_command_handler::<AppQuit, _>(handler);
+        bus.register_command_handler::<Quit, _>(handler);
 
         // When processing a command.
-        bus.submit_command(Command::AppQuit);
+        bus.submit_command(Command::Quit);
         let mut state = TestState;
         bus.process_commands(&mut state);
 
         // Then drain_processed_commands returns the dispatched command with no source.
         let processed = bus.drain_processed_commands();
         assert_eq!(processed.len(), 1);
-        assert!(matches!(processed[0].command, Command::AppQuit));
+        assert!(matches!(processed[0].command, Command::Quit));
         assert!(processed[0].source.is_none());
     }
 
     #[test]
     fn drain_processed_commands_clears_buffer() {
         // Given a bus with a processed command.
-        let (handler, _calls) = FakeCommandHandler::<AppQuit, TestState>::continuing();
+        let (handler, _calls) = FakeCommandHandler::<Quit, TestState>::continuing();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_command_handler::<AppQuit, _>(handler);
-        bus.submit_command(Command::AppQuit);
+        bus.register_command_handler::<Quit, _>(handler);
+        bus.submit_command(Command::Quit);
         let mut state = TestState;
         bus.process_commands(&mut state);
 
@@ -902,12 +897,12 @@ mod tests {
     #[test]
     fn submit_command_from_preserves_source() {
         // Given a bus with a command handler.
-        let (handler, _calls) = FakeCommandHandler::<AppQuit, TestState>::continuing();
+        let (handler, _calls) = FakeCommandHandler::<Quit, TestState>::continuing();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_command_handler::<AppQuit, _>(handler);
+        bus.register_command_handler::<Quit, _>(handler);
 
         // When submitting a command with a source.
-        bus.submit_command_from(Command::AppQuit, Some(ExtensionName::new("ext-test")));
+        bus.submit_command_from(Command::Quit, Some(ActorName::new("ext-test")));
         let mut state = TestState;
         bus.process_commands(&mut state);
 
@@ -920,15 +915,12 @@ mod tests {
     #[test]
     fn submit_event_from_preserves_source() {
         // Given a bus with an event handler.
-        let (handler, _calls) = FakeEventHandler::<EventApplicationReady, TestState>::new();
+        let (handler, _calls) = FakeEventHandler::<ApplicationReady, TestState>::new();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_event_handler::<EventApplicationReady, _>(handler);
+        bus.register_event_handler::<ApplicationReady, _>(handler);
 
         // When submitting an event with a source.
-        bus.submit_event_from(
-            Event::EventApplicationReady,
-            Some(ExtensionName::new("ext-test")),
-        );
+        bus.submit_event_from(Event::ApplicationReady, Some(ActorName::new("ext-test")));
         let mut state = TestState;
         bus.process_events(&mut state);
 
@@ -941,12 +933,12 @@ mod tests {
     #[test]
     fn submit_command_without_source_has_none() {
         // Given a bus with a command handler.
-        let (handler, _calls) = FakeCommandHandler::<AppQuit, TestState>::continuing();
+        let (handler, _calls) = FakeCommandHandler::<Quit, TestState>::continuing();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_command_handler::<AppQuit, _>(handler);
+        bus.register_command_handler::<Quit, _>(handler);
 
         // When submitting a command without source.
-        bus.submit_command(Command::AppQuit);
+        bus.submit_command(Command::Quit);
         let mut state = TestState;
         bus.process_commands(&mut state);
 

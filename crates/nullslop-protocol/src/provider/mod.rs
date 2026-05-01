@@ -2,4 +2,4 @@
 
 mod command;
 
-pub use command::{ProviderCancelStream, ProviderSendMessage};
+pub use command::{CancelStream, SendMessage};

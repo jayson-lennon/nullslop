@@ -5,8 +5,8 @@ use nullslop_component::AppUiRegistry;
 use nullslop_core::{AppCore, AppMsg};
 use nullslop_protocol::{Command, Mode};
 use ratatui::Frame;
-use ratatui_which_key::WhichKeyState;
 use ratatui_tabs::TabManager;
+use ratatui_which_key::WhichKeyState;
 
 use crate::keymap;
 use crate::msg::Msg;
@@ -70,7 +70,7 @@ impl TuiApp {
     /// Creates a new application with pre-built core and services.
     ///
     /// Use this when the caller has already registered components
-    /// and set up the extension host on the core.
+    /// and set up the actor host on the core.
     #[must_use]
     pub fn new_with_core(
         services: nullslop_services::Services,
@@ -110,12 +110,6 @@ impl TuiApp {
             Msg::Command(cmd) => {
                 self.route_command(cmd);
             }
-            Msg::ExtensionsReady(registrations) => {
-                let _ = self
-                    .core
-                    .sender()
-                    .send(AppMsg::ExtensionsReady(registrations));
-            }
         }
     }
 
@@ -125,10 +119,10 @@ impl TuiApp {
     /// are handled directly. All other commands go through the core channel.
     fn route_command(&mut self, cmd: Command) {
         match cmd {
-            Command::AppToggleWhichKey => {
+            Command::ToggleWhichKey => {
                 self.which_key.toggle();
             }
-            Command::AppEditInput => {
+            Command::EditInput => {
                 let initial_content = self.core.state.read().chat_input.text().to_string();
                 self.suspend.request(SuspendAction::Edit {
                     initial_content,
@@ -163,7 +157,7 @@ mod tests {
     use std::sync::Arc;
 
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-    use nullslop_ext_host::fake::FakeExtensionHost;
+    use nullslop_actor_host::FakeActorHost;
     use nullslop_protocol as npr;
 
     use super::*;
@@ -178,8 +172,8 @@ mod tests {
             tokio::runtime::Runtime::new().expect("test runtime"),
         ));
         let handle = rt.handle().clone();
-        let ext_host: Arc<dyn nullslop_core::ExtensionHost> = Arc::new(FakeExtensionHost::new());
-        let services = nullslop_services::Services::new(handle, ext_host);
+        let actor_host: Arc<dyn nullslop_actor_host::ActorHost> = Arc::new(FakeActorHost::new());
+        let services = nullslop_services::Services::new(handle, actor_host);
         TuiApp::new(services)
     }
 
@@ -224,7 +218,11 @@ mod tests {
         // Given an App in Input scope with "hello" in buffer.
         let mut app = create_test_app();
         app.which_key.set_scope(Scope::Input);
-        app.core.state.write().chat_input.replace_all("hello".to_string());
+        app.core
+            .state
+            .write()
+            .chat_input
+            .replace_all("hello".to_string());
 
         // When pressing Enter.
         app.handle_msg(Msg::Input(key_event(KeyCode::Enter)));
@@ -273,7 +271,11 @@ mod tests {
         // Given an App in Input scope with "ab" in buffer.
         let mut app = create_test_app();
         app.which_key.set_scope(Scope::Input);
-        app.core.state.write().chat_input.replace_all("ab".to_string());
+        app.core
+            .state
+            .write()
+            .chat_input
+            .replace_all("ab".to_string());
 
         // When pressing Backspace.
         app.handle_msg(Msg::Input(key_event(KeyCode::Backspace)));
@@ -290,23 +292,22 @@ mod tests {
         let mut app = create_test_app();
         assert!(!app.which_key.active);
 
-        // When routing AppToggleWhichKey directly.
-        app.route_command(Command::AppToggleWhichKey);
+        // When routing ToggleWhichKey directly.
+        app.route_command(Command::ToggleWhichKey);
 
         // Then which_key is active (handled directly, not through core).
         assert!(app.which_key.active);
     }
 
     #[test]
-    fn app_custom_command_routes_through_bus() {
+    fn app_push_chat_entry_routes_through_bus() {
         // Given an App with components registered.
         let mut app = create_test_app();
 
-        // When routing a CustomCommand (echo).
-        app.route_command(Command::CustomCommand {
-            payload: npr::command::CustomCommand {
-                name: "echo".to_string(),
-                args: serde_json::json!({"source": "nullslop-echo", "text": "HELLO"}),
+        // When routing a PushChatEntry with an actor entry.
+        app.route_command(Command::PushChatEntry {
+            payload: npr::chat_input::PushChatEntry {
+                entry: npr::ChatEntry::actor("nullslop-echo", "HELLO"),
             },
         });
 
@@ -316,7 +317,7 @@ mod tests {
         assert_eq!(guard.chat_history.len(), 1);
         assert_eq!(
             guard.chat_history[0].kind,
-            npr::ChatEntryKind::Extension {
+            npr::ChatEntryKind::Actor {
                 source: "nullslop-echo".to_string(),
                 text: "HELLO".to_string(),
             }

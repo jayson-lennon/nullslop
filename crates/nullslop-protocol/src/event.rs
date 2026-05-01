@@ -1,10 +1,11 @@
 //! Event types for the component event pipeline.
 //!
 //! The [`Event`] enum is the unified type the host broadcasts to
-//! inform internal handlers and extensions about state changes and input.
+//! inform internal handlers and actors about state changes and input.
 //!
 //! Individual event structs live in domain modules ([`chat_input`], [`system`],
-//! [`custom`], [`extension`]). This module re-exports them for convenience.
+//! [`custom`], [`actor`]). Consumers import structs directly from those modules —
+//! this facade only re-exports infrastructure types.
 //!
 //! # When adding a new event
 //!
@@ -14,17 +15,17 @@
 
 use serde::{Deserialize, Serialize};
 
-// Re-export event structs and trait from domain modules.
-pub use crate::chat_input::EventChatMessageSubmitted;
-pub use crate::custom::{EventCustom, EventMsg};
-pub use crate::extension::{
-    ExtensionShutdownCompleted, ExtensionStarted, ExtensionStarting,
-};
-pub use crate::system::{EventApplicationReady, EventApplicationShuttingDown, EventKeyDown, EventKeyUp, EventModeChanged};
+// Re-export infrastructure types only. Domain structs are imported from their modules.
+pub use crate::custom::EventMsg;
+
+// Internal imports for enum definition, type_name(), and tests.
+use crate::actor::{ActorShutdownCompleted, ActorStarted, ActorStarting};
+use crate::chat_input::ChatEntrySubmitted;
+use crate::system::{ApplicationReady, ApplicationShuttingDown, KeyDown, KeyUp, ModeChanged};
 
 /// Every event the host can broadcast.
 ///
-/// Extensions subscribe to relevant variants; the host also
+/// Actors subscribe to relevant variants; the host also
 /// uses them internally to drive UI updates.
 ///
 /// **When adding a new event struct**, you must add a corresponding variant to
@@ -34,90 +35,88 @@ pub use crate::system::{EventApplicationReady, EventApplicationShuttingDown, Eve
 #[serde(tag = "type")]
 pub enum Event {
     /// A key was pressed down.
-    #[serde(rename = "event_key_down")]
-    EventKeyDown {
+    #[serde(rename = "key_down")]
+    KeyDown {
         /// Which key was pressed.
         #[serde(flatten)]
-        payload: EventKeyDown,
+        payload: KeyDown,
     },
     /// A key was released.
-    #[serde(rename = "event_key_up")]
-    EventKeyUp {
+    #[serde(rename = "key_up")]
+    KeyUp {
         /// Which key was released.
         #[serde(flatten)]
-        payload: EventKeyUp,
+        payload: KeyUp,
     },
-    /// A chat message was submitted.
-    #[serde(rename = "event_chat_message_submitted")]
-    EventChatMessageSubmitted {
-        /// The submitted chat entry.
+    /// A chat entry was added to the conversation history.
+    #[serde(rename = "chat_entry_submitted")]
+    ChatEntrySubmitted {
+        /// The chat entry that was added.
         #[serde(flatten)]
-        payload: EventChatMessageSubmitted,
+        payload: ChatEntrySubmitted,
     },
     /// The application mode changed.
-    #[serde(rename = "event_mode_changed")]
-    EventModeChanged {
+    #[serde(rename = "mode_changed")]
+    ModeChanged {
         /// The previous and new mode.
         #[serde(flatten)]
-        payload: EventModeChanged,
+        payload: ModeChanged,
     },
     /// The application has finished starting up.
-    #[serde(rename = "event_application_ready")]
-    EventApplicationReady,
-    /// A custom event.
-    #[serde(rename = "event_custom")]
-    EventCustom {
-        /// The extension-defined event name and data.
+    #[serde(rename = "application_ready")]
+    ApplicationReady,
+    /// An actor is starting up.
+    #[serde(rename = "actor_starting")]
+    ActorStarting {
+        /// Which actor is starting.
         #[serde(flatten)]
-        payload: EventCustom,
+        payload: ActorStarting,
     },
-    /// An extension is starting up.
-    #[serde(rename = "event_extension_starting")]
-    EventExtensionStarting {
-        /// Which extension is starting.
+    /// An actor has finished starting up.
+    #[serde(rename = "actor_started")]
+    ActorStarted {
+        /// Which actor finished starting.
         #[serde(flatten)]
-        payload: ExtensionStarting,
+        payload: ActorStarted,
     },
-    /// An extension has finished starting up.
-    #[serde(rename = "event_extension_started")]
-    EventExtensionStarted {
-        /// Which extension finished starting.
+    /// An actor has completed shutdown.
+    #[serde(rename = "actor_shutdown_completed")]
+    ActorShutdownCompleted {
+        /// Which actor finished shutting down.
         #[serde(flatten)]
-        payload: ExtensionStarted,
-    },
-    /// An extension has completed shutdown.
-    #[serde(rename = "event_extension_shutdown_completed")]
-    EventExtensionShutdownCompleted {
-        /// Which extension finished shutting down.
-        #[serde(flatten)]
-        payload: ExtensionShutdownCompleted,
+        payload: ActorShutdownCompleted,
     },
     /// The application is shutting down.
-    #[serde(rename = "event_application_shutting_down")]
-    EventApplicationShuttingDown,
+    #[serde(rename = "application_shutting_down")]
+    ApplicationShuttingDown,
 }
 
 impl Event {
     /// Returns the subscription-relevant type name for event routing.
-    ///
-    /// Returns `None` for events that should not be routed to extensions
-    /// (e.g., key events).
     #[must_use]
     pub fn type_name(&self) -> Option<&str> {
         match self {
-            Self::EventChatMessageSubmitted { .. } => Some(EventChatMessageSubmitted::TYPE_NAME),
-            Self::EventApplicationReady => Some(EventApplicationReady::TYPE_NAME),
-            Self::EventCustom { payload, .. } => Some(payload.name.as_str()),
-            Self::EventExtensionStarting { .. } => Some(ExtensionStarting::TYPE_NAME),
-            Self::EventExtensionStarted { .. } => Some(ExtensionStarted::TYPE_NAME),
-            Self::EventExtensionShutdownCompleted { .. } => {
-                Some(ExtensionShutdownCompleted::TYPE_NAME)
-            }
-            Self::EventApplicationShuttingDown => Some(EventApplicationShuttingDown::TYPE_NAME),
-            Self::EventKeyDown { .. } | Self::EventKeyUp { .. } | Self::EventModeChanged { .. } => {
-                None
-            }
+            Self::ChatEntrySubmitted { .. } => Some(ChatEntrySubmitted::TYPE_NAME),
+            Self::ApplicationReady => Some(ApplicationReady::TYPE_NAME),
+            Self::ActorStarting { .. } => Some(ActorStarting::TYPE_NAME),
+            Self::ActorStarted { .. } => Some(ActorStarted::TYPE_NAME),
+            Self::ActorShutdownCompleted { .. } => Some(ActorShutdownCompleted::TYPE_NAME),
+            Self::ApplicationShuttingDown => Some(ApplicationShuttingDown::TYPE_NAME),
+            Self::KeyDown { .. } => Some(KeyDown::TYPE_NAME),
+            Self::KeyUp { .. } => Some(KeyUp::TYPE_NAME),
+            Self::ModeChanged { .. } => Some(ModeChanged::TYPE_NAME),
         }
+    }
+
+    /// Returns `true` if this event should be broadcast to all actors
+    /// regardless of their subscriptions.
+    ///
+    /// Application-level lifecycle events (ready, shutting down) are broadcast
+    /// so every actor can participate in startup/shutdown without manual
+    /// subscription boilerplate.
+    #[must_use]
+    pub fn is_lifecycle_broadcast(&self) -> bool {
+        matches!(self, Self::ApplicationReady | Self::ApplicationShuttingDown)
     }
 }
 
@@ -128,22 +127,22 @@ mod tests {
 
     #[test]
     fn event_application_ready_serialization() {
-        // Given an EventApplicationReady.
-        let event = Event::EventApplicationReady;
+        // Given an ApplicationReady.
+        let event = Event::ApplicationReady;
 
         // When serialized.
         let json = serde_json::to_string(&event).expect("serialize");
 
-        // Then it is {"type":"event_application_ready"}.
-        assert_eq!(json, r#"{"type":"event_application_ready"}"#);
+        // Then it is {"type":"application_ready"}.
+        assert_eq!(json, r#"{"type":"application_ready"}"#);
     }
 
     #[test]
-    fn event_chat_message_submitted_preserves_entry() {
-        // Given an EventChatMessageSubmitted with a user entry.
+    fn event_chat_entry_submitted_preserves_entry() {
+        // Given a ChatEntrySubmitted event with a user entry.
         let entry = ChatEntry::user("hello");
-        let event = Event::EventChatMessageSubmitted {
-            payload: EventChatMessageSubmitted { entry },
+        let event = Event::ChatEntrySubmitted {
+            payload: ChatEntrySubmitted { entry },
         };
 
         // When serialized and deserialized.
@@ -152,27 +151,26 @@ mod tests {
 
         // Then entry text is preserved.
         match back {
-            Event::EventChatMessageSubmitted { payload } => {
+            Event::ChatEntrySubmitted { payload } => {
                 assert_eq!(
                     payload.entry.kind,
                     crate::ChatEntryKind::User("hello".to_string())
                 );
             }
-            other => panic!("expected EventChatMessageSubmitted, got {other:?}"),
+            other => panic!("expected ChatEntrySubmitted, got {other:?}"),
         }
     }
 
     #[rstest::rstest]
-    #[case::key_down(Event::EventKeyDown { payload: EventKeyDown { key: KeyEvent { key: Key::Char('a'), modifiers: Modifiers::none() } } })]
-    #[case::key_up(Event::EventKeyUp { payload: EventKeyUp { key: KeyEvent { key: Key::Enter, modifiers: Modifiers::none() } } })]
-    #[case::chat_submitted(Event::EventChatMessageSubmitted { payload: EventChatMessageSubmitted { entry: ChatEntry::user("test") } })]
-    #[case::mode_changed(Event::EventModeChanged { payload: EventModeChanged { from: Mode::Normal, to: Mode::Input } })]
-    #[case::application_ready(Event::EventApplicationReady)]
-    #[case::custom(Event::EventCustom { payload: EventCustom { name: "my_event".into(), data: serde_json::json!({"key": "value"}) } })]
-    #[case::extension_starting(Event::EventExtensionStarting { payload: ExtensionStarting { name: "ext-a".into() } })]
-    #[case::extension_started(Event::EventExtensionStarted { payload: ExtensionStarted { name: "ext-a".into() } })]
-    #[case::extension_shutdown_completed(Event::EventExtensionShutdownCompleted { payload: ExtensionShutdownCompleted { name: "ext-a".into() } })]
-    #[case::application_shutting_down(Event::EventApplicationShuttingDown)]
+    #[case::key_down(Event::KeyDown { payload: KeyDown { key: KeyEvent { key: Key::Char('a'), modifiers: Modifiers::none() } } })]
+    #[case::key_up(Event::KeyUp { payload: KeyUp { key: KeyEvent { key: Key::Enter, modifiers: Modifiers::none() } } })]
+    #[case::chat_submitted(Event::ChatEntrySubmitted { payload: ChatEntrySubmitted { entry: ChatEntry::user("test") } })]
+    #[case::mode_changed(Event::ModeChanged { payload: ModeChanged { from: Mode::Normal, to: Mode::Input } })]
+    #[case::application_ready(Event::ApplicationReady)]
+    #[case::actor_starting(Event::ActorStarting { payload: ActorStarting { name: "actor-a".into() } })]
+    #[case::actor_started(Event::ActorStarted { payload: ActorStarted { name: "actor-a".into() } })]
+    #[case::actor_shutdown_completed(Event::ActorShutdownCompleted { payload: ActorShutdownCompleted { name: "actor-a".into() } })]
+    #[case::application_shutting_down(Event::ApplicationShuttingDown)]
     fn event_roundtrip_all_variants(#[case] event: Event) {
         // Given an event variant.
         let json = serde_json::to_string(&event).expect("serialize");
@@ -191,66 +189,54 @@ mod tests {
         // Given all Event variants.
         // Then subscribable events return their EventMsg TYPE_NAME.
         assert_eq!(
-            Event::EventChatMessageSubmitted {
-                payload: EventChatMessageSubmitted {
+            Event::ChatEntrySubmitted {
+                payload: ChatEntrySubmitted {
                     entry: ChatEntry::user("test"),
                 }
             }
             .type_name(),
-            Some(EventChatMessageSubmitted::TYPE_NAME)
+            Some(ChatEntrySubmitted::TYPE_NAME)
         );
         assert_eq!(
-            Event::EventApplicationReady.type_name(),
-            Some(EventApplicationReady::TYPE_NAME)
+            Event::ApplicationReady.type_name(),
+            Some(ApplicationReady::TYPE_NAME)
         );
         assert_eq!(
-            Event::EventExtensionStarting {
-                payload: ExtensionStarting {
-                    name: "ext-a".into(),
+            Event::ActorStarting {
+                payload: ActorStarting {
+                    name: "actor-a".into(),
                 }
             }
             .type_name(),
-            Some(ExtensionStarting::TYPE_NAME)
+            Some(ActorStarting::TYPE_NAME)
         );
         assert_eq!(
-            Event::EventExtensionStarted {
-                payload: ExtensionStarted {
-                    name: "ext-a".into(),
+            Event::ActorStarted {
+                payload: ActorStarted {
+                    name: "actor-a".into(),
                 }
             }
             .type_name(),
-            Some(ExtensionStarted::TYPE_NAME)
+            Some(ActorStarted::TYPE_NAME)
         );
         assert_eq!(
-            Event::EventExtensionShutdownCompleted {
-                payload: ExtensionShutdownCompleted {
-                    name: "ext-a".into(),
+            Event::ActorShutdownCompleted {
+                payload: ActorShutdownCompleted {
+                    name: "actor-a".into(),
                 }
             }
             .type_name(),
-            Some(ExtensionShutdownCompleted::TYPE_NAME)
+            Some(ActorShutdownCompleted::TYPE_NAME)
         );
         assert_eq!(
-            Event::EventApplicationShuttingDown.type_name(),
-            Some(EventApplicationShuttingDown::TYPE_NAME)
+            Event::ApplicationShuttingDown.type_name(),
+            Some(ApplicationShuttingDown::TYPE_NAME)
         );
 
-        // Then EventCustom uses the dynamic name.
+        // Then key and mode events return their TYPE_NAME.
         assert_eq!(
-            Event::EventCustom {
-                payload: EventCustom {
-                    name: "my-event".to_string(),
-                    data: serde_json::json!(null),
-                }
-            }
-            .type_name(),
-            Some("my-event")
-        );
-
-        // Then non-subscribable events return None.
-        assert_eq!(
-            Event::EventKeyDown {
-                payload: EventKeyDown {
+            Event::KeyDown {
+                payload: KeyDown {
                     key: KeyEvent {
                         key: Key::Enter,
                         modifiers: Modifiers::none(),
@@ -258,11 +244,11 @@ mod tests {
                 }
             }
             .type_name(),
-            None
+            Some(KeyDown::TYPE_NAME)
         );
         assert_eq!(
-            Event::EventKeyUp {
-                payload: EventKeyUp {
+            Event::KeyUp {
+                payload: KeyUp {
                     key: KeyEvent {
                         key: Key::Char('a'),
                         modifiers: Modifiers::none(),
@@ -270,34 +256,69 @@ mod tests {
                 }
             }
             .type_name(),
-            None
+            Some(KeyUp::TYPE_NAME)
         );
         assert_eq!(
-            Event::EventModeChanged {
-                payload: EventModeChanged {
+            Event::ModeChanged {
+                payload: ModeChanged {
                     from: Mode::Normal,
                     to: Mode::Input,
                 }
             }
             .type_name(),
-            None
+            Some(ModeChanged::TYPE_NAME)
         );
 
-        // Then TYPE_NAME constants match the expected string values.
+        // Then TYPE_NAME constants match the expected module-scoped values.
         assert_eq!(
-            EventChatMessageSubmitted::TYPE_NAME,
-            "EventChatMessageSubmitted"
+            ChatEntrySubmitted::TYPE_NAME,
+            "chat_input::ChatEntrySubmitted"
         );
-        assert_eq!(EventApplicationReady::TYPE_NAME, "EventApplicationReady");
-        assert_eq!(ExtensionStarting::TYPE_NAME, "EventExtensionStarting");
-        assert_eq!(ExtensionStarted::TYPE_NAME, "EventExtensionStarted");
+        assert_eq!(ApplicationReady::TYPE_NAME, "system::ApplicationReady");
+        assert_eq!(ActorStarting::TYPE_NAME, "actor::ActorStarting");
+        assert_eq!(ActorStarted::TYPE_NAME, "actor::ActorStarted");
         assert_eq!(
-            ExtensionShutdownCompleted::TYPE_NAME,
-            "EventExtensionShutdownCompleted"
+            ActorShutdownCompleted::TYPE_NAME,
+            "actor::ActorShutdownCompleted"
         );
         assert_eq!(
-            EventApplicationShuttingDown::TYPE_NAME,
-            "EventApplicationShuttingDown"
+            ApplicationShuttingDown::TYPE_NAME,
+            "system::ApplicationShuttingDown"
         );
+        assert_eq!(KeyDown::TYPE_NAME, "system::KeyDown");
+        assert_eq!(KeyUp::TYPE_NAME, "system::KeyUp");
+        assert_eq!(ModeChanged::TYPE_NAME, "system::ModeChanged");
+    }
+
+    #[test]
+    fn is_lifecycle_broadcast_returns_true_for_application_ready() {
+        // Given an ApplicationReady event.
+        let event = Event::ApplicationReady;
+
+        // Then it is a lifecycle broadcast.
+        assert!(event.is_lifecycle_broadcast());
+    }
+
+    #[test]
+    fn is_lifecycle_broadcast_returns_true_for_application_shutting_down() {
+        // Given an ApplicationShuttingDown event.
+        let event = Event::ApplicationShuttingDown;
+
+        // Then it is a lifecycle broadcast.
+        assert!(event.is_lifecycle_broadcast());
+    }
+
+    #[rstest::rstest]
+    #[case::key_down(Event::KeyDown { payload: KeyDown { key: KeyEvent { key: Key::Char('a'), modifiers: Modifiers::none() } } })]
+    #[case::key_up(Event::KeyUp { payload: KeyUp { key: KeyEvent { key: Key::Enter, modifiers: Modifiers::none() } } })]
+    #[case::chat_submitted(Event::ChatEntrySubmitted { payload: ChatEntrySubmitted { entry: ChatEntry::user("test") } })]
+    #[case::mode_changed(Event::ModeChanged { payload: ModeChanged { from: Mode::Normal, to: Mode::Input } })]
+    #[case::actor_starting(Event::ActorStarting { payload: ActorStarting { name: "actor-a".into() } })]
+    #[case::actor_started(Event::ActorStarted { payload: ActorStarted { name: "actor-a".into() } })]
+    #[case::actor_shutdown_completed(Event::ActorShutdownCompleted { payload: ActorShutdownCompleted { name: "actor-a".into() } })]
+    fn is_lifecycle_broadcast_returns_false_for_non_lifecycle_events(#[case] event: Event) {
+        // Given a non-lifecycle event variant.
+        // Then it is not a lifecycle broadcast.
+        assert!(!event.is_lifecycle_broadcast());
     }
 }

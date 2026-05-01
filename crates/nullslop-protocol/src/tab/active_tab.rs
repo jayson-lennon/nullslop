@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 pub enum ActiveTab {
     /// The chat conversation view.
     Chat,
-    /// The dashboard view showing extension status.
+    /// The dashboard view showing actor status.
     Dashboard,
 }
 
@@ -89,7 +89,10 @@ mod tests {
     #[test]
     fn labels_are_distinct() {
         // Given all tabs.
-        let labels: Vec<&str> = ActiveTab::all().iter().map(super::ActiveTab::label).collect();
+        let labels: Vec<&str> = ActiveTab::all()
+            .iter()
+            .map(super::ActiveTab::label)
+            .collect();
 
         // Then no two labels are the same.
         for i in 0..labels.len() {
