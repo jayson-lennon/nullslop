@@ -74,16 +74,5 @@ impl MessageSink for TestSink {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
-    #[test]
-    fn message_sink_is_object_safe() {
-        // Given a TestSink.
-        let sink = TestSink::new();
-
-        // When boxing it as dyn MessageSink.
-        let _boxed: Box<dyn MessageSink> = Box::new(sink);
-
-        // Then it compiles (object-safe).
-    }
 }

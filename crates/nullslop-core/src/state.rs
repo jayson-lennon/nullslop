@@ -125,17 +125,4 @@ mod tests {
         assert_eq!(guard.chat_history.len(), 1);
     }
 
-    /// Compile-time check that [`StateReadGuard`] provides
-    /// access only through `Deref<Target = AppState>`.
-    #[test]
-    fn state_read_guard_hides_lock() {
-        // Given a State.
-        let state = State::new(AppState::new());
-
-        // When acquiring a read guard.
-        let guard = state.read();
-
-        // Then we can only access AppState through Deref.
-        let _history = &guard.chat_history;
-    }
 }

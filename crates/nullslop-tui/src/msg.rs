@@ -51,29 +51,5 @@ mod tests {
         }
     }
 
-    #[test]
-    fn tick_message_constructs() {
-        // Given a Tick message.
-        let msg = Msg::Tick;
 
-        // When matching the message.
-        assert!(matches!(msg, Msg::Tick));
-
-        // Then it matches Tick.
-    }
-
-    #[test]
-    fn input_message_wraps_crossterm_event() {
-        // Given an Input message wrapping a crossterm key event.
-        let event = crossterm::event::Event::Key(crossterm::event::KeyEvent::new(
-            crossterm::event::KeyCode::Char('a'),
-            crossterm::event::KeyModifiers::NONE,
-        ));
-        let msg = Msg::Input(event);
-
-        // When matching on the message.
-        assert!(matches!(msg, Msg::Input(_)));
-
-        // Then it matches Input.
-    }
 }

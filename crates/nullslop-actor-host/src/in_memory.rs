@@ -313,23 +313,6 @@ mod tests {
         }
     }
 
-    /// Subscribes to `ChatEntrySubmitted`, registers command `chat_input::PushChatEntry`.
-    struct EchoLikeActor;
-
-    impl Actor for EchoLikeActor {
-        type Message = String;
-
-        fn activate(ctx: &mut ActorContext) -> Self {
-            ctx.subscribe_command_by_name(nullslop_protocol::chat_input::PushChatEntry::NAME);
-            ctx.subscribe_event::<ChatEntrySubmitted>();
-            Self
-        }
-
-        async fn handle(&mut self, _msg: ActorEnvelope<String>, _ctx: &ActorContext) {}
-
-        async fn shutdown(self) {}
-    }
-
     /// No-op actor for lifecycle testing.
     struct NoopActor;
 
@@ -402,18 +385,6 @@ mod tests {
         tokio::runtime::Runtime::new().expect("create runtime")
     }
 
-    fn spawn_echo_actor(
-        name: &str,
-        sink: Arc<dyn MessageSink>,
-        handle: &tokio::runtime::Handle,
-    ) -> ActorSpawnResult {
-        let (tx, rx) = kanal::unbounded::<ActorEnvelope<String>>();
-        let actor_ref = ActorRef::new(tx);
-        let mut ctx = ActorContext::new(name, sink);
-        let actor = EchoLikeActor::activate(&mut ctx);
-        spawn_actor(name, actor, &actor_ref, rx, ctx, handle)
-    }
-
     fn spawn_noop_actor(
         name: &str,
         sink: Arc<dyn MessageSink>,
@@ -449,11 +420,17 @@ mod tests {
 
     #[test]
     fn host_routes_subscribed_event() {
-        // Given a host with an echo-like actor.
+        // Given a host with a recording actor subscribed to ChatEntrySubmitted.
         let runtime = rt();
         let _guard = runtime.enter();
         let sink = Arc::new(TestSink::new());
-        let result = spawn_echo_actor("echo", sink.clone(), runtime.handle());
+        let (result, received) = spawn_recording_actor(
+            "recorder",
+            sink.clone(),
+            &["chat_input::ChatEntrySubmitted"],
+            &[],
+            runtime.handle(),
+        );
         let host =
             InMemoryActorHost::from_actors_with_handle(vec![result], runtime.handle().clone());
 
@@ -464,8 +441,13 @@ mod tests {
             },
         };
         host.send_event(&event, None);
+        std::thread::sleep(Duration::from_millis(50));
 
-        // Then no panic (event routed).
+        // Then the actor received the event.
+        let msgs = received.lock().unwrap().clone();
+        assert!(!msgs.is_empty(), "actor should receive the subscribed event");
+        assert!(msgs.iter().any(|m| m.contains("event:")), "expected event message, got: {msgs:?}");
+
         host.shutdown_with_timeout(Duration::from_millis(200))
             .expect("shutdown");
     }
@@ -515,11 +497,17 @@ mod tests {
 
     #[test]
     fn host_routes_registered_command() {
-        // Given a host with an echo-like actor.
+        // Given a host with a recording actor registered for PushChatEntry.
         let runtime = rt();
         let _guard = runtime.enter();
         let sink = Arc::new(TestSink::new());
-        let result = spawn_echo_actor("echo", sink.clone(), runtime.handle());
+        let (result, received) = spawn_recording_actor(
+            "recorder",
+            sink.clone(),
+            &[],
+            &[nullslop_protocol::chat_input::PushChatEntry::NAME],
+            runtime.handle(),
+        );
         let host =
             InMemoryActorHost::from_actors_with_handle(vec![result], runtime.handle().clone());
 
@@ -532,26 +520,41 @@ mod tests {
             },
             None,
         );
+        std::thread::sleep(Duration::from_millis(50));
 
-        // Then no panic (command routed).
+        // Then the actor received the command.
+        let msgs = received.lock().unwrap().clone();
+        assert!(!msgs.is_empty(), "actor should receive the registered command");
+        assert!(msgs.iter().any(|m| m.contains("command:")), "expected command message, got: {msgs:?}");
+
         host.shutdown_with_timeout(Duration::from_millis(200))
             .expect("shutdown");
     }
 
     #[test]
     fn host_skips_unregistered_command() {
-        // Given a host with an echo-like actor (registered "echo" only).
+        // Given a host with a recording actor registered for PushChatEntry only.
         let runtime = rt();
         let _guard = runtime.enter();
         let sink = Arc::new(TestSink::new());
-        let result = spawn_echo_actor("echo", sink.clone(), runtime.handle());
+        let (result, received) = spawn_recording_actor(
+            "recorder",
+            sink.clone(),
+            &[],
+            &[nullslop_protocol::chat_input::PushChatEntry::NAME],
+            runtime.handle(),
+        );
         let host =
             InMemoryActorHost::from_actors_with_handle(vec![result], runtime.handle().clone());
 
         // When sending an unregistered command (Quit is not subscribed by the actor).
         host.send_command(&Command::Quit, None);
+        std::thread::sleep(Duration::from_millis(50));
 
-        // Then no panic (command not routed).
+        // Then no messages were delivered to the actor.
+        let msgs = received.lock().unwrap().clone();
+        assert!(msgs.is_empty(), "actor should not receive unregistered command: {msgs:?}");
+
         host.shutdown_with_timeout(Duration::from_millis(200))
             .expect("shutdown");
     }

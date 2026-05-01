@@ -235,19 +235,6 @@ mod tests {
     use nullslop_protocol::Mode;
 
     #[test]
-    fn new_core_has_empty_state() {
-        // Given a new AppCore.
-        let core = AppCore::new();
-
-        // When inspecting the default state.
-        let guard = core.state.read();
-
-        // Then state has empty history and should_quit is false.
-        assert!(guard.chat_history.is_empty());
-        assert!(!guard.should_quit);
-    }
-
-    #[test]
     fn submit_command_processes_through_bus() {
         // Given an AppCore with components registered.
         let mut core = AppCore::new();

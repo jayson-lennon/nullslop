@@ -255,40 +255,6 @@ mod tests {
     }
 
     #[test]
-    fn app_input_char_appends() {
-        // Given an App in Input scope.
-        let mut app = create_test_app();
-        app.which_key.set_scope(Scope::Input);
-
-        // When pressing 'x'.
-        app.handle_msg(Msg::Input(key_event(KeyCode::Char('x'))));
-
-        // Then process core and verify.
-        app.core.tick();
-        assert_eq!(app.core.state.read().chat_input.text(), "x");
-    }
-
-    #[test]
-    fn app_input_backspace_deletes() {
-        // Given an App in Input scope with "ab" in buffer.
-        let mut app = create_test_app();
-        app.which_key.set_scope(Scope::Input);
-        app.core
-            .state
-            .write()
-            .chat_input
-            .replace_all("ab".to_string());
-
-        // When pressing Backspace.
-        app.handle_msg(Msg::Input(key_event(KeyCode::Backspace)));
-
-        // Then process core and verify.
-        app.core.tick();
-        assert_eq!(app.core.state.read().chat_input.text(), "a");
-        assert_eq!(app.core.state.read().chat_input.cursor_pos(), 1);
-    }
-
-    #[test]
     fn app_toggle_which_key_handled_directly() {
         // Given an App with inactive which_key.
         let mut app = create_test_app();

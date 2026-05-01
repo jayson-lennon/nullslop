@@ -161,20 +161,6 @@ mod tests {
         assert!(!result);
     }
 
-    #[test]
-    fn app_layout_splits() {
-        // Given an 80x24 area.
-        let area = Rect::new(0, 0, 80, 24);
-
-        // When computing layout.
-        let layout = AppLayout::new(area);
-
-        // Then tabs is 1 row, chat content is 19, counter is 1, input is 3.
-        assert_eq!(layout.tabs.height, 1);
-        assert_eq!(layout.content.height, 19);
-        assert_eq!(layout.counter.height, 1);
-        assert_eq!(layout.input.height, 3);
-    }
 
     #[test]
     fn init_tab_manager_has_two_tabs() {

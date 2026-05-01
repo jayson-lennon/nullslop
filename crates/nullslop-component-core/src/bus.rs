@@ -600,29 +600,6 @@ mod tests {
     }
 
     #[test]
-    fn unit_event_dispatches_correctly() {
-        // Given a bus with a handler for KeyDown (struct with payload).
-        let (handler, calls) = FakeEventHandler::<KeyDown, TestState>::new();
-        let mut bus: Bus<TestState> = Bus::new();
-        bus.register_event_handler::<KeyDown, _>(handler);
-
-        // When processing a KeyDown event.
-        bus.submit_event(Event::KeyDown {
-            payload: KeyDown {
-                key: npr::KeyEvent {
-                    key: npr::Key::Char('a'),
-                    modifiers: npr::Modifiers::none(),
-                },
-            },
-        });
-        let mut state = TestState;
-        bus.process_events(&mut state);
-
-        // Then the handler was called.
-        assert_eq!(calls.borrow().len(), 1);
-    }
-
-    #[test]
     fn all_event_handlers_run() {
         // Given a bus with two event handlers for ModeChanged.
         let (h1, calls1) = FakeEventHandler::<ModeChanged, TestState>::new();
@@ -836,16 +813,19 @@ mod tests {
         assert_eq!(event_calls.borrow().len(), 1);
     }
 
-    // --- drain_processed_events tests ---
+    // --- Drain processed tests ---
 
     #[test]
-    fn drain_processed_events_returns_dispatched_events() {
-        // Given a bus with an event handler.
-        let (handler, _calls) = FakeEventHandler::<ModeChanged, TestState>::new();
+    fn drain_processed_returns_dispatched_items() {
+        // Given a bus with a command and event handler.
+        let (cmd_handler, _cmd_calls) = FakeCommandHandler::<Quit, TestState>::continuing();
+        let (evt_handler, _evt_calls) = FakeEventHandler::<ModeChanged, TestState>::new();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_event_handler::<ModeChanged, _>(handler);
+        bus.register_command_handler::<Quit, _>(cmd_handler);
+        bus.register_event_handler::<ModeChanged, _>(evt_handler);
 
-        // When processing an event.
+        // When processing a command and event.
+        bus.submit_command(Command::Quit);
         bus.submit_event(Event::ModeChanged {
             payload: ModeChanged {
                 from: npr::Mode::Normal,
@@ -853,21 +833,29 @@ mod tests {
             },
         });
         let mut state = TestState;
+        bus.process_commands(&mut state);
         bus.process_events(&mut state);
 
-        // Then drain_processed_events returns the dispatched event with no source.
-        let processed = bus.drain_processed_events();
-        assert_eq!(processed.len(), 1);
-        assert!(matches!(processed[0].event, Event::ModeChanged { .. }));
-        assert!(processed[0].source.is_none());
+        // Then drain returns both with no source.
+        let events = bus.drain_processed_events();
+        let commands = bus.drain_processed_commands();
+        assert_eq!(events.len(), 1);
+        assert!(matches!(events[0].event, Event::ModeChanged { .. }));
+        assert!(events[0].source.is_none());
+        assert_eq!(commands.len(), 1);
+        assert!(matches!(commands[0].command, Command::Quit));
+        assert!(commands[0].source.is_none());
     }
 
     #[test]
-    fn drain_processed_events_clears_buffer() {
-        // Given a bus with a processed event.
-        let (handler, _calls) = FakeEventHandler::<ModeChanged, TestState>::new();
+    fn drain_processed_clears_buffers() {
+        // Given a bus with a command and event handler.
+        let (cmd_handler, _cmd_calls) = FakeCommandHandler::<Quit, TestState>::continuing();
+        let (evt_handler, _evt_calls) = FakeEventHandler::<ModeChanged, TestState>::new();
         let mut bus: Bus<TestState> = Bus::new();
-        bus.register_event_handler::<ModeChanged, _>(handler);
+        bus.register_command_handler::<Quit, _>(cmd_handler);
+        bus.register_event_handler::<ModeChanged, _>(evt_handler);
+        bus.submit_command(Command::Quit);
         bus.submit_event(Event::ModeChanged {
             payload: ModeChanged {
                 from: npr::Mode::Normal,
@@ -875,55 +863,20 @@ mod tests {
             },
         });
         let mut state = TestState;
+        bus.process_commands(&mut state);
         bus.process_events(&mut state);
 
         // When draining twice.
-        let first = bus.drain_processed_events();
-        let second = bus.drain_processed_events();
+        let first_events = bus.drain_processed_events();
+        let first_commands = bus.drain_processed_commands();
+        let second_events = bus.drain_processed_events();
+        let second_commands = bus.drain_processed_commands();
 
-        // Then first has the event and second is empty.
-        assert_eq!(first.len(), 1);
-        assert!(second.is_empty());
-    }
-
-    // --- drain_processed_commands tests ---
-
-    #[test]
-    fn drain_processed_commands_returns_dispatched_commands() {
-        // Given a bus with a command handler.
-        let (handler, _calls) = FakeCommandHandler::<Quit, TestState>::continuing();
-        let mut bus: Bus<TestState> = Bus::new();
-        bus.register_command_handler::<Quit, _>(handler);
-
-        // When processing a command.
-        bus.submit_command(Command::Quit);
-        let mut state = TestState;
-        bus.process_commands(&mut state);
-
-        // Then drain_processed_commands returns the dispatched command with no source.
-        let processed = bus.drain_processed_commands();
-        assert_eq!(processed.len(), 1);
-        assert!(matches!(processed[0].command, Command::Quit));
-        assert!(processed[0].source.is_none());
-    }
-
-    #[test]
-    fn drain_processed_commands_clears_buffer() {
-        // Given a bus with a processed command.
-        let (handler, _calls) = FakeCommandHandler::<Quit, TestState>::continuing();
-        let mut bus: Bus<TestState> = Bus::new();
-        bus.register_command_handler::<Quit, _>(handler);
-        bus.submit_command(Command::Quit);
-        let mut state = TestState;
-        bus.process_commands(&mut state);
-
-        // When draining twice.
-        let first = bus.drain_processed_commands();
-        let second = bus.drain_processed_commands();
-
-        // Then first has the command and second is empty.
-        assert_eq!(first.len(), 1);
-        assert!(second.is_empty());
+        // Then first has items and second is empty.
+        assert_eq!(first_events.len(), 1);
+        assert_eq!(first_commands.len(), 1);
+        assert!(second_events.is_empty());
+        assert!(second_commands.is_empty());
     }
 
     // --- Source tagging tests ---

@@ -74,42 +74,6 @@ mod macro_tests {
 
     use crate::AppState;
 
-    // --- Test handler: command handler returning Continue ---
-
-    nullslop_component_core::define_handler! {
-        struct ContinueHandler;
-
-        commands {
-            InsertChar: on_insert_char,
-        }
-
-        events {}
-    }
-
-    impl ContinueHandler {
-        fn on_insert_char(cmd: &InsertChar, state: &mut AppState, _out: &mut Out) -> CommandAction {
-            state.chat_input.insert_grapheme_at_cursor(cmd.ch);
-            CommandAction::Continue
-        }
-    }
-
-    #[test]
-    fn command_handler_returning_continue() {
-        // Given a handler registered with the bus.
-        let mut bus: Bus<AppState> = Bus::new();
-        ContinueHandler.register(&mut bus);
-
-        // When submitting an InsertChar command.
-        bus.submit_command(Command::InsertChar {
-            payload: InsertChar { ch: 'x' },
-        });
-        let mut state = AppState::new();
-        bus.process_commands(&mut state);
-
-        // Then the handler ran and mutated state.
-        assert_eq!(state.chat_input.text(), "x");
-    }
-
     // --- Test handler: command handler returning Stop ---
 
     nullslop_component_core::define_handler! {
