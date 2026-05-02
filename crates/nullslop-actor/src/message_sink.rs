@@ -34,8 +34,8 @@ pub trait MessageSink: Send + Sync + 'static {
 /// Visible within the crate for use in other modules' tests.
 #[cfg(test)]
 pub(crate) struct TestSink {
-    commands: std::sync::Mutex<Vec<Command>>,
-    events: std::sync::Mutex<Vec<Event>>,
+    commands: parking_lot::Mutex<Vec<Command>>,
+    events: parking_lot::Mutex<Vec<Event>>,
 }
 
 #[cfg(test)]
@@ -43,39 +43,31 @@ impl TestSink {
     /// Creates a new empty test sink.
     pub(crate) fn new() -> Self {
         Self {
-            commands: std::sync::Mutex::new(Vec::new()),
-            events: std::sync::Mutex::new(Vec::new()),
+            commands: parking_lot::Mutex::new(Vec::new()),
+            events: parking_lot::Mutex::new(Vec::new()),
         }
     }
 
     /// Returns all commands sent through this sink.
     pub(crate) fn commands(&self) -> Vec<Command> {
-        self.commands.lock().unwrap().clone()
+        self.commands.lock().clone()
     }
 
     /// Returns all events sent through this sink.
     pub(crate) fn events(&self) -> Vec<Event> {
-        self.events.lock().unwrap().clone()
+        self.events.lock().clone()
     }
 }
 
 #[cfg(test)]
 impl MessageSink for TestSink {
-    #[expect(
-        clippy::unwrap_in_result,
-        reason = "test sink: mutex poisoning is acceptable in tests"
-    )]
     fn send_command(&self, command: Command) -> SendResult {
-        self.commands.lock().unwrap().push(command);
+        self.commands.lock().push(command);
         Ok(())
     }
 
-    #[expect(
-        clippy::unwrap_in_result,
-        reason = "test sink: mutex poisoning is acceptable in tests"
-    )]
     fn send_event(&self, event: Event) -> SendResult {
-        self.events.lock().unwrap().push(event);
+        self.events.lock().push(event);
         Ok(())
     }
 }

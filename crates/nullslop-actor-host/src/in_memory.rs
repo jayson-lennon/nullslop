@@ -291,34 +291,26 @@ mod tests {
 
     /// A test message sink that records commands and events.
     struct TestSink {
-        commands: std::sync::Mutex<Vec<Command>>,
-        events: std::sync::Mutex<Vec<Event>>,
+        commands: parking_lot::Mutex<Vec<Command>>,
+        events: parking_lot::Mutex<Vec<Event>>,
     }
 
     impl TestSink {
         fn new() -> Self {
             Self {
-                commands: std::sync::Mutex::new(Vec::new()),
-                events: std::sync::Mutex::new(Vec::new()),
+                commands: parking_lot::Mutex::new(Vec::new()),
+                events: parking_lot::Mutex::new(Vec::new()),
             }
         }
     }
 
     impl MessageSink for TestSink {
-        #[expect(
-            clippy::unwrap_in_result,
-            reason = "test sink: mutex poisoning is acceptable in tests"
-        )]
         fn send_command(&self, command: Command) -> SendResult {
-            self.commands.lock().unwrap().push(command);
+            self.commands.lock().push(command);
             Ok(())
         }
-        #[expect(
-            clippy::unwrap_in_result,
-            reason = "test sink: mutex poisoning is acceptable in tests"
-        )]
         fn send_event(&self, event: Event) -> SendResult {
-            self.events.lock().unwrap().push(event);
+            self.events.lock().push(event);
             Ok(())
         }
     }
@@ -340,12 +332,12 @@ mod tests {
 
     /// Actor that records received messages.
     struct RecordingActor {
-        received: Arc<std::sync::Mutex<Vec<String>>>,
+        received: Arc<parking_lot::Mutex<Vec<String>>>,
     }
 
     impl RecordingActor {
-        fn new() -> (Self, Arc<std::sync::Mutex<Vec<String>>>) {
-            let received = Arc::new(std::sync::Mutex::new(Vec::new()));
+        fn new() -> (Self, Arc<parking_lot::Mutex<Vec<String>>>) {
+            let received = Arc::new(parking_lot::Mutex::new(Vec::new()));
             let clone = received.clone();
             (Self { received }, clone)
         }
@@ -361,29 +353,22 @@ mod tests {
         async fn handle(&mut self, msg: ActorEnvelope<String>, _ctx: &ActorContext) {
             match msg {
                 ActorEnvelope::Direct(s) => {
-                    self.received.lock().unwrap().push(s);
+                    self.received.lock().push(s);
                 }
                 ActorEnvelope::Event(e) => {
                     self.received
                         .lock()
-                        .unwrap()
                         .push(format!("event:{}", e.type_name().unwrap_or("unknown")));
                 }
                 ActorEnvelope::Command(c) => {
                     let name = format!("{c}");
-                    self.received
-                        .lock()
-                        .unwrap()
-                        .push(format!("command:{name}"));
+                    self.received.lock().push(format!("command:{name}"));
                 }
                 ActorEnvelope::Shutdown => {
-                    self.received.lock().unwrap().push("shutdown".to_owned());
+                    self.received.lock().push("shutdown".to_owned());
                 }
                 ActorEnvelope::System(msg) => {
-                    self.received
-                        .lock()
-                        .unwrap()
-                        .push(format!("system:{msg:?}"));
+                    self.received.lock().push(format!("system:{msg:?}"));
                 }
             }
         }
@@ -413,7 +398,7 @@ mod tests {
         subscriptions: &[&str],
         commands: &[&str],
         handle: &tokio::runtime::Handle,
-    ) -> (ActorSpawnResult, Arc<std::sync::Mutex<Vec<String>>>) {
+    ) -> (ActorSpawnResult, Arc<parking_lot::Mutex<Vec<String>>>) {
         let (actor, received) = RecordingActor::new();
         let (tx, rx) = kanal::unbounded::<ActorEnvelope<String>>();
         let actor_ref = ActorRef::new(tx);
@@ -455,7 +440,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(50));
 
         // Then the actor received the event.
-        let msgs = received.lock().unwrap().clone();
+        let msgs = received.lock().clone();
         assert!(
             !msgs.is_empty(),
             "actor should receive the subscribed event"
@@ -497,8 +482,8 @@ mod tests {
         std::thread::sleep(Duration::from_millis(50));
 
         // Then both actors receive it regardless of subscriptions.
-        let msgs_a = received1.lock().unwrap().clone();
-        let msgs_b = received2.lock().unwrap().clone();
+        let msgs_a = received1.lock().clone();
+        let msgs_b = received2.lock().clone();
         assert!(!msgs_a.is_empty(), "actor-a should receive system message");
         assert!(!msgs_b.is_empty(), "actor-b should receive system message");
 
@@ -535,7 +520,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(50));
 
         // Then the actor received the command.
-        let msgs = received.lock().unwrap().clone();
+        let msgs = received.lock().clone();
         assert!(
             !msgs.is_empty(),
             "actor should receive the registered command"
@@ -570,7 +555,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(50));
 
         // Then no messages were delivered to the actor.
-        let msgs = received.lock().unwrap().clone();
+        let msgs = received.lock().clone();
         assert!(
             msgs.is_empty(),
             "actor should not receive unregistered command: {msgs:?}"
@@ -634,8 +619,8 @@ mod tests {
         std::thread::sleep(Duration::from_millis(50));
 
         // Then actor-b receives it but actor-a does not.
-        let msgs_a = received1.lock().unwrap().clone();
-        let msgs_b = received2.lock().unwrap().clone();
+        let msgs_a = received1.lock().clone();
+        let msgs_b = received2.lock().clone();
         assert!(
             msgs_a.is_empty(),
             "actor-a should not receive the event: {msgs_a:?}"
@@ -674,8 +659,8 @@ mod tests {
         std::thread::sleep(Duration::from_millis(50));
 
         // Then both actors receive it regardless of subscriptions.
-        let msgs_a = received1.lock().unwrap().clone();
-        let msgs_b = received2.lock().unwrap().clone();
+        let msgs_a = received1.lock().clone();
+        let msgs_b = received2.lock().clone();
         assert!(
             !msgs_a.is_empty(),
             "actor-a should receive system shutdown message"
@@ -739,7 +724,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(50));
 
         // Then actor-b receives the direct message.
-        let msgs_b = received_b.lock().unwrap().clone();
+        let msgs_b = received_b.lock().clone();
         assert!(
             msgs_b.iter().any(|m| m.contains("hello from a")),
             "actor-b should receive direct message: {msgs_b:?}"
