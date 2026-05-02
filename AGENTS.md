@@ -12,6 +12,8 @@ This style guide ensures consistent, maintainable Rust code across the codebase.
 
 Use `wherror::Error` with `error_stack::Report` for all fallible operations.
 
+**Colocate errors with their related types.** Never create standalone `error.rs` or `errors.rs` files. Error types belong in the same module as the trait, struct, or function that produces them. For example, `ActorHostError` lives in `actor_host.rs` alongside the `ActorHost` trait, not in a separate `error.rs`.
+
 **Error type:**
 
 ```rust
@@ -47,6 +49,8 @@ pub fn run(tick_rate: Duration) -> Result<(), Report<TuiRunError>>
 ### Trait Usage
 
 Every external dependency or service must have a trait abstraction.
+
+**Colocate traits with their related types.** Never create standalone `traits.rs` files. Traits belong in the same module as the types that implement them or the domain they define. For example, `MessageSink` lives in `message_sink.rs`, not in a separate `traits.rs`.
 
 **Trait pattern:**
 
