@@ -48,7 +48,7 @@ impl TuiApp {
     /// Creates a new application with the given services.
     #[must_use]
     pub fn new(services: nullslop_services::Services) -> Self {
-        let mut core = AppCore::new();
+        let mut core = AppCore::new(services.clone());
         let mut ui_registry = AppUiRegistry::new();
         nullslop_component::register_all(&mut core.bus, &mut ui_registry);
         let keymap = keymap::init();
@@ -120,10 +120,8 @@ impl TuiApp {
                     "key event received"
                 );
                 let Some(cmd) = self.which_key.handle_key(protocol_key) else {
-                    tracing::info!("key produced no command");
                     return;
                 };
-                tracing::info!(command = %cmd, "dispatching command");
                 self.route_command(cmd);
             }
             Msg::Command(cmd) => {
@@ -168,6 +166,7 @@ pub fn scope_for_mode(mode: Mode) -> Scope {
     match mode {
         Mode::Normal => Scope::Normal,
         Mode::Input => Scope::Input,
+        Mode::Picker => Scope::Picker,
     }
 }
 
@@ -200,7 +199,23 @@ mod tests {
         let llm = nullslop_services::providers::LlmServiceFactoryService::new(Arc::new(
             FakeLlmServiceFactory::new(vec![]),
         ));
-        let services = nullslop_services::Services::new(handle, actor_host, llm);
+        let config = nullslop_providers::ProvidersConfig {
+            providers: vec![],
+            aliases: vec![],
+            default_provider: None,
+        };
+        let services = nullslop_services::Services::new(
+            handle,
+            actor_host,
+            llm,
+            nullslop_providers::ProviderRegistryService::new(
+                nullslop_providers::ProviderRegistry::from_config(config).expect("test registry"),
+            ),
+            nullslop_providers::ApiKeysService::new(nullslop_providers::ApiKeys::new()),
+            nullslop_providers::ConfigStorageService::new(Arc::new(
+                nullslop_providers::InMemoryConfigStorage::new(),
+            )),
+        );
         TuiApp::new(services)
     }
 
@@ -246,6 +261,7 @@ mod tests {
     fn app_input_enter_submits() {
         // Given an App in Input scope with "hello" in buffer.
         let mut app = create_test_app();
+        app.core.state.write().active_provider = "test".to_owned();
         app.which_key.set_scope(Scope::Input);
         app.core
             .state
@@ -327,6 +343,7 @@ mod tests {
         // Then each mode maps to its corresponding scope.
         assert_eq!(scope_for_mode(Mode::Normal), Scope::Normal);
         assert_eq!(scope_for_mode(Mode::Input), Scope::Input);
+        assert_eq!(scope_for_mode(Mode::Picker), Scope::Picker);
     }
 
     #[test]

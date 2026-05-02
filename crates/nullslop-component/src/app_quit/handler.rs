@@ -35,6 +35,7 @@ mod tests {
     use nullslop_protocol as npr;
 
     use super::*;
+    use crate::test_utils;
 
     #[test]
     fn quit_sets_should_quit() {
@@ -44,7 +45,7 @@ mod tests {
 
         // When processing Quit.
         bus.submit_command(Command::Quit);
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_commands(&mut state);
 
         // Then should_quit is true.

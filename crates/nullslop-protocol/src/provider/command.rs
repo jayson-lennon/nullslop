@@ -6,6 +6,17 @@ use super::message::LlmMessage;
 use crate::CommandMsg;
 use crate::SessionId;
 
+/// Switch the active LLM provider.
+///
+/// Carries the target provider ID. The handler validates it against the registry,
+/// swaps the factory, and emits [`ProviderSwitched`](super::ProviderSwitched).
+#[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
+#[cmd("provider")]
+pub struct ProviderSwitch {
+    /// The provider to switch to.
+    pub provider_id: String,
+}
+
 /// Send a message to the AI provider.
 #[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
 #[cmd("provider")]
@@ -47,4 +58,25 @@ pub struct SendToLlmProvider {
     pub session_id: SessionId,
     /// The full conversation history, converted to LLM messages.
     pub messages: Vec<LlmMessage>,
+    /// Optional provider override for per-message routing (future).
+    /// Currently always `None` — uses the active provider.
+    #[serde(default)]
+    pub provider_id: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn send_to_llm_provider_deserializes_without_provider_id() {
+        // Given JSON without the provider_id field (old format).
+        let json = r#"{"session_id":"sid-1","messages":[]}"#;
+
+        // When deserializing.
+        let cmd: SendToLlmProvider = serde_json::from_str(json).expect("deserialize");
+
+        // Then provider_id is None (backwards compatible).
+        assert!(cmd.provider_id.is_none());
+    }
 }

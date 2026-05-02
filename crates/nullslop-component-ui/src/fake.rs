@@ -71,8 +71,8 @@ impl<S: std::fmt::Debug + 'static> UiElement<S> for FakeUiElement<S> {
 
 #[cfg(test)]
 mod tests {
-    use ratatui::backend::TestBackend;
     use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
 
     use super::*;
 

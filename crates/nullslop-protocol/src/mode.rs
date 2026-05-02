@@ -12,6 +12,8 @@ pub enum Mode {
     Normal,
     /// Text input mode — keystrokes type into the buffer.
     Input,
+    /// Provider picker mode — keystrokes filter/select a provider.
+    Picker,
 }
 
 impl std::fmt::Display for Mode {
@@ -19,6 +21,7 @@ impl std::fmt::Display for Mode {
         match self {
             Self::Normal => write!(f, "normal"),
             Self::Input => write!(f, "input"),
+            Self::Picker => write!(f, "picker"),
         }
     }
 }
@@ -30,7 +33,7 @@ mod tests {
     #[test]
     fn mode_serialization_roundtrip() {
         // Given both mode variants.
-        for mode in [Mode::Normal, Mode::Input] {
+        for mode in [Mode::Normal, Mode::Input, Mode::Picker] {
             // When serialized and deserialized.
             let json = serde_json::to_string(&mode).expect("serialize");
             let back: Mode = serde_json::from_str(&json).expect("deserialize");

@@ -9,7 +9,9 @@ pub use nullslop_providers as providers;
 use std::sync::Arc;
 
 use nullslop_actor_host::ActorHostService;
-use nullslop_providers::LlmServiceFactoryService;
+use nullslop_providers::{
+    ApiKeysService, ConfigStorageService, LlmServiceFactoryService, ProviderRegistryService,
+};
 use tokio::runtime::Handle;
 
 /// Runtime services shared across the application.
@@ -24,6 +26,12 @@ pub struct Services {
     actor_host: ActorHostService,
     /// LLM service factory for creating streaming chat instances.
     llm_service: LlmServiceFactoryService,
+    /// Provider registry for looking up and validating provider configs.
+    provider_registry: ProviderRegistryService,
+    /// Resolved API keys for provider availability checks and factory creation.
+    api_keys: ApiKeysService,
+    /// Config storage for persisting provider configuration.
+    config_storage: ConfigStorageService,
 }
 
 impl Services {
@@ -33,11 +41,17 @@ impl Services {
         handle: Handle,
         actor_host: Arc<dyn nullslop_actor_host::ActorHost>,
         llm_service: LlmServiceFactoryService,
+        provider_registry: ProviderRegistryService,
+        api_keys: ApiKeysService,
+        config_storage: ConfigStorageService,
     ) -> Self {
         Self {
             handle,
             actor_host: ActorHostService::new(actor_host),
             llm_service,
+            provider_registry,
+            api_keys,
+            config_storage,
         }
     }
 
@@ -58,4 +72,24 @@ impl Services {
     pub fn llm_service(&self) -> &LlmServiceFactoryService {
         &self.llm_service
     }
+
+    /// Returns a reference to the provider registry service.
+    #[must_use]
+    pub fn provider_registry(&self) -> &ProviderRegistryService {
+        &self.provider_registry
+    }
+
+    /// Returns a reference to the resolved API keys service.
+    #[must_use]
+    pub fn api_keys(&self) -> &ApiKeysService {
+        &self.api_keys
+    }
+
+    /// Returns a reference to the config storage service.
+    #[must_use]
+    pub fn config_storage(&self) -> &ConfigStorageService {
+        &self.config_storage
+    }
 }
+
+pub mod test_services;

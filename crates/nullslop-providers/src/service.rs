@@ -54,5 +54,5 @@ pub trait LlmServiceFactory: Send + Sync + std::fmt::Debug {
     fn create(&self) -> Result<Box<dyn LlmService>, Report<LlmServiceError>>;
 
     /// Returns a human-readable name for this factory.
-    fn name(&self) -> &'static str;
+    fn name(&self) -> &str;
 }

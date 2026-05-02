@@ -1,0 +1,108 @@
+# nullslop provider configuration
+# Configure the providers you want to use.
+# The active provider can be changed at runtime via the picker UI.
+#
+# API keys are never stored here — reference env var names instead.
+# For providers that don't require a key (Ollama, LMStudio), set requires_key = false.
+# Each provider block groups models that share the same backend, API key, and base URL.
+# Need different settings for the same backend? Create a separate block with a unique name.
+
+[[providers]]
+name = "openrouter"
+backend = "openrouter"
+api_key_env = "OPENROUTER_API_KEY"
+models = ["openai/gpt-oss-120b", "anthropic/claude-sonnet-4-20250514", "google/gemini-2.5-flash"]
+
+[[providers]]
+name = "openai"
+backend = "openai"
+api_key_env = "OPENAI_API_KEY"
+models = ["gpt-4o", "gpt-4o-mini"]
+
+[[providers]]
+name = "anthropic"
+backend = "anthropic"
+api_key_env = "ANTHROPIC_API_KEY"
+models = ["claude-sonnet-4-20250514", "claude-haiku-4-20250514"]
+
+[[providers]]
+name = "ollama"
+backend = "ollama"
+requires_key = false
+base_url = "http://localhost:11434"
+models = ["llama3", "codellama"]
+
+[[providers]]
+name = "lmstudio"
+backend = "openai"
+base_url = "http://localhost:1234/v1"
+requires_key = false
+models = ["local-model"]
+
+[[providers]]
+name = "deepseek"
+backend = "deepseek"
+api_key_env = "DEEPSEEK_API_KEY"
+models = ["deepseek-chat", "deepseek-reasoner"]
+
+[[providers]]
+name = "xai"
+backend = "xai"
+api_key_env = "XAI_API_KEY"
+models = ["grok-3", "grok-3-mini"]
+
+[[providers]]
+name = "google"
+backend = "google"
+api_key_env = "GOOGLE_API_KEY"
+models = ["gemini-2.5-flash", "gemini-2.5-pro"]
+
+[[providers]]
+name = "groq"
+backend = "groq"
+api_key_env = "GROQ_API_KEY"
+models = ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"]
+
+[[providers]]
+name = "cohere"
+backend = "cohere"
+api_key_env = "COHERE_API_KEY"
+models = ["command-r-plus", "command-r"]
+
+[[providers]]
+name = "mistral"
+backend = "mistral"
+api_key_env = "MISTRAL_API_KEY"
+models = ["mistral-large-latest", "mistral-small-latest"]
+
+[[providers]]
+name = "huggingface"
+backend = "huggingface"
+api_key_env = "HF_API_KEY"
+models = ["meta-llama/Llama-3.3-70B-Instruct"]
+
+[[providers]]
+name = "phind"
+backend = "phind"
+api_key_env = "PHIND_API_KEY"
+models = ["Phind-70B"]
+
+[[providers]]
+name = "elevenlabs"
+backend = "elevenlabs"
+api_key_env = "ELEVENLABS_API_KEY"
+models = ["eleven-labs-model"]
+
+[[providers]]
+name = "sample"
+backend = "sample"
+requires_key = false
+models = ["sample"]
+
+# [[aliases]]
+# name = "fast"
+# target = "ollama/llama3"
+#
+# [[aliases]]
+# name = "smart"
+# target = "openrouter/openai/gpt-oss-120b"

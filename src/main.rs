@@ -32,27 +32,8 @@ fn main() {
         }
     };
 
-    let api_key = if cli.fake_llm {
-        String::new()
-    } else {
-        read_api_key()
-    };
-
-    if let Err(e) = app.dispatch(cli, api_key) {
+    if let Err(e) = app.dispatch(cli) {
         eprintln!("error: {e:?}");
         std::process::exit(1);
-    }
-}
-
-/// Reads the `OPENROUTER_API_KEY` environment variable.
-///
-/// Aborts with a clear error message if the variable is missing or empty.
-fn read_api_key() -> String {
-    match std::env::var("OPENROUTER_API_KEY") {
-        Ok(key) if !key.is_empty() => key,
-        _ => {
-            eprintln!("error: OPENROUTER_API_KEY environment variable is required");
-            std::process::exit(1);
-        }
     }
 }

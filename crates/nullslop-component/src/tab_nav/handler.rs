@@ -33,6 +33,7 @@ mod tests {
     use nullslop_protocol::{ActiveTab, Command, TabDirection};
 
     use super::*;
+    use crate::test_utils;
 
     #[test]
     fn switch_tab_next_from_chat_goes_to_dashboard() {
@@ -46,7 +47,7 @@ mod tests {
                 direction: TabDirection::Next,
             },
         });
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_commands(&mut state);
 
         // Then the active tab is Dashboard.
@@ -58,7 +59,7 @@ mod tests {
         // Given a bus with TabNavHandler registered and state on Dashboard.
         let mut bus: Bus<AppState> = Bus::new();
         TabNavHandler.register(&mut bus);
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         state.active_tab = ActiveTab::Dashboard;
 
         // When processing an SwitchTab(Next) command.
@@ -85,7 +86,7 @@ mod tests {
                 direction: TabDirection::Prev,
             },
         });
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_commands(&mut state);
 
         // Then the active tab wraps to Dashboard.

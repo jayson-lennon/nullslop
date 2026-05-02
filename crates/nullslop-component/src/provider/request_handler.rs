@@ -52,6 +52,7 @@ impl MessageQueueHandler {
                 payload: SendToLlmProvider {
                     session_id: cmd.session_id.clone(),
                     messages,
+                    provider_id: None,
                 },
             });
         } else {
@@ -122,6 +123,7 @@ impl MessageQueueHandler {
             payload: SendToLlmProvider {
                 session_id: evt.session_id.clone(),
                 messages,
+                provider_id: None,
             },
         });
     }
@@ -138,6 +140,7 @@ mod tests {
     use nullslop_protocol as npr;
 
     use super::*;
+    use crate::test_utils;
 
     fn session_id(state: &AppState) -> npr::SessionId {
         state.active_session.clone()
@@ -149,7 +152,8 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         MessageQueueHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
+        state.active_provider = "test".to_owned();
         let sid = session_id(&state);
 
         // When processing EnqueueUserMessage while idle.
@@ -183,7 +187,7 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         MessageQueueHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         let sid = session_id(&state);
         state.session_mut(&sid).begin_sending();
 
@@ -210,7 +214,8 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         MessageQueueHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
+        state.active_provider = "test".to_owned();
         let sid = session_id(&state);
         state.session_mut(&sid).begin_sending();
         state
@@ -250,7 +255,7 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         MessageQueueHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         let sid = session_id(&state);
         state.session_mut(&sid).begin_sending();
         // Cancel already drained the queue in the cancel handler.
@@ -278,7 +283,7 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         MessageQueueHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         let sid = session_id(&state);
         state.session_mut(&sid).begin_streaming();
         state.session_mut(&sid).enqueue_message("first".to_owned());
@@ -316,7 +321,8 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         MessageQueueHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
+        state.active_provider = "test".to_owned();
         let sid = session_id(&state);
         state.session_mut(&sid).begin_sending();
         state.session_mut(&sid).enqueue_message("msg 1".to_owned());
@@ -360,7 +366,10 @@ mod tests {
             .iter()
             .filter(|c| matches!(c.command, Command::SendToLlmProvider { .. }))
             .count();
-        assert_eq!(send_count, 1, "expected exactly one SendToLlmProvider command");
+        assert_eq!(
+            send_count, 1,
+            "expected exactly one SendToLlmProvider command"
+        );
     }
 
     #[test]
@@ -369,7 +378,7 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         MessageQueueHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         let sid = session_id(&state);
         state.session_mut(&sid).begin_sending();
 
@@ -395,7 +404,7 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         MessageQueueHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         let sid = session_id(&state);
 
         // When processing SetChatInputText.
@@ -409,5 +418,41 @@ mod tests {
 
         // Then the input buffer is updated.
         assert_eq!(state.active_chat_input().text(), "restored text");
+    }
+
+    #[test]
+    fn enqueue_when_no_provider_dispatches_to_llm() {
+        // Given a bus with MessageQueueHandler registered and no real provider.
+        let mut bus: Bus<AppState> = Bus::new();
+        MessageQueueHandler.register(&mut bus);
+
+        let mut state = AppState::new(test_utils::test_services());
+        let sid = session_id(&state);
+        // active_provider defaults to NO_PROVIDER_ID.
+
+        // When processing EnqueueUserMessage while idle with no real provider.
+        bus.submit_command(Command::EnqueueUserMessage {
+            payload: EnqueueUserMessage {
+                session_id: sid.clone(),
+                text: "hello".to_owned(),
+            },
+        });
+        bus.process_commands(&mut state);
+
+        // Then the message is dispatched to the LLM
+        // (the NoProvidersAvailableFactory will stream a help message).
+        assert_eq!(state.session(&sid).history().len(), 1);
+        assert_eq!(
+            state.session(&sid).history()[0].kind,
+            npr::ChatEntryKind::User("hello".to_owned())
+        );
+        assert!(state.session(&sid).is_sending());
+
+        // And a SendToLlmProvider command was submitted.
+        let commands = bus.drain_processed_commands();
+        let send = commands
+            .iter()
+            .find(|c| matches!(c.command, Command::SendToLlmProvider { .. }));
+        assert!(send.is_some(), "expected SendToLlmProvider command");
     }
 }

@@ -13,6 +13,13 @@ error-stack = { workspace = true }
 derive_more = { workspace = true }
 async-trait = { workspace = true }
 rand = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
+dirs = { workspace = true }
+parking_lot = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
 
 [lints]
 workspace = true

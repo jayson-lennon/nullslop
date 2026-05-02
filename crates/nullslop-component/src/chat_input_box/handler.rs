@@ -108,6 +108,12 @@ impl ChatInputBoxHandler {
                 payload: npr::provider::CancelStream { session_id },
             });
         }
+
+        // Reset picker state when entering Picker mode.
+        if cmd.mode == npr::Mode::Picker {
+            state.picker.reset();
+        }
+
         state.mode = cmd.mode;
         CommandAction::Continue
     }
@@ -213,6 +219,7 @@ mod tests {
     use nullslop_protocol as npr;
 
     use super::*;
+    use crate::test_utils;
 
     #[test]
     fn insert_char_appends_to_buffer() {
@@ -224,7 +231,7 @@ mod tests {
         bus.submit_command(Command::InsertChar {
             payload: InsertChar { ch: 'x' },
         });
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_commands(&mut state);
 
         // Then chat_input.text() is "x" and cursor is at 1.
@@ -246,7 +253,7 @@ mod tests {
             payload: InsertChar { ch: 'b' },
         });
         bus.submit_command(Command::DeleteGrapheme);
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_commands(&mut state);
 
         // Then chat_input.text() is "a" and cursor is at 1.
@@ -261,7 +268,8 @@ mod tests {
         ChatInputBoxHandler.register(&mut bus);
         crate::provider::request_handler::MessageQueueHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
+        state.active_provider = "test".to_owned();
         for ch in "hello".chars() {
             state.active_chat_input_mut().insert_grapheme_at_cursor(ch);
         }
@@ -298,7 +306,7 @@ mod tests {
                 text: String::new(),
             },
         });
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_commands(&mut state);
 
         // Then no entry is added and no event is emitted.
@@ -314,7 +322,8 @@ mod tests {
         ChatInputBoxHandler.register(&mut bus);
         crate::provider::request_handler::MessageQueueHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
+        state.active_provider = "test".to_owned();
         for ch in "hello".chars() {
             state.active_chat_input_mut().insert_grapheme_at_cursor(ch);
         }
@@ -345,7 +354,7 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         for ch in "some text".chars() {
             state.active_chat_input_mut().insert_grapheme_at_cursor(ch);
         }
@@ -371,7 +380,7 @@ mod tests {
                 mode: npr::Mode::Input,
             },
         });
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_commands(&mut state);
 
         // Then state mode is Input.
@@ -395,7 +404,7 @@ mod tests {
         // When processing MoveCursorLeft.
         bus.submit_command(Command::MoveCursorLeft);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_commands(&mut state);
 
         // Then cursor is at 1 and text is still "ab".
@@ -419,7 +428,7 @@ mod tests {
         // When processing MoveCursorRight.
         bus.submit_command(Command::MoveCursorRight);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_commands(&mut state);
 
         // Then cursor is back at 2.
@@ -440,7 +449,7 @@ mod tests {
         // When processing MoveCursorToStart.
         bus.submit_command(Command::MoveCursorToStart);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_commands(&mut state);
 
         // Then cursor is at 0.
@@ -462,7 +471,7 @@ mod tests {
         // When processing MoveCursorToEnd.
         bus.submit_command(Command::MoveCursorToEnd);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_commands(&mut state);
 
         // Then cursor is at 3.
@@ -485,7 +494,7 @@ mod tests {
         // When processing DeleteGraphemeForward.
         bus.submit_command(Command::DeleteGraphemeForward);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_commands(&mut state);
 
         // Then text is "a" and cursor is at 1.
@@ -505,7 +514,7 @@ mod tests {
         // When processing DeleteGraphemeForward at end of buffer.
         bus.submit_command(Command::DeleteGraphemeForward);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_commands(&mut state);
 
         // Then text is still "a".
@@ -526,7 +535,7 @@ mod tests {
         // When processing MoveCursorWordLeft.
         bus.submit_command(Command::MoveCursorWordLeft);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_commands(&mut state);
 
         // Then cursor is at 6 (start of "world").
@@ -548,7 +557,7 @@ mod tests {
         // When processing MoveCursorWordRight.
         bus.submit_command(Command::MoveCursorWordRight);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_commands(&mut state);
 
         // Then cursor is at 6 (start of "world").
@@ -561,7 +570,7 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         state.mode = npr::Mode::Input;
         // Simulate a sending state (not yet streaming).
         state.active_session_mut().begin_sending();
@@ -594,7 +603,7 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         state.mode = npr::Mode::Input;
 
         // When processing SetMode(Normal) — ESC while idle.
@@ -622,7 +631,7 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         for ch in "hello".chars() {
             state.active_chat_input_mut().insert_grapheme_at_cursor(ch);
         }
@@ -644,7 +653,7 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         for ch in "ab\ncd".chars() {
             state.active_chat_input_mut().insert_grapheme_at_cursor(ch);
         }
@@ -664,7 +673,7 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         for ch in "ab\ncd".chars() {
             state.active_chat_input_mut().insert_grapheme_at_cursor(ch);
         }
@@ -685,7 +694,7 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         for ch in "hello".chars() {
             state.active_chat_input_mut().insert_grapheme_at_cursor(ch);
         }
@@ -705,7 +714,7 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         for ch in "hello".chars() {
             state.active_chat_input_mut().insert_grapheme_at_cursor(ch);
         }
@@ -726,7 +735,7 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         ChatInputBoxHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         for ch in "hello".chars() {
             state.active_chat_input_mut().insert_grapheme_at_cursor(ch);
         }
@@ -749,7 +758,7 @@ mod tests {
 
         // When processing Interrupt with empty input.
         bus.submit_command(Command::Interrupt);
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_commands(&mut state);
 
         // Then should_quit is true (Interrupt cascaded Quit).

@@ -42,6 +42,10 @@ use nullslop_protocol::chat_input::{
     MoveCursorRight, MoveCursorToEnd, MoveCursorToStart, MoveCursorUp, MoveCursorWordLeft,
     MoveCursorWordRight,
 };
+use nullslop_protocol::provider_picker::{
+    PickerBackspace, PickerConfirm, PickerMoveCursorLeft, PickerMoveCursorRight, PickerMoveDown,
+    PickerMoveUp,
+};
 use nullslop_protocol::system::{EditInput, Quit, ScrollDown, ScrollUp, ToggleWhichKey};
 use nullslop_protocol::{ActorName, Command, CommandAction, Event};
 
@@ -426,6 +430,36 @@ impl<S> Bus<S> {
                 let cmd = ScrollDown;
                 self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
+            Command::ProviderSwitch { payload } => {
+                self.dispatch_command_to_handlers(&payload, state, &mut out);
+            }
+            Command::PickerInsertChar { payload } => {
+                self.dispatch_command_to_handlers(&payload, state, &mut out);
+            }
+            Command::PickerBackspace => {
+                let cmd = PickerBackspace;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
+            }
+            Command::PickerConfirm => {
+                let cmd = PickerConfirm;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
+            }
+            Command::PickerMoveUp => {
+                let cmd = PickerMoveUp;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
+            }
+            Command::PickerMoveDown => {
+                let cmd = PickerMoveDown;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
+            }
+            Command::PickerMoveCursorLeft => {
+                let cmd = PickerMoveCursorLeft;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
+            }
+            Command::PickerMoveCursorRight => {
+                let cmd = PickerMoveCursorRight;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
+            }
         }
         self.flush_out(out);
     }
@@ -474,6 +508,9 @@ impl<S> Bus<S> {
                 self.dispatch_event_to_handlers(&payload, state, &mut out);
             }
             Event::StreamCompleted { payload } => {
+                self.dispatch_event_to_handlers(&payload, state, &mut out);
+            }
+            Event::ProviderSwitched { payload } => {
                 self.dispatch_event_to_handlers(&payload, state, &mut out);
             }
         }

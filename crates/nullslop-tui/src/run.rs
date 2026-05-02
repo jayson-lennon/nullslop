@@ -112,8 +112,6 @@ fn run_main_loop(
 
         // Core processing: drain messages, process bus, forward events.
         let should_quit = app.core.tick().should_quit;
-
-        // Sync which_key scope from AppState.mode.
         let scope = scope_for_mode(app.core.state.read().mode);
         app.which_key.set_scope(scope);
 

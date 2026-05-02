@@ -24,3 +24,13 @@ pub struct StreamCompleted {
     /// Why the stream completed.
     pub reason: StreamCompletedReason,
 }
+
+/// The active provider was switched.
+///
+/// Emitted after a successful [`ProviderSwitch`](super::ProviderSwitch) command.
+#[derive(Debug, Clone, Serialize, Deserialize, EventMsg)]
+#[event_msg("provider")]
+pub struct ProviderSwitched {
+    /// The display name of the new provider.
+    pub provider_name: String,
+}

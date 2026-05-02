@@ -81,6 +81,7 @@ mod tests {
     use ratatui::layout::Rect;
 
     use super::*;
+    use crate::test_utils;
     use crate::AppState;
 
     fn render_rows(element: &mut DashboardElement, state: &AppState) -> Vec<String> {
@@ -122,7 +123,7 @@ mod tests {
     fn render_empty_shows_no_actors() {
         // Given a DashboardElement with no actors.
         let mut element = DashboardElement;
-        let state = AppState::new();
+        let state = AppState::new(test_utils::test_services());
 
         // When rendering.
         let rows = render_rows(&mut element, &state);
@@ -136,7 +137,7 @@ mod tests {
         // Given a DashboardElement with an actor in Starting status.
         let mut element = DashboardElement;
         let state = {
-            let mut s = AppState::new();
+            let mut s = AppState::new(test_utils::test_services());
             s.dashboard.mark_starting("actor-a");
             s
         };
@@ -154,7 +155,7 @@ mod tests {
         // Given a DashboardElement with an actor in Started status.
         let mut element = DashboardElement;
         let state = {
-            let mut s = AppState::new();
+            let mut s = AppState::new(test_utils::test_services());
             s.dashboard.mark_starting("actor-a");
             s.dashboard.mark_started("actor-a");
             s

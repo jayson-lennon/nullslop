@@ -28,10 +28,7 @@ pub type SendResult = Result<(), Report<ActorSendError>>;
 /// Converts a kanal send failure into a [`SendResult`].
 ///
 /// Attaches a human-readable message to the report for diagnostics.
-pub(crate) fn from_kanal_send(
-    result: Result<(), SendError>,
-    context: &'static str,
-) -> SendResult {
+pub(crate) fn from_kanal_send(result: Result<(), SendError>, context: &'static str) -> SendResult {
     result.map_err(|err| {
         Report::new(ActorSendError)
             .attach(context)
@@ -134,10 +131,7 @@ impl<M: Send + 'static> ActorRef<M> {
     ///
     /// Used during actor restart to redirect all messages to a new channel
     /// without breaking existing peer references.
-    pub fn swap_sender(
-        &self,
-        new_sender: Sender<ActorEnvelope<M>>,
-    ) -> Sender<ActorEnvelope<M>> {
+    pub fn swap_sender(&self, new_sender: Sender<ActorEnvelope<M>>) -> Sender<ActorEnvelope<M>> {
         let mut guard = self.cell.sender.write();
         std::mem::replace(&mut *guard, new_sender)
     }

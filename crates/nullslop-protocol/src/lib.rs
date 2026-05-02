@@ -22,6 +22,7 @@ pub mod event;
 pub mod key;
 pub mod mode;
 pub mod provider;
+pub mod provider_picker;
 pub mod session;
 pub mod system;
 pub mod tab;
@@ -39,6 +40,9 @@ pub use mode::Mode;
 pub use nullslop_protocol_derive::{CommandMsg, EventMsg};
 pub use provider::entries_to_messages;
 pub use provider::{LlmMessage, LlmRole};
+pub use provider_picker::{
+    PickerBackspace, PickerConfirm, PickerInsertChar, PickerMoveDown, PickerMoveUp,
+};
 pub use session::SessionId;
 pub use tab::ActiveTab;
 pub use tab::TabDirection;

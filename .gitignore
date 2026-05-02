@@ -12,6 +12,7 @@
 !crates/**/
 !crates/**/*.rs
 !crates/**/Cargo.toml
+!crates/**/*.toml
 !src/
 !src/**/
 !src/**/*.rs
@@ -28,3 +29,6 @@
 !AGENTS.md
 !ARCHITECTURE.md
 !.ba/
+!.plans/
+!.plans/**/
+!.plans/**/*

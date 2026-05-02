@@ -9,8 +9,8 @@ pub mod fake;
 pub mod in_memory;
 pub mod routing;
 
-pub use actor_host::{ActorHost, ActorHostService};
 pub use actor_host::ActorHostError;
+pub use actor_host::{ActorHost, ActorHostService};
 pub use fake::FakeActorHost;
 pub use in_memory::{ActorSpawnResult, InMemoryActorHost, spawn_actor};
 pub use routing::RoutingEntry;

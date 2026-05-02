@@ -57,6 +57,7 @@ mod tests {
     use ratatui::layout::Rect;
 
     use super::*;
+    use crate::test_utils;
     use crate::AppState;
 
     #[test]
@@ -75,7 +76,7 @@ mod tests {
     fn render_shows_sending_indicator() {
         // Given a StreamingIndicatorElement and a sending session.
         let mut element = StreamingIndicatorElement;
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         state.active_session_mut().begin_sending();
 
         let backend = TestBackend::new(40, 10);
@@ -99,7 +100,7 @@ mod tests {
     fn render_shows_streaming_indicator() {
         // Given a StreamingIndicatorElement and a streaming session.
         let mut element = StreamingIndicatorElement;
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         state.active_session_mut().begin_streaming();
 
         let backend = TestBackend::new(40, 10);
@@ -123,7 +124,7 @@ mod tests {
     fn render_shows_nothing_when_idle() {
         // Given a StreamingIndicatorElement and an idle session.
         let mut element = StreamingIndicatorElement;
-        let state = AppState::new();
+        let state = AppState::new(test_utils::test_services());
 
         let backend = TestBackend::new(40, 10);
         let mut terminal = Terminal::new(backend).unwrap();

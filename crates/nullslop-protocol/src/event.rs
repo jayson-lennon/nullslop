@@ -21,7 +21,7 @@ pub use crate::custom::EventMsg;
 // Internal imports for enum definition, type_name(), and tests.
 use crate::actor::{ActorShutdownCompleted, ActorStarted, ActorStarting};
 use crate::chat_input::ChatEntrySubmitted;
-use crate::provider::StreamCompleted;
+use crate::provider::{ProviderSwitched, StreamCompleted};
 use crate::system::{KeyDown, KeyUp, ModeChanged};
 
 /// Every event the host can broadcast.
@@ -91,6 +91,13 @@ pub enum Event {
         #[serde(flatten)]
         payload: StreamCompleted,
     },
+    /// The active provider was switched.
+    #[serde(rename = "provider_switched")]
+    ProviderSwitched {
+        /// The provider switch confirmation.
+        #[serde(flatten)]
+        payload: ProviderSwitched,
+    },
 }
 
 impl Event {
@@ -106,6 +113,7 @@ impl Event {
             Self::KeyUp { .. } => Some(KeyUp::TYPE_NAME),
             Self::ModeChanged { .. } => Some(ModeChanged::TYPE_NAME),
             Self::StreamCompleted { .. } => Some(StreamCompleted::TYPE_NAME),
+            Self::ProviderSwitched { .. } => Some(ProviderSwitched::TYPE_NAME),
         }
     }
 }
@@ -152,6 +160,7 @@ mod tests {
     #[case::actor_started(Event::ActorStarted { payload: ActorStarted { name: "actor-a".into() } })]
     #[case::actor_shutdown_completed(Event::ActorShutdownCompleted { payload: ActorShutdownCompleted { name: "actor-a".into() } })]
     #[case::stream_completed(Event::StreamCompleted { payload: StreamCompleted { session_id: SessionId::new(), reason: StreamCompletedReason::Finished } })]
+    #[case::provider_switched(Event::ProviderSwitched { payload: ProviderSwitched { provider_name: "Ollama".into() } })]
     fn event_roundtrip_all_variants(#[case] event: Event) {
         // Given an event variant.
         let json = serde_json::to_string(&event).expect("serialize");
@@ -260,5 +269,8 @@ mod tests {
 
         // Then StreamCompleted has the correct TYPE_NAME.
         assert_eq!(StreamCompleted::TYPE_NAME, "provider::StreamCompleted");
+
+        // Then ProviderSwitched has the correct TYPE_NAME.
+        assert_eq!(ProviderSwitched::TYPE_NAME, "provider::ProviderSwitched");
     }
 }

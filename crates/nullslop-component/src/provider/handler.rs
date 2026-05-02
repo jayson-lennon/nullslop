@@ -46,6 +46,7 @@ mod tests {
     use nullslop_protocol as npr;
 
     use super::*;
+    use crate::test_utils;
 
     fn session_id(state: &AppState) -> npr::SessionId {
         state.active_session.clone()
@@ -57,7 +58,7 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         ProviderHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         let sid = session_id(&state);
 
         // When processing StreamToken(index=0, token="Hello").
@@ -100,7 +101,7 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         ProviderHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         let sid = session_id(&state);
         state.session_mut(&sid).begin_sending();
         assert!(state.session(&sid).is_sending());

@@ -306,16 +306,37 @@ mod tests {
             tokio::runtime::Runtime::new().expect("test runtime"),
         ));
         let handle = rt.handle().clone();
-        let mut core = AppCore::new();
-        let mut registry = nullslop_component::AppUiRegistry::new();
-        nullslop_component::register_all(&mut core.bus, &mut registry);
 
         let actor_host: Arc<dyn nullslop_actor_host::ActorHost> = Arc::new(FakeActorHost::new());
 
         let llm = nullslop_services::providers::LlmServiceFactoryService::new(Arc::new(
             FakeLlmServiceFactory::new(vec![]),
         ));
-        let services = nullslop_services::Services::new(handle, actor_host, llm);
+        let config = nullslop_providers::ProvidersConfig {
+            providers: vec![],
+            aliases: vec![],
+            default_provider: None,
+        };
+        let provider_registry = nullslop_providers::ProviderRegistryService::new(
+            nullslop_providers::ProviderRegistry::from_config(config).expect("test registry"),
+        );
+        let api_keys = nullslop_providers::ApiKeysService::new(nullslop_providers::ApiKeys::new());
+        let config_storage = nullslop_providers::ConfigStorageService::new(Arc::new(
+            nullslop_providers::InMemoryConfigStorage::new(),
+        ));
+        let services = nullslop_services::Services::new(
+            handle,
+            actor_host,
+            llm,
+            provider_registry,
+            api_keys,
+            config_storage,
+        );
+
+        let mut core = AppCore::new(services.clone());
+        let mut registry = nullslop_component::AppUiRegistry::new();
+        nullslop_component::register_all(&mut core.bus, &mut registry);
+
         HeadlessApp::new(core, services)
     }
 

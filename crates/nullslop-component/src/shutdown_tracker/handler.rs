@@ -64,6 +64,7 @@ mod tests {
     use nullslop_protocol::Event;
 
     use super::*;
+    use crate::test_utils;
 
     #[test]
     fn shutdown_tracker_tracks_starting_actor() {
@@ -77,7 +78,7 @@ mod tests {
                 name: "actor-a".into(),
             },
         });
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_events(&mut state);
 
         // Then the actor is in the tracker's pending set.
@@ -92,7 +93,7 @@ mod tests {
         // Given a bus with ShutdownTrackerHandler registered and one tracked actor.
         let mut bus: Bus<AppState> = Bus::new();
         ShutdownTrackerHandler.register(&mut bus);
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         state.shutdown_tracker.track("actor-a");
         state.shutdown_tracker.begin_shutdown();
 
@@ -120,7 +121,7 @@ mod tests {
         // Given a bus with ShutdownTrackerHandler, one tracked actor, and shutdown active.
         let mut bus: Bus<AppState> = Bus::new();
         ShutdownTrackerHandler.register(&mut bus);
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         state.shutdown_tracker.track("actor-a");
         state.shutdown_tracker.begin_shutdown();
 
@@ -145,7 +146,7 @@ mod tests {
         // Given a bus with ShutdownTrackerHandler registered and one tracked actor.
         let mut bus: Bus<AppState> = Bus::new();
         ShutdownTrackerHandler.register(&mut bus);
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         state.shutdown_tracker.track("actor-a");
         // shutdown_active is false (default).
 

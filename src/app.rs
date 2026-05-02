@@ -10,15 +10,23 @@ use error_stack::{Report, ResultExt};
 use nullslop_actor::{Actor, ActorContext, ActorEnvelope, ActorRef, MessageSink};
 use nullslop_actor_host::{ActorHostService, InMemoryActorHost, spawn_actor};
 use nullslop_cli::Cli;
-use nullslop_core::{ActorMessageSink, AppCore};
+use nullslop_component::AppState;
+use nullslop_component_core::Bus;
+use nullslop_core::{ActorMessageSink, AppCore, AppMsg, State};
 use nullslop_echo::EchoActor;
 use nullslop_llm::LlmActor;
 use nullslop_protocol::Event;
 use nullslop_protocol::actor::{ActorStarted, ActorStarting};
-use nullslop_services::providers::ApiKey;
-use nullslop_services::providers::LlmServiceFactoryService;
-use nullslop_services::providers::OpenRouterLlmServiceFactory;
-use nullslop_services::providers::SampleLlmServiceFactory;
+use nullslop_providers::ApiKeys;
+use nullslop_providers::ApiKeysService;
+use nullslop_providers::ConfigStorageService;
+use nullslop_providers::FilesystemConfigStorage;
+use nullslop_providers::LlmServiceFactoryService;
+use nullslop_providers::NoProvidersAvailableFactory;
+use nullslop_providers::ProviderId;
+use nullslop_providers::ProviderRegistry;
+use nullslop_providers::ProviderRegistryService;
+use nullslop_services::Services;
 use tokio::runtime::Runtime;
 use wherror::Error;
 
@@ -63,32 +71,63 @@ impl App {
     ///
     /// # Errors
     ///
-    /// Returns an error if the runner fails or if the API key is missing.
-    pub fn dispatch(&mut self, cli: Cli, api_key: String) -> Result<(), Report<AppError>> {
+    /// Returns an error if the runner fails.
+    pub fn dispatch(&mut self, cli: Cli) -> Result<(), Report<AppError>> {
         use nullslop_cli::cli::{Commands, HeadlessCommands};
 
-        let llm_service = if cli.fake_llm {
-            create_sample_llm_service()
-        } else {
-            create_llm_service(&api_key)?
-        };
+        // Load config from providers.toml (auto-creates on first run).
+        let config_storage =
+            ConfigStorageService::new(Arc::new(FilesystemConfigStorage::default_path()));
+        let provider_config = config_storage
+            .load()
+            .change_context(AppError)
+            .attach("failed to load provider config")?;
+
+        // Resolve API keys at startup from environment variables.
+        let mut api_keys = ApiKeys::new();
+        for provider in &provider_config.providers {
+            if let Some(ref env_var) = provider.api_key_env
+                && let Ok(value) = std::env::var(env_var)
+                && !value.is_empty()
+            {
+                api_keys.insert(env_var.clone(), value);
+            }
+        }
+        let resolved_api_keys = ApiKeysService::new(api_keys);
+
+        // Build provider registry.
+        let provider_registry = ProviderRegistryService::new(
+            ProviderRegistry::from_config(provider_config).change_context(AppError)?,
+        );
+
+        // Determine initial provider and factory.
+        let (llm_service, initial_provider) =
+            resolve_initial_factory(&provider_registry, &resolved_api_keys);
 
         match cli.command.unwrap_or(Commands::Tui) {
             Commands::Tui => {
-                let (core, host_arc) =
-                    create_core_with_actor_host(&self.handle(), llm_service.clone());
-                let services =
-                    nullslop_services::Services::new(self.handle(), host_arc, llm_service);
+                let (core, services) = create_core_with_actor_host(
+                    &self.handle(),
+                    llm_service.clone(),
+                    provider_registry.clone(),
+                    resolved_api_keys.clone(),
+                    config_storage.clone(),
+                );
+                core.state.write().active_provider = initial_provider;
                 let runner = Runner::Tui(Box::new(nullslop_tui::TuiApp::new_with_core(
                     services, core,
                 )));
                 runner.run().change_context(AppError)?;
             }
             Commands::Headless { command, .. } => {
-                let (core, host_arc) =
-                    create_core_with_actor_host(&self.handle(), llm_service.clone());
-                let services =
-                    nullslop_services::Services::new(self.handle(), host_arc, llm_service);
+                let (core, services) = create_core_with_actor_host(
+                    &self.handle(),
+                    llm_service.clone(),
+                    provider_registry,
+                    resolved_api_keys,
+                    config_storage,
+                );
+                core.state.write().active_provider = initial_provider;
                 let mut headless = HeadlessApp::new(core, services);
                 match command {
                     Some(HeadlessCommands::SendChat { message }) => {
@@ -111,33 +150,50 @@ impl App {
     }
 }
 
-/// Creates the LLM service factory from the provided API key.
+/// Resolves the initial LLM factory and provider name at startup.
 ///
-/// If the key is empty, returns an error — the program cannot function
-/// without an LLM backend.
-///
-/// # Errors
-///
-/// Returns an error if `api_key` is empty.
-fn create_llm_service(api_key: &str) -> Result<LlmServiceFactoryService, Report<AppError>> {
-    if api_key.is_empty() {
-        return Err(Report::new(AppError))
-            .attach("OPENROUTER_API_KEY environment variable is required");
+/// Tries the configured default provider first, then falls back to the
+/// first available provider. If none are available, returns a
+/// [`NoProvidersAvailableFactory`] that streams a helpful setup message.
+fn resolve_initial_factory(
+    registry: &ProviderRegistryService,
+    api_keys: &ApiKeysService,
+) -> (LlmServiceFactoryService, String) {
+    let registry_guard = registry.read();
+    let api_keys_guard = api_keys.read();
+
+    // Try configured default.
+    if let Some(id) = registry_guard.default_provider_id()
+        && registry_guard.is_available(&id, &api_keys_guard)
+        && let Ok(factory) = registry_guard.create_factory(&id, &api_keys_guard)
+    {
+        tracing::info!("using configured default provider: {}", id.as_str());
+        return (
+            LlmServiceFactoryService::new(Arc::from(factory)),
+            id.to_string(),
+        );
     }
 
-    tracing::info!("using OpenRouter LLM backend");
-    Ok(LlmServiceFactoryService::new(Arc::new(
-        OpenRouterLlmServiceFactory::with_key_and_model(
-            ApiKey::new(api_key.to_string()),
-            OpenRouterLlmServiceFactory::default_model().to_string(),
-        ),
-    )))
-}
+    // Fallback: first available provider.
+    for provider in registry_guard.providers() {
+        let id = ProviderId::new(provider.name.clone());
+        if registry_guard.is_available(&id, &api_keys_guard)
+            && let Ok(factory) = registry_guard.create_factory(&id, &api_keys_guard)
+        {
+            tracing::info!("using first available provider: {}", provider.name);
+            return (
+                LlmServiceFactoryService::new(Arc::from(factory)),
+                provider.name.clone(),
+            );
+        }
+    }
 
-/// Creates the sample LLM service factory for `--fake-llm` mode.
-fn create_sample_llm_service() -> LlmServiceFactoryService {
-    tracing::info!("using Sample LLM backend (--fake-llm)");
-    LlmServiceFactoryService::new(Arc::new(SampleLlmServiceFactory))
+    // No provider available — use the no-provider factory.
+    tracing::warn!("no provider configured or available; use the picker to select one");
+    (
+        LlmServiceFactoryService::new(Arc::new(NoProvidersAvailableFactory)),
+        nullslop_providers::NO_PROVIDER_ID.to_owned(),
+    )
 }
 
 impl Default for App {
@@ -150,13 +206,17 @@ impl Default for App {
 fn create_core_with_actor_host(
     handle: &tokio::runtime::Handle,
     llm_service: LlmServiceFactoryService,
-) -> (AppCore, Arc<dyn nullslop_actor_host::ActorHost>) {
-    let mut core = AppCore::new();
-    let mut registry = nullslop_component::AppUiRegistry::new();
-    nullslop_component::register_all(&mut core.bus, &mut registry);
+    provider_registry: ProviderRegistryService,
+    api_keys: ApiKeysService,
+    config_storage: ConfigStorageService,
+) -> (AppCore, Services) {
+    // Create channel first — actors need the sender, but AppCore needs services
+    // which needs the actor host which needs actors. Break the cycle by creating
+    // the channel independently.
+    let (sender, receiver) = kanal::unbounded::<AppMsg>();
 
     // Create the message sink that bridges actor output to AppCore's channel.
-    let sink = Arc::new(ActorMessageSink::new(core.sender()));
+    let sink = Arc::new(ActorMessageSink::new(sender.clone()));
 
     // Create echo actor using two-phase startup.
     let (echo_tx, echo_rx) = kanal::unbounded::<ActorEnvelope<nullslop_echo::EchoDirectMsg>>();
@@ -176,7 +236,7 @@ fn create_core_with_actor_host(
     let (llm_tx, llm_rx) = kanal::unbounded::<ActorEnvelope<nullslop_llm::LlmDirectMsg>>();
     let llm_ref = ActorRef::new(llm_tx);
     let mut llm_ctx = ActorContext::new("nullslop-llm", sink.clone());
-    llm_ctx.set_data(llm_service);
+    llm_ctx.set_data(llm_service.clone());
     let llm_actor = LlmActor::activate(&mut llm_ctx);
     let llm_result = spawn_actor("nullslop-llm", llm_actor, &llm_ref, llm_rx, llm_ctx, handle);
 
@@ -205,9 +265,29 @@ fn create_core_with_actor_host(
     let host =
         InMemoryActorHost::from_actors_with_handle(vec![echo_result, llm_result], handle.clone());
     let host_arc: Arc<dyn nullslop_actor_host::ActorHost> = Arc::new(host);
-    core.set_actor_host(ActorHostService::new(host_arc.clone()));
 
-    (core, host_arc)
+    // Build services with the actor host.
+    let services = Services::new(
+        handle.clone(),
+        host_arc.clone(),
+        llm_service,
+        provider_registry,
+        api_keys,
+        config_storage,
+    );
+
+    // Build AppCore with services in its state.
+    let mut core = AppCore {
+        bus: Bus::new(),
+        state: State::new(AppState::new(services.clone())),
+        sender,
+        receiver,
+        actor_host: Some(ActorHostService::new(host_arc)),
+    };
+    let mut registry = nullslop_component::AppUiRegistry::new();
+    nullslop_component::register_all(&mut core.bus, &mut registry);
+
+    (core, services)
 }
 
 #[cfg(test)]
@@ -221,7 +301,6 @@ mod tests {
         Cli {
             verbosity: Verbosity::new(0, 0),
             log_dir: None,
-            fake_llm: false,
             command,
         }
     }
@@ -242,7 +321,7 @@ mod tests {
         }));
 
         // When dispatching the headless script command.
-        let result = app.dispatch(cli, "test-key-for-ci".to_string());
+        let result = app.dispatch(cli);
 
         // Then it completes without error.
         assert!(result.is_ok());
@@ -260,7 +339,7 @@ mod tests {
         }));
 
         // When dispatching the headless script command.
-        let result = app.dispatch(cli, "test-key-for-ci".to_string());
+        let result = app.dispatch(cli);
 
         // Then an error is returned.
         assert!(result.is_err());

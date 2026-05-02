@@ -9,6 +9,7 @@ pub mod handler;
 pub mod indicator;
 pub mod queue_element;
 pub mod request_handler;
+pub mod switch_handler;
 
 use nullslop_component_core::Bus;
 use nullslop_component_ui::UiRegistry;
@@ -19,6 +20,7 @@ use crate::AppState;
 pub(crate) fn register(bus: &mut Bus<AppState>, registry: &mut UiRegistry<AppState>) {
     handler::ProviderHandler.register(bus);
     request_handler::MessageQueueHandler.register(bus);
+    switch_handler::SwitchHandler.register(bus);
     registry.register(Box::new(indicator::StreamingIndicatorElement));
     registry.register(Box::new(queue_element::QueueDisplayElement));
 }

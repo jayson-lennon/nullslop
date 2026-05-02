@@ -63,11 +63,11 @@ impl AppCore {
     /// [`Bus::register_command_handler`] / [`Bus::register_event_handler`],
     /// and optionally sets the actor host via [`Self::set_actor_host`].
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(services: nullslop_services::Services) -> Self {
         let (sender, receiver) = kanal::unbounded();
         Self {
             bus: Bus::new(),
-            state: State::new(AppState::new()),
+            state: State::new(AppState::new(services)),
             sender,
             receiver,
             actor_host: None,
@@ -224,21 +224,21 @@ impl AppCore {
     }
 }
 
-impl Default for AppCore {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use nullslop_protocol::Mode;
 
+    fn test_services() -> nullslop_services::Services {
+        nullslop_services::test_services::TestServices::builder().build()
+    }
+
     #[test]
     fn submit_command_processes_through_bus() {
         // Given an AppCore with components registered.
-        let mut core = AppCore::new();
+        let mut core = AppCore::new(test_services());
         let mut registry = nullslop_component::AppUiRegistry::new();
         nullslop_component::register_all(&mut core.bus, &mut registry);
 
@@ -254,7 +254,7 @@ mod tests {
     #[test]
     fn tick_returns_false_when_not_quit() {
         // Given an AppCore with no messages.
-        let mut core = AppCore::new();
+        let mut core = AppCore::new(test_services());
 
         // When ticking with no messages.
         let result = core.tick();
@@ -267,7 +267,7 @@ mod tests {
     #[test]
     fn tick_processes_insert_char_command() {
         // Given an AppCore with components registered, in Input mode.
-        let mut core = AppCore::new();
+        let mut core = AppCore::new(test_services());
         let mut registry = nullslop_component::AppUiRegistry::new();
         nullslop_component::register_all(&mut core.bus, &mut registry);
         core.state.write().mode = Mode::Input;

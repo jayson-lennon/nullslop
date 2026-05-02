@@ -62,6 +62,7 @@ mod tests {
     use nullslop_protocol as npr;
 
     use super::*;
+    use crate::test_utils;
 
     #[test]
     fn push_chat_entry_adds_to_history() {
@@ -77,7 +78,7 @@ mod tests {
                 entry,
             },
         });
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_commands(&mut state);
 
         // Then the active session history has one entry.
@@ -102,7 +103,7 @@ mod tests {
                 entry,
             },
         });
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_commands(&mut state);
 
         // Then a ChatEntrySubmitted event is queued.
@@ -131,7 +132,7 @@ mod tests {
                 entry,
             },
         });
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_commands(&mut state);
 
         // Then the active session history has an Actor entry.
@@ -151,7 +152,7 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         ChatLogHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         for i in 0..20 {
             state
                 .active_session_mut()
@@ -174,7 +175,7 @@ mod tests {
         let mut bus: Bus<AppState> = Bus::new();
         ChatLogHandler.register(&mut bus);
 
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         state
             .active_session_mut()
             .push_entry(npr::ChatEntry::user("hello"));

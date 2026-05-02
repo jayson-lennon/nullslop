@@ -39,6 +39,7 @@ mod tests {
     use nullslop_protocol::actor::{ActorStarted, ActorStarting};
 
     use super::*;
+    use crate::test_utils;
 
     #[test]
     fn actor_starting_adds_with_starting_status() {
@@ -52,7 +53,7 @@ mod tests {
                 name: "actor-a".into(),
             },
         });
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_events(&mut state);
 
         // Then the actor is tracked with Starting status.
@@ -66,7 +67,7 @@ mod tests {
         // Given a bus with DashboardHandler registered and an actor that has started.
         let mut bus: Bus<AppState> = Bus::new();
         DashboardHandler.register(&mut bus);
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         state.dashboard.mark_starting("actor-a");
 
         // When an ActorStarted event is processed.
@@ -104,7 +105,7 @@ mod tests {
                 name: "beta".into(),
             },
         });
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_events(&mut state);
 
         // Then both are tracked in order with correct statuses.

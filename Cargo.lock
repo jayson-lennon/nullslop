@@ -1438,6 +1438,7 @@ dependencies = [
  "nullslop-actor-host",
  "nullslop-cli",
  "nullslop-component",
+ "nullslop-component-core",
  "nullslop-core",
  "nullslop-echo",
  "nullslop-llm",
@@ -1496,12 +1497,16 @@ dependencies = [
 name = "nullslop-component"
 version = "0.1.0"
 dependencies = [
+ "nullslop-actor-host",
  "nullslop-component-core",
  "nullslop-component-ui",
  "nullslop-protocol",
+ "nullslop-providers",
+ "nullslop-services",
  "ratatui",
  "rstest",
  "serde_json",
+ "tokio",
  "tracing",
  "unicode-segmentation",
 ]
@@ -1537,6 +1542,7 @@ dependencies = [
  "nullslop-component-core",
  "nullslop-component-ui",
  "nullslop-protocol",
+ "nullslop-services",
  "parking_lot",
  "rstest",
  "serde",
@@ -1598,12 +1604,17 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "derive_more",
+ "dirs",
  "error-stack",
  "futures",
  "llm",
  "nullslop-protocol",
+ "parking_lot",
  "rand 0.9.4",
+ "serde",
+ "tempfile",
  "tokio",
+ "toml",
  "wherror",
 ]
 
@@ -1638,6 +1649,7 @@ dependencies = [
  "nullslop-component-ui",
  "nullslop-core",
  "nullslop-protocol",
+ "nullslop-providers",
  "nullslop-services",
  "parking_lot",
  "ratatui",

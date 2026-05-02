@@ -1,6 +1,6 @@
 # Style Guide
 
-This document defines the coding conventions and patterns for the `nullslop` codebase. For system design and data flow, see [ARCHITECTURE.md](./ARCHITECTURE.md).
+This document defines the _coding conventions_ and _patterns_ for the `nullslop` codebase. Always load the [ARCHITECTURE.md](./ARCHITECTURE.md) document for more detailed information that will help guide change requests and code reviews.
 
 ## 1. Overview
 
@@ -324,3 +324,4 @@ Read the `justfile` to determine what additional tooling is related to this proj
 - NEVER manually split a string using `.chars` or by indexing. Use the `unicode-segmentation` crate.
 - No trivial setters for struct methods. Prefer meaningful semantic actions. It's an anti-pattern to directly inspect and manipulate state.
 - Environment variables should only be accessed at program initialization and then saved into a struct as needed. Environment variables are a global namespace and should be avoided outside of program startup.
+- Use `where` clause for all generics.

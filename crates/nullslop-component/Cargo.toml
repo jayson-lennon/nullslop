@@ -7,6 +7,8 @@ edition = "2024"
 nullslop-protocol = { workspace = true }
 nullslop-component-core = { workspace = true }
 nullslop-component-ui = { workspace = true }
+nullslop-services = { workspace = true }
+nullslop-providers = { workspace = true }
 ratatui = { workspace = true }
 tracing = { workspace = true }
 unicode-segmentation = { workspace = true }
@@ -14,6 +16,8 @@ unicode-segmentation = { workspace = true }
 [dev-dependencies]
 rstest = { workspace = true }
 serde_json = { workspace = true }
+nullslop-actor-host = { workspace = true }
+tokio = { workspace = true }
 
 [lints]
 workspace = true

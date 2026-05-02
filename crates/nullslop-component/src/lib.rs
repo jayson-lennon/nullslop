@@ -23,6 +23,7 @@ pub mod chat_log;
 pub mod chat_session;
 pub mod dashboard;
 pub mod provider;
+pub mod provider_picker;
 pub mod shutdown_tracker;
 pub mod tab_nav;
 
@@ -31,6 +32,17 @@ pub use chat_input_box::ChatInputBoxState;
 pub use chat_session::ChatSessionState;
 pub use dashboard::DashboardState;
 pub use shutdown_tracker::ShutdownTrackerState;
+
+/// Test utilities shared across the crate.
+///
+/// Only available in `#[cfg(test)]` builds.
+#[cfg(test)]
+pub(crate) mod test_utils {
+    /// Create a [`nullslop_services::Services`] with fake implementations for tests.
+    pub fn test_services() -> nullslop_services::Services {
+        nullslop_services::test_services::TestServices::builder().build()
+    }
+}
 
 use nullslop_component_core::Bus;
 use nullslop_component_ui::UiRegistry;
@@ -53,6 +65,7 @@ pub fn register_all(bus: &mut AppBus, registry: &mut AppUiRegistry) {
     dashboard::register(bus, registry);
     tab_nav::register(bus, registry);
     provider::register(bus, registry);
+    provider_picker::register(bus, registry);
 }
 
 /// Register only TUI elements (no bus handlers).
@@ -79,6 +92,7 @@ mod macro_tests {
     use nullslop_protocol as npr;
 
     use crate::AppState;
+    use crate::test_utils;
 
     // --- Test handler: command handler returning Stop ---
 
@@ -109,7 +123,7 @@ mod macro_tests {
 
         // When processing a Quit command.
         bus.submit_command(Command::Quit);
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_commands(&mut state);
 
         // Then the stop handler ran and prevented the fake from running.
@@ -148,7 +162,7 @@ mod macro_tests {
                 to: npr::Mode::Input,
             },
         });
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_events(&mut state);
 
         // Then the handler ran and mutated state.
@@ -199,7 +213,7 @@ mod macro_tests {
         bus.submit_command(Command::InsertChar {
             payload: InsertChar { ch: 'h' },
         });
-        let mut state = AppState::new();
+        let mut state = AppState::new(test_utils::test_services());
         bus.process_commands(&mut state);
 
         // Then the command handler ran.

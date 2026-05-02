@@ -26,7 +26,11 @@ use crate::chat_input::{
     MoveCursorWordRight, PushChatEntry, SetChatInputText, SubmitMessage,
 };
 use crate::chat_input::{MoveCursorLeft, MoveCursorRight};
-use crate::provider::{CancelStream, SendMessage, SendToLlmProvider, StreamToken};
+use crate::provider::{CancelStream, ProviderSwitch, SendMessage, SendToLlmProvider, StreamToken};
+use crate::provider_picker::{
+    PickerBackspace, PickerConfirm, PickerInsertChar, PickerMoveCursorLeft,
+    PickerMoveCursorRight, PickerMoveDown, PickerMoveUp,
+};
 use crate::system::SetMode;
 use crate::tab::SwitchTab;
 
@@ -170,12 +174,44 @@ pub enum Command {
         #[serde(flatten)]
         payload: ProceedWithShutdown,
     },
+    /// Switch the active LLM provider.
+    #[serde(rename = "provider_switch")]
+    ProviderSwitch {
+        /// The provider switch details.
+        #[serde(flatten)]
+        payload: ProviderSwitch,
+    },
     /// Scroll the chat log up (toward older messages).
     #[serde(rename = "scroll_up")]
     ScrollUp,
     /// Scroll the chat log down (toward newer messages).
     #[serde(rename = "scroll_down")]
     ScrollDown,
+    /// Insert a character into the picker filter.
+    #[serde(rename = "picker_insert_char")]
+    PickerInsertChar {
+        /// The character to insert.
+        #[serde(flatten)]
+        payload: PickerInsertChar,
+    },
+    /// Delete the last character from the picker filter.
+    #[serde(rename = "picker_backspace")]
+    PickerBackspace,
+    /// Confirm the current picker selection.
+    #[serde(rename = "picker_confirm")]
+    PickerConfirm,
+    /// Move the picker selection up.
+    #[serde(rename = "picker_move_up")]
+    PickerMoveUp,
+    /// Move the picker selection down.
+    #[serde(rename = "picker_move_down")]
+    PickerMoveDown,
+    /// Move the picker filter cursor left.
+    #[serde(rename = "picker_move_cursor_left")]
+    PickerMoveCursorLeft,
+    /// Move the picker filter cursor right.
+    #[serde(rename = "picker_move_cursor_right")]
+    PickerMoveCursorRight,
 }
 
 impl Command {
@@ -215,6 +251,14 @@ impl Command {
             Self::EnqueueUserMessage { .. } => Some(EnqueueUserMessage::NAME),
             Self::SetChatInputText { .. } => Some(SetChatInputText::NAME),
             Self::ProceedWithShutdown { .. } => Some(ProceedWithShutdown::NAME),
+            Self::ProviderSwitch { .. } => Some(ProviderSwitch::NAME),
+            Self::PickerInsertChar { .. } => Some(PickerInsertChar::NAME),
+            Self::PickerBackspace => Some(PickerBackspace::NAME),
+            Self::PickerConfirm => Some(PickerConfirm::NAME),
+            Self::PickerMoveUp => Some(PickerMoveUp::NAME),
+            Self::PickerMoveDown => Some(PickerMoveDown::NAME),
+            Self::PickerMoveCursorLeft => Some(PickerMoveCursorLeft::NAME),
+            Self::PickerMoveCursorRight => Some(PickerMoveCursorRight::NAME),
         }
     }
 }
@@ -262,8 +306,18 @@ impl std::fmt::Display for Command {
                     payload.timed_out.len()
                 )
             }
+            Command::ProviderSwitch { payload } => {
+                write!(f, "provider switch to '{}'", payload.provider_id)
+            }
             Command::ScrollUp => write!(f, "scroll up"),
             Command::ScrollDown => write!(f, "scroll down"),
+            Command::PickerInsertChar { payload } => write!(f, "picker insert '{}'", payload.ch),
+            Command::PickerBackspace => write!(f, "picker backspace"),
+            Command::PickerConfirm => write!(f, "picker confirm"),
+            Command::PickerMoveUp => write!(f, "picker move up"),
+            Command::PickerMoveDown => write!(f, "picker move down"),
+            Command::PickerMoveCursorLeft => write!(f, "picker cursor left"),
+            Command::PickerMoveCursorRight => write!(f, "picker cursor right"),
         }
     }
 }
@@ -314,7 +368,7 @@ mod tests {
     #[case::switch_tab(Command::SwitchTab { payload: SwitchTab { direction: crate::TabDirection::Next } })]
     #[case::send_message(Command::SendMessage { payload: SendMessage { session_id: SessionId::new(), text: "hi".into() } })]
     #[case::cancel_stream(Command::CancelStream { payload: CancelStream { session_id: SessionId::new() } })]
-    #[case::send_to_llm_provider(Command::SendToLlmProvider { payload: SendToLlmProvider { session_id: SessionId::new(), messages: vec![] } })]
+    #[case::send_to_llm_provider(Command::SendToLlmProvider { payload: SendToLlmProvider { session_id: SessionId::new(), messages: vec![], provider_id: None } })]
     #[case::stream_token(Command::StreamToken { payload: StreamToken { session_id: SessionId::new(), index: 0, token: "hello".into() } })]
     #[case::push_chat_entry(Command::PushChatEntry { payload: PushChatEntry { session_id: SessionId::new(), entry: crate::ChatEntry::user("hi") } })]
     #[case::proceed_with_shutdown(Command::ProceedWithShutdown { payload: ProceedWithShutdown { completed: vec!["ext-a".into()], timed_out: vec!["ext-b".into()] } })]
@@ -327,10 +381,18 @@ mod tests {
     #[case::move_cursor_word_right(Command::MoveCursorWordRight)]
     #[case::enqueue_user_message(Command::EnqueueUserMessage { payload: EnqueueUserMessage { session_id: SessionId::new(), text: "hello".into() } })]
     #[case::set_chat_input_text(Command::SetChatInputText { payload: SetChatInputText { session_id: SessionId::new(), text: "restored".into() } })]
+    #[case::provider_switch(Command::ProviderSwitch { payload: ProviderSwitch { provider_id: "ollama".into() } })]
     #[case::scroll_up(Command::ScrollUp)]
     #[case::scroll_down(Command::ScrollDown)]
     #[case::move_cursor_up(Command::MoveCursorUp)]
     #[case::move_cursor_down(Command::MoveCursorDown)]
+    #[case::picker_insert_char(Command::PickerInsertChar { payload: PickerInsertChar { ch: 'x' } })]
+    #[case::picker_backspace(Command::PickerBackspace)]
+    #[case::picker_confirm(Command::PickerConfirm)]
+    #[case::picker_move_up(Command::PickerMoveUp)]
+    #[case::picker_move_down(Command::PickerMoveDown)]
+    #[case::picker_move_cursor_left(Command::PickerMoveCursorLeft)]
+    #[case::picker_move_cursor_right(Command::PickerMoveCursorRight)]
     fn command_roundtrip_all_variants(#[case] cmd: Command) {
         // Given a command variant.
         let json = serde_json::to_string(&cmd).expect("serialize");
