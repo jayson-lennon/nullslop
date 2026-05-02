@@ -16,6 +16,7 @@
 !src/**/
 !src/**/*.rs
 !Cargo.{toml,lock}#
+!clippy.toml
 
 # cmd runner
 !justfile
