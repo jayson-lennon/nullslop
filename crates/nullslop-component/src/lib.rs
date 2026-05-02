@@ -173,7 +173,9 @@ mod macro_tests {
 
     impl MultiHandler {
         fn on_insert_char(cmd: &InsertChar, state: &mut AppState, _out: &mut Out) -> CommandAction {
-            state.active_chat_input_mut().insert_grapheme_at_cursor(cmd.ch);
+            state
+                .active_chat_input_mut()
+                .insert_grapheme_at_cursor(cmd.ch);
             CommandAction::Continue
         }
 

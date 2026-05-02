@@ -14,16 +14,19 @@ use nullslop_component::AppState;
 /// Wraps [`AppState`] so readers always see a consistent snapshot.
 #[derive(Debug, Clone)]
 pub struct State {
+    /// The underlying shared, lock-protected application state.
     inner: Arc<RwLock<AppState>>,
 }
 
 /// Read guard for application data.
 pub struct StateReadGuard<'a> {
+    /// The underlying read lock guard.
     inner: parking_lot::RwLockReadGuard<'a, AppState>,
 }
 
 /// Write guard for application data.
 pub struct StateWriteGuard<'a> {
+    /// The underlying write lock guard.
     inner: parking_lot::RwLockWriteGuard<'a, AppState>,
 }
 

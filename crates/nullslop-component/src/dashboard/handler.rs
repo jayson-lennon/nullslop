@@ -19,10 +19,12 @@ define_handler! {
 }
 
 impl DashboardHandler {
+    /// Records an actor as starting in the dashboard state.
     fn on_actor_starting(evt: &ActorStarting, state: &mut AppState, _out: &mut Out) {
         state.dashboard.mark_starting(&evt.name);
     }
 
+    /// Records an actor as started in the dashboard state.
     fn on_actor_started(evt: &ActorStarted, state: &mut AppState, _out: &mut Out) {
         state.dashboard.mark_started(&evt.name);
     }

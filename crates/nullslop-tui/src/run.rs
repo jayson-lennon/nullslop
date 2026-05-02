@@ -8,13 +8,11 @@
 use std::io::{self, Stdout};
 
 use crossterm::{
-    event::{
-        KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
-    },
+    event::{KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use error_stack::{Report, ResultExt};
+use error_stack::{Report, ResultExt as _};
 use ratatui::{Terminal, backend::CrosstermBackend};
 use wherror::Error;
 
@@ -50,9 +48,7 @@ pub fn run(mut app: TuiApp) -> Result<(), Report<TuiRunError>> {
     // Terminals that don't support it silently ignore the sequence.
     execute!(
         stdout,
-        PushKeyboardEnhancementFlags(
-            KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
-        )
+        PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
     )
     .change_context(TuiRunError)
     .attach("failed to push keyboard enhancement flags")?;
@@ -96,6 +92,7 @@ pub fn run(mut app: TuiApp) -> Result<(), Report<TuiRunError>> {
     result
 }
 
+/// Runs the main TUI event loop — receives events, processes state, and renders frames.
 fn run_main_loop(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     app: &mut TuiApp,
@@ -194,7 +191,11 @@ fn handle_suspend_action(
 
     // Handle the suspend result directly — set input_buffer on AppState.
     if let Some(content) = result_content {
-        app.core.state.write().active_chat_input_mut().replace_all(content);
+        app.core
+            .state
+            .write()
+            .active_chat_input_mut()
+            .replace_all(content);
     }
 
     Ok(())

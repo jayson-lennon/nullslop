@@ -33,9 +33,9 @@ impl DashboardState {
     /// Record that an actor has started the startup process.
     pub fn mark_starting(&mut self, name: &str) {
         if !self.actors.contains_key(name) {
-            self.order.push(name.to_string());
+            self.order.push(name.to_owned());
         }
-        self.actors.insert(name.to_string(), ActorStatus::Starting);
+        self.actors.insert(name.to_owned(), ActorStatus::Starting);
     }
 
     /// Record that an actor has finished starting.
@@ -44,9 +44,9 @@ impl DashboardState {
     /// it is added with `Started` status.
     pub fn mark_started(&mut self, name: &str) {
         if !self.actors.contains_key(name) {
-            self.order.push(name.to_string());
+            self.order.push(name.to_owned());
         }
-        self.actors.insert(name.to_string(), ActorStatus::Started);
+        self.actors.insert(name.to_owned(), ActorStatus::Started);
     }
 
     /// Returns all tracked actors in insertion order with their status.

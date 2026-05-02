@@ -19,7 +19,7 @@ pub struct StreamingIndicatorElement;
 
 impl UiElement<AppState> for StreamingIndicatorElement {
     fn name(&self) -> String {
-        "streaming-indicator".to_string()
+        "streaming-indicator".to_owned()
     }
 
     fn render(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppState) {
@@ -30,13 +30,13 @@ impl UiElement<AppState> for StreamingIndicatorElement {
             if queue_len > 0 {
                 format!("📤 Sending... ({queue_len} queued)")
             } else {
-                "📤 Sending...".to_string()
+                "📤 Sending...".to_owned()
             }
         } else if session.is_streaming() {
             if queue_len > 0 {
                 format!("🧠 Streaming... ({queue_len} queued)")
             } else {
-                "🧠 Streaming...".to_string()
+                "🧠 Streaming...".to_owned()
             }
         } else {
             return;

@@ -20,6 +20,7 @@ define_handler! {
 }
 
 impl AppQuitHandler {
+    /// Handles the Quit command — flags the application for exit and stops processing.
     fn on_quit(_cmd: &Quit, state: &mut AppState, _out: &mut Out) -> CommandAction {
         state.should_quit = true;
         CommandAction::Stop

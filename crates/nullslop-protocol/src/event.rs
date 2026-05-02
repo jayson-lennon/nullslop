@@ -113,8 +113,8 @@ impl Event {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ChatEntry, Key, KeyEvent, Mode, Modifiers, SessionId};
     use crate::provider::StreamCompletedReason;
+    use crate::{ChatEntry, Key, KeyEvent, Mode, Modifiers, SessionId};
 
     #[test]
     fn event_chat_entry_submitted_preserves_entry() {
@@ -136,7 +136,7 @@ mod tests {
             Event::ChatEntrySubmitted { payload } => {
                 assert_eq!(
                     payload.entry.kind,
-                    crate::ChatEntryKind::User("hello".to_string())
+                    crate::ChatEntryKind::User("hello".to_owned())
                 );
             }
             other => panic!("expected ChatEntrySubmitted, got {other:?}"),
@@ -165,7 +165,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::too_many_lines)]
     fn event_type_name_exhaustive_coverage() {
         // Given all Event variants.
         // When calling type_name() on each variant.

@@ -16,3 +16,12 @@ pub enum TabDirection {
     /// Move to the previous tab (wrapping).
     Prev,
 }
+
+impl std::fmt::Display for TabDirection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Next => write!(f, "next"),
+            Self::Prev => write!(f, "prev"),
+        }
+    }
+}

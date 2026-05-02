@@ -16,6 +16,7 @@ define_handler! {
 }
 
 impl TabNavHandler {
+    /// Switches the active tab in the given direction.
     fn on_switch_tab(cmd: &SwitchTab, state: &mut AppState, _out: &mut Out) -> CommandAction {
         state.active_tab = match cmd.direction {
             TabDirection::Next => state.active_tab.next(),

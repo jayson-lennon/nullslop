@@ -19,7 +19,6 @@ use std::future::Future;
 /// After activation, the actor receives all messages — bus events, bus commands,
 /// direct messages from other actors, and shutdown — through a single
 /// [`ActorEnvelope`] in the [`handle`](Actor::handle) method.
-#[allow(async_fn_in_trait)]
 pub trait Actor {
     /// The direct message type this actor accepts from other actors.
     type Message: Send + 'static;

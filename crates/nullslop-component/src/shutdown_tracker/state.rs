@@ -28,7 +28,7 @@ impl ShutdownTrackerState {
 
     /// Record that an actor has started.
     pub fn track(&mut self, name: &str) {
-        self.pending.insert(name.to_string());
+        self.pending.insert(name.to_owned());
     }
 
     /// Record that an actor has finished shutting down.

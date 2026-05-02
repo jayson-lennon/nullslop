@@ -20,8 +20,10 @@ define_handler! {
 }
 
 impl ChatLogHandler {
+    /// Number of lines to scroll per step.
     const SCROLL_STEP: u16 = 10;
 
+    /// Appends a chat entry to the active session's history.
     fn on_push_chat_entry(
         cmd: &PushChatEntry,
         state: &mut AppState,
@@ -39,11 +41,13 @@ impl ChatLogHandler {
         CommandAction::Continue
     }
 
+    /// Scrolls the chat log up by [`SCROLL_STEP`] lines.
     fn on_scroll_up(_cmd: &ScrollUp, state: &mut AppState, _out: &mut Out) -> CommandAction {
         state.active_session_mut().scroll_up(Self::SCROLL_STEP);
         CommandAction::Continue
     }
 
+    /// Scrolls the chat log down by [`SCROLL_STEP`] lines.
     fn on_scroll_down(_cmd: &ScrollDown, state: &mut AppState, _out: &mut Out) -> CommandAction {
         state.active_session_mut().scroll_down(Self::SCROLL_STEP);
         CommandAction::Continue
@@ -80,7 +84,7 @@ mod tests {
         assert_eq!(state.active_session().history().len(), 1);
         assert_eq!(
             state.active_session().history()[0].kind,
-            npr::ChatEntryKind::User("hello".to_string())
+            npr::ChatEntryKind::User("hello".to_owned())
         );
     }
 
@@ -135,8 +139,8 @@ mod tests {
         assert_eq!(
             state.active_session().history()[0].kind,
             npr::ChatEntryKind::Actor {
-                source: "nullslop-echo".to_string(),
-                text: "HELLO".to_string(),
+                source: "nullslop-echo".to_owned(),
+                text: "HELLO".to_owned(),
             }
         );
     }

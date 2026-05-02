@@ -4,7 +4,7 @@
 //! Tracks cursor position as a grapheme-cluster index so that insert and delete
 //! operations work correctly at any position in the buffer.
 
-use unicode_segmentation::UnicodeSegmentation;
+use unicode_segmentation::UnicodeSegmentation as _;
 
 /// The user's in-progress message being composed in the input box.
 ///
@@ -103,6 +103,10 @@ impl ChatInputBoxState {
     /// Delete the grapheme immediately before the cursor and move the cursor back by 1.
     ///
     /// No-op when the cursor is at position 0.
+    #[expect(
+        clippy::indexing_slicing,
+        reason = "delete_idx is cursor_pos - 1 where cursor_pos > 0, and graphemes length equals grapheme count which is >= cursor_pos"
+    )]
     pub fn delete_grapheme_before_cursor(&mut self) {
         if self.cursor_pos == 0 {
             return;
@@ -160,6 +164,10 @@ impl ChatInputBoxState {
     /// Delete the grapheme at the cursor position (forward delete).
     ///
     /// No-op when the cursor is at the end of the buffer.
+    #[expect(
+        clippy::indexing_slicing,
+        reason = "cursor_pos < count is checked above, so index is in bounds"
+    )]
     pub fn delete_grapheme_after_cursor(&mut self) {
         let count = self.grapheme_count();
         if self.cursor_pos >= count {
@@ -177,6 +185,10 @@ impl ChatInputBoxState {
     /// Scans left from the current cursor position, skips any whitespace,
     /// then finds the start of the preceding word.
     /// No-op when the cursor is at position 0.
+    #[expect(
+        clippy::indexing_slicing,
+        reason = "pos > 0 is checked before indexing pos - 1, guaranteed in bounds"
+    )]
     pub fn move_cursor_word_left(&mut self) {
         if self.cursor_pos == 0 {
             return;
@@ -201,6 +213,10 @@ impl ChatInputBoxState {
     /// Scans right from the current cursor position, skips any non-whitespace,
     /// then skips any whitespace to land at the start of the next word.
     /// No-op when the cursor is at the end of the buffer.
+    #[expect(
+        clippy::indexing_slicing,
+        reason = "pos < count is checked before indexing pos, guaranteed in bounds"
+    )]
     pub fn move_cursor_word_right(&mut self) {
         let count = self.grapheme_count();
         if self.cursor_pos >= count {

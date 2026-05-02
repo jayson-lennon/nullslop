@@ -39,11 +39,11 @@ pub struct AppCore {
     /// Shared application state.
     pub state: State,
     /// Sender half of the internal message channel.
-    sender: kanal::Sender<AppMsg>,
+    pub sender: kanal::Sender<AppMsg>,
     /// Receiver half of the internal message channel.
-    receiver: kanal::Receiver<AppMsg>,
+    pub receiver: kanal::Receiver<AppMsg>,
     /// Optional actor host for forwarding processed messages.
-    actor_host: Option<ActorHostService>,
+    pub actor_host: Option<ActorHostService>,
 }
 
 impl std::fmt::Debug for AppCore {

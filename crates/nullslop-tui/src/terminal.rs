@@ -10,7 +10,7 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use error_stack::{Report, ResultExt};
+use error_stack::{Report, ResultExt as _};
 use ratatui::{Terminal, backend::CrosstermBackend};
 use wherror::Error;
 
@@ -25,6 +25,7 @@ pub struct TerminalSuspendError;
 /// and automatically restores it when dropped. Used to temporarily return
 /// to the normal terminal for external editor sessions.
 pub struct TerminalGuard<'a> {
+    /// Reference to the terminal being suspended and restored.
     terminal: &'a mut Terminal<CrosstermBackend<io::Stdout>>,
 }
 

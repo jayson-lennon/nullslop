@@ -17,7 +17,7 @@ pub struct ActorName(String);
 impl ActorName {
     /// Creates a new actor name from a string.
     #[must_use]
-    pub fn new(name: impl Into<String>) -> Self {
+    pub fn new<T: Into<String>>(name: T) -> Self {
         Self(name.into())
     }
 }

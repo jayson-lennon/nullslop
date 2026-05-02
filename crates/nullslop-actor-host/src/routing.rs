@@ -44,7 +44,7 @@ mod tests {
         let (actor_ref, rx) = make_actor_ref_and_rx();
         let ref_clone = actor_ref.clone();
         let entry = super::RoutingEntry {
-            name: "test".to_string(),
+            name: "test".to_owned(),
             subscriptions: vec![],
             commands: vec![],
             send_event: Box::new(move |event| {
@@ -80,7 +80,7 @@ mod tests {
         let (actor_ref, rx) = make_actor_ref_and_rx();
         let ref_clone = actor_ref.clone();
         let entry = super::RoutingEntry {
-            name: "test".to_string(),
+            name: "test".to_owned(),
             subscriptions: vec![],
             commands: vec![],
             send_event: Box::new(|_| {}),
@@ -111,7 +111,7 @@ mod tests {
         let (actor_ref, rx) = make_actor_ref_and_rx();
         let ref_clone = actor_ref.clone();
         let entry = super::RoutingEntry {
-            name: "test".to_string(),
+            name: "test".to_owned(),
             subscriptions: vec![],
             commands: vec![],
             send_event: Box::new(|_| {}),
@@ -139,7 +139,7 @@ mod tests {
         let (actor_ref, rx) = make_actor_ref_and_rx();
         let ref_clone = actor_ref.clone();
         let entry = super::RoutingEntry {
-            name: "test".to_string(),
+            name: "test".to_owned(),
             subscriptions: vec![],
             commands: vec![],
             send_event: Box::new(|_| {}),

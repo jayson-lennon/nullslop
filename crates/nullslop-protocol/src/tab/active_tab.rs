@@ -34,6 +34,10 @@ impl ActiveTab {
 
     /// Advance to the next tab, wrapping around.
     #[must_use]
+    #[expect(
+        clippy::indexing_slicing,
+        reason = "modular arithmetic guarantees idx is within bounds of ALL"
+    )]
     pub fn next(self) -> Self {
         let idx = self.index();
         Self::ALL[(idx + 1) % Self::ALL.len()]
@@ -41,6 +45,10 @@ impl ActiveTab {
 
     /// Go to the previous tab, wrapping around.
     #[must_use]
+    #[expect(
+        clippy::indexing_slicing,
+        reason = "modular arithmetic guarantees idx is within bounds of ALL"
+    )]
     pub fn prev(self) -> Self {
         let idx = self.index();
         let len = Self::ALL.len();

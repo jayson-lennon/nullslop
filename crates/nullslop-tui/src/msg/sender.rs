@@ -10,11 +10,13 @@ use super::Msg;
 /// [`Self::send`] never blocks.
 #[derive(Debug, Clone)]
 pub struct MsgSender {
+    /// The underlying kanal sender.
     #[debug(skip)]
     inner: kanal::Sender<Msg>,
 }
 
 impl MsgSender {
+    /// Creates a new message sender wrapping the given channel sender.
     pub(super) fn new(sender: kanal::Sender<Msg>) -> Self {
         Self { inner: sender }
     }

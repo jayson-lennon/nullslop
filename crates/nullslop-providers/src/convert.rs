@@ -28,7 +28,7 @@ mod tests {
         // Given a protocol user message.
         let msg = LlmMessage {
             role: LlmRole::User,
-            content: "hello".to_string(),
+            content: "hello".to_owned(),
         };
 
         // When converting to ChatMessage.
@@ -44,7 +44,7 @@ mod tests {
         // Given a protocol assistant message.
         let msg = LlmMessage {
             role: LlmRole::Assistant,
-            content: "hi there".to_string(),
+            content: "hi there".to_owned(),
         };
 
         // When converting to ChatMessage.
@@ -61,11 +61,11 @@ mod tests {
         let messages = vec![
             LlmMessage {
                 role: LlmRole::User,
-                content: "hello".to_string(),
+                content: "hello".to_owned(),
             },
             LlmMessage {
                 role: LlmRole::Assistant,
-                content: "hi".to_string(),
+                content: "hi".to_owned(),
             },
         ];
 

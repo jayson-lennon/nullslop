@@ -51,21 +51,21 @@ impl ratatui_which_key::Key for KeyEvent {
         }
 
         let base = match self.key {
-            Key::Char(' ') => "Space".to_string(),
+            Key::Char(' ') => "Space".to_owned(),
             Key::Char(c) => c.to_string(),
-            Key::Tab => "Tab".to_string(),
-            Key::Enter => "Enter".to_string(),
-            Key::Backspace => "Backspace".to_string(),
-            Key::Esc => "Esc".to_string(),
-            Key::Up => "↑".to_string(),
-            Key::Down => "↓".to_string(),
-            Key::Left => "←".to_string(),
-            Key::Right => "→".to_string(),
-            Key::Home => "Home".to_string(),
-            Key::End => "End".to_string(),
-            Key::PageUp => "PageUp".to_string(),
-            Key::PageDown => "PageDown".to_string(),
-            Key::Delete => "Delete".to_string(),
+            Key::Tab => "Tab".to_owned(),
+            Key::Enter => "Enter".to_owned(),
+            Key::Backspace => "Backspace".to_owned(),
+            Key::Esc => "Esc".to_owned(),
+            Key::Up => "↑".to_owned(),
+            Key::Down => "↓".to_owned(),
+            Key::Left => "←".to_owned(),
+            Key::Right => "→".to_owned(),
+            Key::Home => "Home".to_owned(),
+            Key::End => "End".to_owned(),
+            Key::PageUp => "PageUp".to_owned(),
+            Key::PageDown => "PageDown".to_owned(),
+            Key::Delete => "Delete".to_owned(),
             Key::F(n) => format!("F{n}"),
         };
 
@@ -116,18 +116,21 @@ impl ratatui_which_key::Key for KeyEvent {
     fn from_special_name(name: &str) -> Option<Self> {
         let lower = name.to_ascii_lowercase();
 
-        let (modifiers, rest): (Modifiers, &str) = if lower.starts_with("s-") {
-            (Modifiers::shift(), &lower[2..])
-        } else if lower.starts_with("c-") && lower.len() > 2 && !lower[2..].starts_with('f') {
-            // c-X where X is a single char (not "f" for function keys)
-            if lower[2..].len() == 1 {
-                let c = lower.chars().nth(2)?;
-                return Some(KeyEvent {
-                    key: Key::Char(c),
-                    modifiers: Modifiers::ctrl(),
-                });
+        let (modifiers, rest): (Modifiers, &str) = if let Some(stripped) = lower.strip_prefix("s-")
+        {
+            (Modifiers::shift(), stripped)
+        } else if let Some(stripped) = lower.strip_prefix("c-") {
+            if !stripped.is_empty() && !stripped.starts_with('f') {
+                // c-X where X is a single char (not "f" for function keys)
+                if stripped.len() == 1 {
+                    let ch = stripped.chars().next()?;
+                    return Some(KeyEvent {
+                        key: Key::Char(ch),
+                        modifiers: Modifiers::ctrl(),
+                    });
+                }
             }
-            (Modifiers::ctrl(), &lower[2..])
+            (Modifiers::ctrl(), stripped)
         } else {
             (Modifiers::none(), lower.as_str())
         };
@@ -150,7 +153,8 @@ impl ratatui_which_key::Key for KeyEvent {
             "lt" => Key::Char('<'),
             "gt" => Key::Char('>'),
             s if s.starts_with('f') && s.len() > 1 => {
-                let num: u8 = s[1..].parse().ok()?;
+                let num_str = s.get(1..)?;
+                let num: u8 = num_str.parse().ok()?;
                 if !(1..=12).contains(&num) {
                     return None;
                 }

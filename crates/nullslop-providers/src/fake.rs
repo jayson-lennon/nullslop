@@ -12,6 +12,7 @@ use crate::service::{ChatStream, LlmService, LlmServiceError, LlmServiceFactory}
 /// Use this in tests to avoid hitting real LLM backends.
 #[derive(Debug, Clone)]
 pub struct FakeLlmServiceFactory {
+    /// Tokens each created service will yield.
     tokens: Vec<String>,
 }
 
@@ -37,6 +38,7 @@ impl LlmServiceFactory for FakeLlmServiceFactory {
 
 /// A fake LLM service that yields preconfigured tokens.
 struct FakeLlmService {
+    /// Tokens to yield during streaming.
     tokens: Vec<String>,
 }
 
@@ -61,7 +63,7 @@ mod tests {
     #[test]
     fn fake_factory_creates_service() {
         // Given a fake factory.
-        let factory = FakeLlmServiceFactory::new(vec!["hello".to_string()]);
+        let factory = FakeLlmServiceFactory::new(vec!["hello".to_owned()]);
 
         // When creating a service.
         let result = factory.create();
@@ -84,15 +86,17 @@ mod tests {
     async fn fake_service_yields_configured_tokens() {
         // Given a fake factory with specific tokens.
         let factory = FakeLlmServiceFactory::new(vec![
-            "Hello".to_string(),
-            " world".to_string(),
-            "!".to_string(),
+            "Hello".to_owned(),
+            " world".to_owned(),
+            "!".to_owned(),
         ]);
 
         // When creating a service and streaming.
         let service = factory.create().expect("create service");
         let stream = service.chat_stream(vec![]).await.expect("chat_stream");
-        let tokens: Vec<String> = stream.map(|r| r.expect("token")).collect().await;
+        let tokens: Vec<String> = StreamExt::map(stream, |r| r.expect("token"))
+            .collect()
+            .await;
 
         // Then the tokens match the configured list.
         assert_eq!(tokens, vec!["Hello", " world", "!"]);

@@ -96,6 +96,18 @@ impl ChatSessionState {
     /// # Panics
     ///
     /// Panics if the session is not streaming. This is a programming error.
+    #[expect(
+        clippy::indexing_slicing,
+        reason = "index comes from push_entry which always returns a valid index"
+    )]
+    #[expect(
+        clippy::expect_used,
+        reason = "streaming_entry_index invariant guaranteed by begin_streaming"
+    )]
+    #[expect(
+        clippy::panic,
+        reason = "streaming invariant violated: entry must be Assistant during active stream"
+    )]
     pub fn append_stream_token(&mut self, token: &str) {
         assert!(
             self.is_streaming,
@@ -279,7 +291,7 @@ mod tests {
         // Then the assistant entry text is "Hello world".
         assert_eq!(
             session.history()[0].kind,
-            nullslop_protocol::ChatEntryKind::Assistant("Hello world".to_string())
+            nullslop_protocol::ChatEntryKind::Assistant("Hello world".to_owned())
         );
     }
 
@@ -297,7 +309,7 @@ mod tests {
         assert!(!session.is_streaming());
         assert_eq!(
             session.history()[0].kind,
-            nullslop_protocol::ChatEntryKind::Assistant("Hi".to_string())
+            nullslop_protocol::ChatEntryKind::Assistant("Hi".to_owned())
         );
     }
 
@@ -315,7 +327,7 @@ mod tests {
         assert!(!session.is_streaming());
         assert_eq!(
             session.history()[0].kind,
-            nullslop_protocol::ChatEntryKind::Assistant("Partial".to_string())
+            nullslop_protocol::ChatEntryKind::Assistant("Partial".to_owned())
         );
     }
 
@@ -418,7 +430,7 @@ mod tests {
         assert_eq!(session.queue_len(), 0);
 
         // When enqueuing a message.
-        session.enqueue_message("hello".to_string());
+        session.enqueue_message("hello".to_owned());
 
         // Then the queue has one message.
         assert_eq!(session.queue_len(), 1);
@@ -429,8 +441,8 @@ mod tests {
     fn dequeue_message_returns_first_in_order() {
         // Given a session with two queued messages.
         let mut session = ChatSessionState::new();
-        session.enqueue_message("first".to_string());
-        session.enqueue_message("second".to_string());
+        session.enqueue_message("first".to_owned());
+        session.enqueue_message("second".to_owned());
 
         // When dequeuing a message.
         let msg = session.dequeue_message();
@@ -456,9 +468,9 @@ mod tests {
     fn drain_queue_empties_and_returns_all() {
         // Given a session with three queued messages.
         let mut session = ChatSessionState::new();
-        session.enqueue_message("a".to_string());
-        session.enqueue_message("b".to_string());
-        session.enqueue_message("c".to_string());
+        session.enqueue_message("a".to_owned());
+        session.enqueue_message("b".to_owned());
+        session.enqueue_message("c".to_owned());
 
         // When draining the queue.
         let drained = session.drain_queue();
@@ -592,9 +604,7 @@ mod tests {
         session.begin_sending();
         // Manually set is_streaming to simulate the transition.
         session.is_streaming = true;
-        session.streaming_entry_index = Some(
-            session.push_entry(ChatEntry::assistant("")),
-        );
+        session.streaming_entry_index = Some(session.push_entry(ChatEntry::assistant("")));
 
         // When finishing streaming.
         session.finish_streaming();

@@ -45,7 +45,7 @@ mod tests {
             Msg::Command(npr::Command::PushChatEntry { payload }) => {
                 assert_eq!(
                     payload.entry.kind,
-                    npr::ChatEntryKind::User("hello".to_string())
+                    npr::ChatEntryKind::User("hello".to_owned())
                 );
             }
             _ => panic!("expected Command"),

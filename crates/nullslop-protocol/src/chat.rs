@@ -35,7 +35,7 @@ pub enum ChatEntryKind {
 impl ChatEntry {
     /// Create a new user chat entry with the current timestamp.
     #[must_use]
-    pub fn user(text: impl Into<String>) -> Self {
+    pub fn user<T: Into<String>>(text: T) -> Self {
         Self {
             timestamp: jiff::Timestamp::now(),
             kind: ChatEntryKind::User(text.into()),
@@ -44,7 +44,7 @@ impl ChatEntry {
 
     /// Create a new system chat entry with the current timestamp.
     #[must_use]
-    pub fn system(text: impl Into<String>) -> Self {
+    pub fn system<T: Into<String>>(text: T) -> Self {
         Self {
             timestamp: jiff::Timestamp::now(),
             kind: ChatEntryKind::System(text.into()),
@@ -53,7 +53,7 @@ impl ChatEntry {
 
     /// Create a new assistant chat entry with the current timestamp.
     #[must_use]
-    pub fn assistant(text: impl Into<String>) -> Self {
+    pub fn assistant<T: Into<String>>(text: T) -> Self {
         Self {
             timestamp: jiff::Timestamp::now(),
             kind: ChatEntryKind::Assistant(text.into()),
@@ -62,7 +62,7 @@ impl ChatEntry {
 
     /// Create a new actor chat entry with the current timestamp.
     #[must_use]
-    pub fn actor(source: impl Into<String>, text: impl Into<String>) -> Self {
+    pub fn actor<S: Into<String>, T: Into<String>>(source: S, text: T) -> Self {
         Self {
             timestamp: jiff::Timestamp::now(),
             kind: ChatEntryKind::Actor {
@@ -86,7 +86,7 @@ mod tests {
         let entry = ChatEntry::user(text);
 
         // Then kind is User("hello").
-        assert_eq!(entry.kind, ChatEntryKind::User("hello".to_string()));
+        assert_eq!(entry.kind, ChatEntryKind::User("hello".to_owned()));
     }
 
     #[test]
@@ -98,7 +98,7 @@ mod tests {
         let entry = ChatEntry::system(text);
 
         // Then kind is System("ready").
-        assert_eq!(entry.kind, ChatEntryKind::System("ready".to_string()));
+        assert_eq!(entry.kind, ChatEntryKind::System("ready".to_owned()));
     }
 
     #[test]
@@ -133,7 +133,7 @@ mod tests {
     fn assistant_entry_has_assistant_kind() {
         let text = "hello";
         let entry = ChatEntry::assistant(text);
-        assert_eq!(entry.kind, ChatEntryKind::Assistant("hello".to_string()));
+        assert_eq!(entry.kind, ChatEntryKind::Assistant("hello".to_owned()));
     }
 
     #[test]
@@ -158,8 +158,8 @@ mod tests {
         assert_eq!(
             entry.kind,
             ChatEntryKind::Actor {
-                source: "nullslop-echo".to_string(),
-                text: "HELLO".to_string(),
+                source: "nullslop-echo".to_owned(),
+                text: "HELLO".to_owned(),
             }
         );
     }

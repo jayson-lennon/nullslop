@@ -18,7 +18,7 @@ pub struct DashboardElement;
 
 impl UiElement<AppState> for DashboardElement {
     fn name(&self) -> String {
-        "dashboard".to_string()
+        "dashboard".to_owned()
     }
 
     fn render(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppState) {

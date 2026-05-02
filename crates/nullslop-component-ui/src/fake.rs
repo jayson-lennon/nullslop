@@ -31,8 +31,11 @@ pub type RenderCall = (ratatui::layout::Rect, String);
 /// [`FakeCommandHandler`]: nullslop_component_core::fake::FakeCommandHandler
 #[derive(Debug)]
 pub struct FakeUiElement<S> {
+    /// Element name used for lookup.
     name: String,
+    /// Recorded render invocations.
     render_calls: Rc<RefCell<Vec<RenderCall>>>,
+    /// Marker for the unused state type parameter.
     _phantom: std::marker::PhantomData<S>,
 }
 
@@ -45,7 +48,7 @@ impl<S> FakeUiElement<S> {
     pub fn new(name: &str) -> (Self, Rc<RefCell<Vec<RenderCall>>>) {
         let render_calls = Rc::new(RefCell::new(Vec::new()));
         let element = Self {
-            name: name.to_string(),
+            name: name.to_owned(),
             render_calls: Rc::clone(&render_calls),
             _phantom: std::marker::PhantomData,
         };

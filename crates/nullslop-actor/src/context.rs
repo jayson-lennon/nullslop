@@ -49,7 +49,7 @@ impl ActorContext {
     #[must_use]
     pub fn new(name: &str, sink: Arc<dyn MessageSink>) -> Self {
         Self {
-            name: name.to_string(),
+            name: name.to_owned(),
             subscriptions: Vec::new(),
             commands: Vec::new(),
             actor_refs: HashMap::new(),
@@ -68,7 +68,7 @@ impl ActorContext {
     ///
     /// For compile-time-checked subscriptions, prefer
     /// [`subscribe_event`](Self::subscribe_event).
-    pub fn subscribe_event_by_name(&mut self, name: impl Into<EventTypeName>) {
+    pub fn subscribe_event_by_name<N: Into<EventTypeName>>(&mut self, name: N) {
         self.subscriptions.push(name.into());
     }
 
@@ -77,14 +77,14 @@ impl ActorContext {
     /// Uses the [`EventMsg::TYPE_NAME`] constant for routing,
     /// providing compile-time validation.
     pub fn subscribe_event<T: EventMsg>(&mut self) {
-        self.subscriptions.push(T::TYPE_NAME.to_string());
+        self.subscriptions.push(T::TYPE_NAME.to_owned());
     }
 
     /// Subscribes to a bus command by name.
     ///
     /// For compile-time-checked subscriptions, prefer
     /// [`subscribe_command`](Self::subscribe_command).
-    pub fn subscribe_command_by_name(&mut self, name: impl Into<CommandName>) {
+    pub fn subscribe_command_by_name<N: Into<CommandName>>(&mut self, name: N) {
         self.commands.push(name.into());
     }
 
@@ -93,7 +93,7 @@ impl ActorContext {
     /// Uses the [`CommandMsg::NAME`] constant for routing,
     /// providing compile-time validation.
     pub fn subscribe_command<T: CommandMsg>(&mut self) {
-        self.commands.push(T::NAME.to_string());
+        self.commands.push(T::NAME.to_owned());
     }
 
     /// Stores an [`ActorRef<M>`] keyed by the message type `M`.
@@ -389,14 +389,14 @@ mod tests {
     fn take_data_removes_from_context() {
         // Given a context with injected data.
         let mut ctx = ActorContext::new("test", test_sink());
-        ctx.set_data("hello".to_string());
+        ctx.set_data("hello".to_owned());
 
         // When taking it twice.
         let first = ctx.take_data::<String>();
         let second = ctx.take_data::<String>();
 
         // Then first is Some and second is None.
-        assert_eq!(first, Some("hello".to_string()));
+        assert_eq!(first, Some("hello".to_owned()));
         assert!(second.is_none());
     }
 

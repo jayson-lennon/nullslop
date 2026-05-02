@@ -17,7 +17,7 @@ pub struct QueueDisplayElement;
 
 impl UiElement<AppState> for QueueDisplayElement {
     fn name(&self) -> String {
-        "queue-display".to_string()
+        "queue-display".to_owned()
     }
 
     fn render(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppState) {
@@ -31,7 +31,8 @@ impl UiElement<AppState> for QueueDisplayElement {
             .map(|msg| {
                 let first_line = msg.lines().next().unwrap_or("");
                 let display = if first_line.len() > 60 {
-                    format!("QUEUED: {}…", &first_line[..59])
+                    let truncated: String = first_line.chars().take(59).collect();
+                    format!("QUEUED: {truncated}…")
                 } else {
                     format!("QUEUED: {first_line}")
                 };

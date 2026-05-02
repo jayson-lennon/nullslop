@@ -18,7 +18,7 @@ use derive_more::Debug;
 /// The `on_result` closure maps the editor's output to the new input buffer
 /// content (or `None` if no change).
 #[derive(Debug)]
-pub(crate) enum SuspendAction {
+pub enum SuspendAction {
     /// Open `$EDITOR` with the given initial content.
     Edit {
         /// The text to pre-fill in the editor.
@@ -32,7 +32,8 @@ pub(crate) enum SuspendAction {
 
 /// Holds an optional deferred suspend action to be consumed by the event loop.
 #[derive(Debug, Default)]
-pub(crate) struct Suspend {
+pub struct Suspend {
+    /// The pending suspend action, if any.
     action: Option<SuspendAction>,
 }
 
@@ -77,7 +78,7 @@ mod tests {
         // Given a Suspend.
         let mut suspend = Suspend::new();
         let action = SuspendAction::Edit {
-            initial_content: "hello".to_string(),
+            initial_content: "hello".to_owned(),
             on_result: Box::new(|_| None),
         };
 
@@ -94,7 +95,7 @@ mod tests {
         // Given a Suspend with a pending action.
         let mut suspend = Suspend::new();
         suspend.request(SuspendAction::Edit {
-            initial_content: "hello".to_string(),
+            initial_content: "hello".to_owned(),
             on_result: Box::new(|_| None),
         });
 
@@ -112,13 +113,13 @@ mod tests {
         // Given a Suspend with a pending action.
         let mut suspend = Suspend::new();
         suspend.request(SuspendAction::Edit {
-            initial_content: "first".to_string(),
+            initial_content: "first".to_owned(),
             on_result: Box::new(|_| None),
         });
 
         // When requesting a new action.
         suspend.request(SuspendAction::Edit {
-            initial_content: "second".to_string(),
+            initial_content: "second".to_owned(),
             on_result: Box::new(|_| None),
         });
 

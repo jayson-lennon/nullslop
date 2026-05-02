@@ -10,10 +10,12 @@
 
 use crate::AppState;
 use npr::chat_input::{EnqueueUserMessage, SetChatInputText};
-use npr::provider::{CancelStream, SendToLlmProvider, StreamCompleted, StreamCompletedReason, entries_to_messages};
+use npr::provider::{
+    CancelStream, SendToLlmProvider, StreamCompleted, StreamCompletedReason, entries_to_messages,
+};
 use nullslop_component_core::{Out, define_handler};
-use nullslop_protocol::CommandAction;
 use nullslop_protocol as npr;
+use nullslop_protocol::CommandAction;
 
 define_handler! {
     pub(crate) struct MessageQueueHandler;
@@ -30,6 +32,7 @@ define_handler! {
 }
 
 impl MessageQueueHandler {
+    /// Enqueues a user message, dispatching immediately if idle or queuing if busy.
     fn on_enqueue_user_message(
         cmd: &EnqueueUserMessage,
         state: &mut AppState,
@@ -59,11 +62,8 @@ impl MessageQueueHandler {
         CommandAction::Continue
     }
 
-    fn on_cancel_stream(
-        cmd: &CancelStream,
-        state: &mut AppState,
-        out: &mut Out,
-    ) -> CommandAction {
+    /// Cancels the active stream and restores queued messages to the input box.
+    fn on_cancel_stream(cmd: &CancelStream, state: &mut AppState, out: &mut Out) -> CommandAction {
         let session = state.session_mut(&cmd.session_id);
         session.cancel_streaming();
 
@@ -81,6 +81,7 @@ impl MessageQueueHandler {
         CommandAction::Continue
     }
 
+    /// Replaces the chat input text for a session.
     fn on_set_chat_input_text(
         cmd: &SetChatInputText,
         state: &mut AppState,
@@ -91,32 +92,29 @@ impl MessageQueueHandler {
         CommandAction::Continue
     }
 
-    fn on_stream_completed(
-        evt: &StreamCompleted,
-        state: &mut AppState,
-        out: &mut Out,
-    ) {
+    /// Handles stream completion, dispatching the next queued message if available.
+    fn on_stream_completed(evt: &StreamCompleted, state: &mut AppState, out: &mut Out) {
         let session = state.session_mut(&evt.session_id);
         // finish_streaming clears both is_streaming and is_sending.
         session.finish_streaming();
 
         // Only dispatch next on normal completion.
         // On cancel, the queue was already drained by on_cancel_stream.
-        if evt.reason == StreamCompletedReason::Finished {
-            if let Some(text) = session.dequeue_message() {
-                let entry = npr::ChatEntry::user(&text);
-                session.push_entry(entry);
-                let history = session.history();
-                let messages = entries_to_messages(history);
-                session.begin_sending();
+        if evt.reason == StreamCompletedReason::Finished
+            && let Some(text) = session.dequeue_message()
+        {
+            let entry = npr::ChatEntry::user(&text);
+            session.push_entry(entry);
+            let history = session.history();
+            let messages = entries_to_messages(history);
+            session.begin_sending();
 
-                out.submit_command(npr::Command::SendToLlmProvider {
-                    payload: SendToLlmProvider {
-                        session_id: evt.session_id.clone(),
-                        messages,
-                    },
-                });
-            }
+            out.submit_command(npr::Command::SendToLlmProvider {
+                payload: SendToLlmProvider {
+                    session_id: evt.session_id.clone(),
+                    messages,
+                },
+            });
         }
     }
 }
@@ -150,7 +148,7 @@ mod tests {
         bus.submit_command(Command::EnqueueUserMessage {
             payload: EnqueueUserMessage {
                 session_id: sid.clone(),
-                text: "hello".to_string(),
+                text: "hello".to_owned(),
             },
         });
         bus.process_commands(&mut state);
@@ -159,7 +157,7 @@ mod tests {
         assert_eq!(state.session(&sid).history().len(), 1);
         assert_eq!(
             state.session(&sid).history()[0].kind,
-            npr::ChatEntryKind::User("hello".to_string())
+            npr::ChatEntryKind::User("hello".to_owned())
         );
         assert!(state.session(&sid).is_sending());
 
@@ -185,7 +183,7 @@ mod tests {
         bus.submit_command(Command::EnqueueUserMessage {
             payload: EnqueueUserMessage {
                 session_id: sid.clone(),
-                text: "queued msg".to_string(),
+                text: "queued msg".to_owned(),
             },
         });
         bus.process_commands(&mut state);
@@ -207,7 +205,9 @@ mod tests {
         let mut state = AppState::new();
         let sid = session_id(&state);
         state.session_mut(&sid).begin_sending();
-        state.session_mut(&sid).enqueue_message("next msg".to_string());
+        state
+            .session_mut(&sid)
+            .enqueue_message("next msg".to_owned());
 
         // When processing StreamCompleted(Finished).
         bus.submit_event(Event::StreamCompleted {
@@ -223,7 +223,7 @@ mod tests {
         assert_eq!(state.session(&sid).history().len(), 1);
         assert_eq!(
             state.session(&sid).history()[0].kind,
-            npr::ChatEntryKind::User("next msg".to_string())
+            npr::ChatEntryKind::User("next msg".to_owned())
         );
         assert_eq!(state.session(&sid).queue_len(), 0);
         assert!(state.session(&sid).is_sending());
@@ -273,8 +273,8 @@ mod tests {
         let mut state = AppState::new();
         let sid = session_id(&state);
         state.session_mut(&sid).begin_streaming();
-        state.session_mut(&sid).enqueue_message("first".to_string());
-        state.session_mut(&sid).enqueue_message("second".to_string());
+        state.session_mut(&sid).enqueue_message("first".to_owned());
+        state.session_mut(&sid).enqueue_message("second".to_owned());
 
         // When processing CancelStream.
         bus.submit_command(Command::CancelStream {
@@ -315,7 +315,7 @@ mod tests {
         bus.submit_command(Command::SetChatInputText {
             payload: SetChatInputText {
                 session_id: sid,
-                text: "restored text".to_string(),
+                text: "restored text".to_owned(),
             },
         });
         bus.process_commands(&mut state);

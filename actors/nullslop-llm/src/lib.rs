@@ -7,11 +7,13 @@
 
 use std::collections::HashMap;
 
-use futures::StreamExt;
+use futures::StreamExt as _;
 use nullslop_actor::{Actor, ActorContext, ActorEnvelope, SystemMessage};
 use nullslop_protocol::chat_input::PushChatEntry;
 use nullslop_protocol::provider::LlmMessage;
-use nullslop_protocol::provider::{CancelStream, SendToLlmProvider, StreamCompleted, StreamCompletedReason, StreamToken};
+use nullslop_protocol::provider::{
+    CancelStream, SendToLlmProvider, StreamCompleted, StreamCompletedReason, StreamToken,
+};
 use nullslop_protocol::{ChatEntry, Command, Event, SessionId};
 use nullslop_services::providers::LlmServiceFactoryService;
 use nullslop_services::providers::llm_messages_to_chat_messages;
@@ -36,6 +38,10 @@ pub struct LlmActor {
 impl Actor for LlmActor {
     type Message = LlmDirectMsg;
 
+    #[expect(
+        clippy::expect_used,
+        reason = "data is injected by the host before activate is called"
+    )]
     fn activate(ctx: &mut ActorContext) -> Self {
         ctx.subscribe_command::<SendToLlmProvider>();
         ctx.subscribe_command::<CancelStream>();
@@ -70,6 +76,7 @@ impl Actor for LlmActor {
 }
 
 impl LlmActor {
+    /// Dispatches incoming commands to the appropriate handler.
     fn handle_command(&mut self, command: &Command, ctx: &ActorContext) {
         match command {
             Command::SendToLlmProvider { payload } => {
@@ -82,6 +89,7 @@ impl LlmActor {
         }
     }
 
+    /// Starts an LLM streaming response for a session, aborting any existing stream.
     fn start_stream(
         &mut self,
         session_id: SessionId,
@@ -173,6 +181,7 @@ impl LlmActor {
         self.tasks.insert(session_id, handle);
     }
 
+    /// Cancels the active stream for a session and emits a completion event.
     fn cancel_stream(&mut self, session_id: &SessionId, ctx: &ActorContext) {
         if let Some(handle) = self.tasks.remove(session_id) {
             handle.abort();
@@ -185,6 +194,7 @@ impl LlmActor {
         }
     }
 
+    /// Cancels all active streams across all sessions.
     fn cancel_all(&self) {
         for handle in self.tasks.values() {
             handle.abort();

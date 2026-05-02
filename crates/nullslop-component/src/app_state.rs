@@ -62,6 +62,10 @@ impl AppState {
     ///
     /// Panics if the active session does not exist in the sessions map.
     /// This should never happen in normal operation.
+    #[expect(
+        clippy::expect_used,
+        reason = "active session invariant guaranteed by construction"
+    )]
     pub fn active_session(&self) -> &ChatSessionState {
         self.sessions
             .get(&self.active_session)
@@ -74,6 +78,10 @@ impl AppState {
     ///
     /// Panics if the active session does not exist in the sessions map.
     /// This should never happen in normal operation.
+    #[expect(
+        clippy::expect_used,
+        reason = "active session invariant guaranteed by construction"
+    )]
     pub fn active_session_mut(&mut self) -> &mut ChatSessionState {
         self.sessions
             .get_mut(&self.active_session)
@@ -85,6 +93,10 @@ impl AppState {
     /// # Panics
     ///
     /// Panics if the given session ID does not exist in the sessions map.
+    #[expect(
+        clippy::expect_used,
+        reason = "session invariant guaranteed by construction"
+    )]
     pub fn session(&self, id: &SessionId) -> &ChatSessionState {
         self.sessions.get(id).expect("session must exist")
     }
@@ -94,6 +106,10 @@ impl AppState {
     /// # Panics
     ///
     /// Panics if the given session ID does not exist in the sessions map.
+    #[expect(
+        clippy::expect_used,
+        reason = "session invariant guaranteed by construction"
+    )]
     pub fn session_mut(&mut self, id: &SessionId) -> &mut ChatSessionState {
         self.sessions.get_mut(id).expect("session must exist")
     }

@@ -24,5 +24,9 @@ pub(crate) fn from_kanal_send(
     result: Result<(), kanal::SendError>,
     context: &'static str,
 ) -> SendResult {
-    result.map_err(|_| error_stack::Report::new(ActorSendError).attach(context))
+    result.map_err(|err| {
+        error_stack::Report::new(ActorSendError)
+            .attach(context)
+            .attach(err.to_string())
+    })
 }

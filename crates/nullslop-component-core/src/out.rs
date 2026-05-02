@@ -12,7 +12,9 @@ use nullslop_protocol::{Command, Event};
 /// queued for a future processing cycle.
 #[derive(Debug, Default)]
 pub struct Out {
+    /// Buffered commands to submit to the bus.
     commands: Vec<Command>,
+    /// Buffered events to submit to the bus.
     events: Vec<Event>,
 }
 

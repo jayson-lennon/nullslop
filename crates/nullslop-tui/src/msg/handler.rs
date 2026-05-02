@@ -7,7 +7,7 @@
 use std::time::Duration;
 
 use derive_more::Debug;
-use futures::StreamExt;
+use futures::StreamExt as _;
 use kanal::Receiver;
 
 use super::{Msg, MsgSender};
@@ -18,8 +18,10 @@ use super::{Msg, MsgSender};
 /// event task, and [`Self::drain`] to discard stale messages after cancelling it.
 #[derive(Debug)]
 pub struct MsgHandler {
+    /// Sending half of the message channel.
     #[debug(skip)]
     sender: kanal::Sender<Msg>,
+    /// Receiving half of the message channel.
     #[debug(skip)]
     receiver: Receiver<Msg>,
 }

@@ -38,26 +38,33 @@ define_handler! {
 }
 
 impl ChatInputBoxHandler {
+    /// Inserts a character at the cursor position.
     fn on_insert_char(cmd: &InsertChar, state: &mut AppState, _out: &mut Out) -> CommandAction {
-        state.active_chat_input_mut().insert_grapheme_at_cursor(cmd.ch);
+        state
+            .active_chat_input_mut()
+            .insert_grapheme_at_cursor(cmd.ch);
         CommandAction::Continue
     }
 
+    /// Deletes the grapheme before the cursor.
     fn on_delete_grapheme(
         _cmd: &DeleteGrapheme,
         state: &mut AppState,
         _out: &mut Out,
     ) -> CommandAction {
-        state.active_chat_input_mut().delete_grapheme_before_cursor();
+        state
+            .active_chat_input_mut()
+            .delete_grapheme_before_cursor();
         CommandAction::Continue
     }
 
+    /// Submits the current input as a user message.
     fn on_submit_message(
         _cmd: &SubmitMessage,
         state: &mut AppState,
         out: &mut Out,
     ) -> CommandAction {
-        let text = state.active_chat_input().text().to_string();
+        let text = state.active_chat_input().text().to_owned();
         if !text.is_empty() {
             let session_id = state.active_session.clone();
             state.active_chat_input_mut().reset();
@@ -69,11 +76,13 @@ impl ChatInputBoxHandler {
         CommandAction::Continue
     }
 
+    /// Clears the input buffer and resets the cursor.
     fn on_clear(_cmd: &Clear, state: &mut AppState, _out: &mut Out) -> CommandAction {
         state.active_chat_input_mut().reset();
         CommandAction::Continue
     }
 
+    /// Sets the application input mode, cancelling active streams when leaving Input mode.
     fn on_set_mode(cmd: &SetMode, state: &mut AppState, out: &mut Out) -> CommandAction {
         // When leaving Input mode during active streaming, cancel the stream.
         if state.mode == npr::Mode::Input
@@ -89,6 +98,7 @@ impl ChatInputBoxHandler {
         CommandAction::Continue
     }
 
+    /// Moves the cursor left one grapheme.
     fn on_move_cursor_left(
         _cmd: &MoveCursorLeft,
         state: &mut AppState,
@@ -98,6 +108,7 @@ impl ChatInputBoxHandler {
         CommandAction::Continue
     }
 
+    /// Moves the cursor right one grapheme.
     fn on_move_cursor_right(
         _cmd: &MoveCursorRight,
         state: &mut AppState,
@@ -107,6 +118,7 @@ impl ChatInputBoxHandler {
         CommandAction::Continue
     }
 
+    /// Moves the cursor to the start of the input.
     fn on_move_cursor_to_start(
         _cmd: &MoveCursorToStart,
         state: &mut AppState,
@@ -116,6 +128,7 @@ impl ChatInputBoxHandler {
         CommandAction::Continue
     }
 
+    /// Moves the cursor to the end of the input.
     fn on_move_cursor_to_end(
         _cmd: &MoveCursorToEnd,
         state: &mut AppState,
@@ -125,6 +138,7 @@ impl ChatInputBoxHandler {
         CommandAction::Continue
     }
 
+    /// Deletes the grapheme after the cursor.
     fn on_delete_grapheme_forward(
         _cmd: &DeleteGraphemeForward,
         state: &mut AppState,
@@ -134,6 +148,7 @@ impl ChatInputBoxHandler {
         CommandAction::Continue
     }
 
+    /// Moves the cursor left one word.
     fn on_move_cursor_word_left(
         _cmd: &MoveCursorWordLeft,
         state: &mut AppState,
@@ -143,6 +158,7 @@ impl ChatInputBoxHandler {
         CommandAction::Continue
     }
 
+    /// Moves the cursor right one word.
     fn on_move_cursor_word_right(
         _cmd: &MoveCursorWordRight,
         state: &mut AppState,
@@ -229,7 +245,7 @@ mod tests {
         assert_eq!(state.active_session().history().len(), 1);
         assert_eq!(
             state.active_session().history()[0].kind,
-            npr::ChatEntryKind::User("hello".to_string())
+            npr::ChatEntryKind::User("hello".to_owned())
         );
         assert!(state.active_chat_input().is_empty());
         assert_eq!(state.active_chat_input().cursor_pos(), 0);
@@ -560,10 +576,7 @@ mod tests {
         let cancel = commands
             .iter()
             .find(|c| matches!(c.command, Command::CancelStream { .. }));
-        assert!(
-            cancel.is_none(),
-            "should not emit CancelStream when idle"
-        );
+        assert!(cancel.is_none(), "should not emit CancelStream when idle");
 
         // And mode is Normal.
         assert_eq!(state.mode, npr::Mode::Normal);

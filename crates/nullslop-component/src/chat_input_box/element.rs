@@ -20,7 +20,7 @@ pub struct ChatInputBoxElement;
 
 impl UiElement<AppState> for ChatInputBoxElement {
     fn name(&self) -> String {
-        "chat-input-box".to_string()
+        "chat-input-box".to_owned()
     }
 
     fn render(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppState) {
@@ -70,9 +70,7 @@ impl UiElement<AppState> for ChatInputBoxElement {
 /// The first line gets a `> ` prompt prefix, continuation lines get `  ` indentation.
 fn build_lines<'a>(text: &str, prompt_style: Style, text_style: Style) -> Vec<Line<'a>> {
     if text.is_empty() {
-        return vec![Line::from(vec![
-            Span::styled("> ", prompt_style),
-        ])];
+        return vec![Line::from(vec![Span::styled("> ", prompt_style)])];
     }
 
     let segments = text.split('\n');
@@ -81,7 +79,7 @@ fn build_lines<'a>(text: &str, prompt_style: Style, text_style: Style) -> Vec<Li
         let prefix = if i == 0 { "> " } else { "  " };
         lines.push(Line::from(vec![
             Span::styled(prefix, prompt_style),
-            Span::styled(segment.to_string(), text_style),
+            Span::styled(segment.to_owned(), text_style),
         ]));
     }
     lines
@@ -90,7 +88,7 @@ fn build_lines<'a>(text: &str, prompt_style: Style, text_style: Style) -> Vec<Li
 #[cfg(test)]
 mod tests {
     use ratatui::Terminal;
-    use ratatui::backend::{Backend, TestBackend};
+    use ratatui::backend::{Backend as _, TestBackend};
     use ratatui::layout::{Position, Rect};
 
     use super::*;

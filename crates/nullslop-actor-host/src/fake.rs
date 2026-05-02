@@ -13,9 +13,13 @@ use crate::error::ActorHostError;
 ///
 /// Use in tests to verify routing behavior without spawning real actors.
 pub struct FakeActorHost {
+    /// Events routed through this host.
     events_sent: Mutex<Vec<Event>>,
+    /// Commands routed through this host.
     commands_sent: Mutex<Vec<Command>>,
+    /// System messages routed through this host.
     system_sent: Mutex<Vec<SystemMessage>>,
+    /// Whether shutdown has been called.
     shutdown_called: AtomicBool,
 }
 

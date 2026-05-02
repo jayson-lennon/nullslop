@@ -64,10 +64,10 @@ where
     let ref_for_command = actor_ref.clone();
     let ref_for_system = actor_ref.clone();
     let ref_for_shutdown = actor_ref.clone();
-    let name_for_event_log = name.to_string();
-    let name_for_command_log = name.to_string();
-    let name_for_system_log = name.to_string();
-    let name_for_shutdown_log = name.to_string();
+    let name_for_event_log = name.to_owned();
+    let name_for_command_log = name.to_owned();
+    let name_for_system_log = name.to_owned();
+    let name_for_shutdown_log = name.to_owned();
 
     let send_event: Box<dyn Fn(Event) + Send + Sync> = Box::new(move |event| {
         if let Err(e) = ref_for_event.send_event(event) {
@@ -94,7 +94,7 @@ where
     });
 
     let routing = RoutingEntry {
-        name: name.to_string(),
+        name: name.to_owned(),
         subscriptions,
         commands,
         send_event,
@@ -146,8 +146,11 @@ struct LifecycleState {
 /// `HashMap` lookups without any Mutex — the Mutex is only touched during
 /// `shutdown()` to join tasks.
 pub struct InMemoryActorHost {
+    /// Pre-computed routing tables for lock-free dispatch.
     routing: RoutingTables,
+    /// Lifecycle state (task handles) touched only during shutdown.
     lifecycle: Mutex<LifecycleState>,
+    /// Tokio runtime handle for spawning and joining tasks.
     handle: tokio::runtime::Handle,
 }
 
@@ -282,7 +285,7 @@ mod tests {
     use nullslop_actor::error::SendResult;
     use nullslop_actor::{Actor, ActorContext, ActorEnvelope, ActorRef, MessageSink};
     use nullslop_protocol::chat_input::ChatEntrySubmitted;
-    use nullslop_protocol::{Command, CommandMsg, Event};
+    use nullslop_protocol::{Command, CommandMsg as _, Event};
 
     use super::*;
 
@@ -302,10 +305,18 @@ mod tests {
     }
 
     impl MessageSink for TestSink {
+        #[expect(
+            clippy::unwrap_in_result,
+            reason = "test sink: mutex poisoning is acceptable in tests"
+        )]
         fn send_command(&self, command: Command) -> SendResult {
             self.commands.lock().unwrap().push(command);
             Ok(())
         }
+        #[expect(
+            clippy::unwrap_in_result,
+            reason = "test sink: mutex poisoning is acceptable in tests"
+        )]
         fn send_event(&self, event: Event) -> SendResult {
             self.events.lock().unwrap().push(event);
             Ok(())
@@ -366,7 +377,7 @@ mod tests {
                         .push(format!("command:{name}"));
                 }
                 ActorEnvelope::Shutdown => {
-                    self.received.lock().unwrap().push("shutdown".to_string());
+                    self.received.lock().unwrap().push("shutdown".to_owned());
                 }
                 ActorEnvelope::System(msg) => {
                     self.received
@@ -724,7 +735,7 @@ mod tests {
         );
 
         // When sending a direct message to actor-b.
-        ref_b.send("hello from a".to_string()).expect("send");
+        ref_b.send("hello from a".to_owned()).expect("send");
         std::thread::sleep(Duration::from_millis(50));
 
         // Then actor-b receives the direct message.

@@ -61,11 +61,19 @@ impl TestSink {
 
 #[cfg(test)]
 impl MessageSink for TestSink {
+    #[expect(
+        clippy::unwrap_in_result,
+        reason = "test sink: mutex poisoning is acceptable in tests"
+    )]
     fn send_command(&self, command: Command) -> SendResult {
         self.commands.lock().unwrap().push(command);
         Ok(())
     }
 
+    #[expect(
+        clippy::unwrap_in_result,
+        reason = "test sink: mutex poisoning is acceptable in tests"
+    )]
     fn send_event(&self, event: Event) -> SendResult {
         self.events.lock().unwrap().push(event);
         Ok(())

@@ -88,7 +88,11 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
 
     let state = app.core.state.read();
     let queue_len = state.active_session().queue_len() as u16;
-    let layout = AppLayout::new(area, state.active_chat_input().visual_line_count() as u16, queue_len);
+    let layout = AppLayout::new(
+        area,
+        state.active_chat_input().visual_line_count() as u16,
+        queue_len,
+    );
 
     // Tab bar — always visible.
     render_tab_bar(frame, layout.tabs, &app.tab_manager);

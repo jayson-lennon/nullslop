@@ -10,6 +10,7 @@ use crate::AppMsg;
 /// Implements [`MessageSink`] by wrapping actor-originated commands and events
 /// in [`AppMsg`] and sending them through the core's message channel.
 pub struct ActorMessageSink {
+    /// Channel sender for forwarding messages to [`AppCore`].
     sender: kanal::Sender<AppMsg>,
 }
 
@@ -28,7 +29,7 @@ impl MessageSink for ActorMessageSink {
                 command,
                 source: None,
             })
-            .map_err(|_| nullslop_actor::error::ActorSendError)?;
+            .map_err(|_send_error| nullslop_actor::error::ActorSendError)?;
         Ok(())
     }
 
@@ -38,7 +39,7 @@ impl MessageSink for ActorMessageSink {
                 event,
                 source: None,
             })
-            .map_err(|_| nullslop_actor::error::ActorSendError)?;
+            .map_err(|_send_error| nullslop_actor::error::ActorSendError)?;
         Ok(())
     }
 }

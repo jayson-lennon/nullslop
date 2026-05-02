@@ -27,8 +27,11 @@ use crate::out::Out;
 /// Returns a configurable [`CommandAction`] on each call, allowing tests to
 /// exercise both continuation and stop-propagation paths.
 pub struct FakeCommandHandler<C, S> {
+    /// Recorded command invocations.
     calls: Rc<RefCell<Vec<C>>>,
+    /// The action to return from each handle call.
     action: CommandAction,
+    /// Marker for the unused state type parameter.
     _phantom: std::marker::PhantomData<S>,
 }
 
@@ -67,7 +70,9 @@ impl<C: Clone + 'static, S> CommandHandler<C, S> for FakeCommandHandler<C, S> {
 
 /// Fake event handler that records every event it receives.
 pub struct FakeEventHandler<E, S> {
+    /// Recorded event invocations.
     calls: Rc<RefCell<Vec<E>>>,
+    /// Marker for the unused state type parameter.
     _phantom: std::marker::PhantomData<S>,
 }
 

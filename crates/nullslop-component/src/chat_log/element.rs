@@ -24,7 +24,7 @@ pub struct ChatLogElement;
 
 impl UiElement<AppState> for ChatLogElement {
     fn name(&self) -> String {
-        "chat-log".to_string()
+        "chat-log".to_owned()
     }
 
     fn render(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppState) {
@@ -65,20 +65,18 @@ impl UiElement<AppState> for ChatLogElement {
 /// The first line gets the entry-type prefix; continuation lines get indentation.
 fn entry_to_lines(entry: &nullslop_protocol::ChatEntry) -> Vec<Line<'static>> {
     match &entry.kind {
-        ChatEntryKind::User(text) => {
-            multiline_styled(text, "> ", "  ", Style::default().add_modifier(Modifier::BOLD))
-        }
+        ChatEntryKind::User(text) => multiline_styled(
+            text,
+            "> ",
+            "  ",
+            Style::default().add_modifier(Modifier::BOLD),
+        ),
         ChatEntryKind::System(text) => {
             multiline_styled(text, "  ", "  ", Style::default().fg(Color::DarkGray))
         }
         ChatEntryKind::Actor { source, text } => {
             let prefix = format!("[actor] {source}: ");
-            multiline_styled(
-                text,
-                &prefix,
-                "  ",
-                Style::default().fg(Color::Yellow),
-            )
+            multiline_styled(text, &prefix, "  ", Style::default().fg(Color::Yellow))
         }
         ChatEntryKind::Assistant(text) => {
             multiline_styled(text, "✦ ", "  ", Style::default().fg(Color::Cyan))
@@ -94,7 +92,7 @@ fn multiline_styled(text: &str, prefix: &str, _indent: &str, style: Style) -> Ve
         let content = if i == 0 {
             format!("{prefix}{segment}")
         } else {
-            segment.to_string()
+            segment.to_owned()
         };
         lines.push(Line::from(Span::styled(content, style)));
     }

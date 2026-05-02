@@ -100,7 +100,7 @@ fn tokenize(text: &str) -> Vec<String> {
         .enumerate()
         .map(|(i, word)| {
             if i == 0 {
-                word.to_string()
+                word.to_owned()
             } else {
                 format!(" {word}")
             }
@@ -112,10 +112,10 @@ fn tokenize(text: &str) -> Vec<String> {
 fn tokenize_think() -> Vec<String> {
     let mut tokens = Vec::new();
     tokens.extend(tokenize("<think"));
-    tokens.push(" ".to_string());
+    tokens.push(" ".to_owned());
     tokens.extend(tokenize(THINK_TEXT));
     tokens.extend(tokenize("</think"));
-    tokens.push("> ".to_string());
+    tokens.push("> ".to_owned());
     tokens.extend(tokenize(THINK_RESPONSE_TEXT));
     tokens
 }
@@ -131,7 +131,7 @@ fn delayed_token_stream(tokens: Vec<String>) -> ChatStream {
     let items: Vec<(String, u64)> = tokens
         .into_iter()
         .map(|token| {
-            let delay = rng.random_range(DELAY_MIN_MS..=DELAY_MAX_MS);
+            let delay = Rng::random_range(&mut rng, DELAY_MIN_MS..=DELAY_MAX_MS);
             (token, delay)
         })
         .collect();
@@ -185,8 +185,7 @@ mod tests {
 
         // When streaming.
         let stream = service.chat_stream(messages).await.expect("chat_stream");
-        let output: String = stream
-            .map(|r| r.expect("token"))
+        let output: String = StreamExt::map(stream, |r| r.expect("token"))
             .collect::<Vec<_>>()
             .await
             .join("");

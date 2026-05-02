@@ -38,6 +38,7 @@ pub trait ActorHost: Send + Sync + 'static {
 /// Follows the service wrapper pattern from the project style guide.
 #[derive(Clone)]
 pub struct ActorHostService {
+    /// The underlying actor host implementation.
     svc: std::sync::Arc<dyn ActorHost>,
 }
 

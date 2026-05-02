@@ -32,7 +32,7 @@ pub struct TuiApp {
     #[debug(skip)]
     pub which_key: WhichKeyInstance,
     /// Deferred suspend action queue (e.g., for external editor).
-    pub(crate) suspend: Suspend,
+    pub suspend: Suspend,
     /// Background event stream. Set by [`run`](crate::run::run).
     #[debug(skip)]
     pub event_task: Option<tokio::task::JoinHandle<()>>,
@@ -142,7 +142,7 @@ impl TuiApp {
                 self.which_key.toggle();
             }
             Command::EditInput => {
-                let initial_content = self.core.state.read().active_chat_input().text().to_string();
+                let initial_content = self.core.state.read().active_chat_input().text().to_owned();
                 self.suspend.request(SuspendAction::Edit {
                     initial_content,
                     on_result: Box::new(|result| result),
@@ -251,7 +251,7 @@ mod tests {
             .state
             .write()
             .active_chat_input_mut()
-            .replace_all("hello".to_string());
+            .replace_all("hello".to_owned());
 
         // When pressing Enter.
         app.handle_msg(Msg::Input(key_event(KeyCode::Enter)));
@@ -262,7 +262,7 @@ mod tests {
         assert_eq!(guard.active_session().history().len(), 1);
         assert_eq!(
             guard.active_session().history()[0].kind,
-            npr::ChatEntryKind::User("hello".to_string())
+            npr::ChatEntryKind::User("hello".to_owned())
         );
         assert!(guard.active_chat_input().is_empty());
     }
@@ -314,8 +314,8 @@ mod tests {
         assert_eq!(
             guard.active_session().history()[0].kind,
             npr::ChatEntryKind::Actor {
-                source: "nullslop-echo".to_string(),
-                text: "HELLO".to_string(),
+                source: "nullslop-echo".to_owned(),
+                text: "HELLO".to_owned(),
             }
         );
     }
@@ -338,7 +338,7 @@ mod tests {
             .state
             .write()
             .active_chat_input_mut()
-            .replace_all("hello".to_string());
+            .replace_all("hello".to_owned());
 
         // When pressing Shift+Enter.
         app.handle_msg(Msg::Input(key_event_with_mod(
@@ -362,7 +362,7 @@ mod tests {
             .state
             .write()
             .active_chat_input_mut()
-            .replace_all("hello".to_string());
+            .replace_all("hello".to_owned());
 
         // When pressing Ctrl+Enter.
         app.handle_msg(Msg::Input(key_event_with_mod(

@@ -44,6 +44,7 @@ impl Actor for EchoActor {
 }
 
 impl EchoActor {
+    /// Processes an incoming event, echoing user messages as ALL CAPS actor entries.
     async fn process_event(event: &Event, ctx: &ActorContext) {
         match event {
             Event::ChatEntrySubmitted {

@@ -13,6 +13,7 @@ use crate::element::UiElement;
 /// yields elements in the order they were added.
 #[derive(Debug)]
 pub struct UiRegistry<S> {
+    /// Registered elements in insertion order.
     elements: Vec<Box<dyn UiElement<S>>>,
 }
 

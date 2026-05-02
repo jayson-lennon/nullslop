@@ -23,15 +23,18 @@ define_handler! {
 }
 
 impl ShutdownTrackerHandler {
+    /// Tracks a new actor for shutdown monitoring.
     fn on_actor_starting(evt: &ActorStarting, state: &mut AppState, _out: &mut Out) {
         state.shutdown_tracker.track(&evt.name);
         tracing::info!(name = %evt.name, "actor starting");
     }
 
+    /// Logs that an actor has finished starting.
     fn on_actor_started(evt: &ActorStarted, _state: &mut AppState, _out: &mut Out) {
         tracing::info!(name = %evt.name, "actor started");
     }
 
+    /// Marks an actor as shut down and signals completion when all actors are done.
     fn on_actor_shutdown_completed(
         evt: &ActorShutdownCompleted,
         state: &mut AppState,
@@ -80,7 +83,7 @@ mod tests {
         // Then the actor is in the tracker's pending set.
         assert_eq!(
             state.shutdown_tracker.pending_names(),
-            vec!["actor-a".to_string()]
+            vec!["actor-a".to_owned()]
         );
     }
 
@@ -133,7 +136,7 @@ mod tests {
         assert!(!bus.has_pending());
         assert_eq!(
             state.shutdown_tracker.pending_names(),
-            vec!["actor-a".to_string()]
+            vec!["actor-a".to_owned()]
         );
     }
 

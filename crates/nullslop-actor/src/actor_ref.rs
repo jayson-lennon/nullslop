@@ -18,6 +18,7 @@ use crate::error::from_kanal_send;
 /// The [`RwLock`] allows the sender to be swapped during actor restart.
 /// All holders of the same [`ActorRef`] share this cell via [`Arc`].
 struct ActorCell<M> {
+    /// The underlying channel sender, wrapped for restart swaps.
     sender: RwLock<kanal::Sender<ActorEnvelope<M>>>,
 }
 
@@ -29,6 +30,7 @@ struct ActorCell<M> {
 ///
 /// Cheaply cloneable — clones the inner [`Arc`].
 pub struct ActorRef<M: Send + 'static> {
+    /// Shared inner cell containing the swappable sender.
     cell: Arc<ActorCell<M>>,
 }
 
@@ -156,7 +158,7 @@ mod tests {
 
         // When sending a direct message.
         actor_ref
-            .send("hello".to_string())
+            .send("hello".to_owned())
             .expect("send should succeed");
 
         // Then it is received as a Direct envelope.
@@ -263,7 +265,7 @@ mod tests {
 
         // And sending a message.
         actor_ref
-            .send("after-swap".to_string())
+            .send("after-swap".to_owned())
             .expect("send should succeed");
 
         // Then the message arrives on channel B, not A.
@@ -284,7 +286,7 @@ mod tests {
         // When cloning and sending on the clone.
         let clone = actor_ref.clone();
         clone
-            .send("from-clone".to_string())
+            .send("from-clone".to_owned())
             .expect("send should succeed");
 
         // Then the original's channel receives it.
@@ -308,7 +310,7 @@ mod tests {
 
         // And sending on the clone.
         clone
-            .send("via-clone".to_string())
+            .send("via-clone".to_owned())
             .expect("send should succeed");
 
         // Then the message arrives on the new channel.
@@ -327,7 +329,7 @@ mod tests {
         drop(rx);
 
         // When sending a message.
-        let result = actor_ref.send("should-fail".to_string());
+        let result = actor_ref.send("should-fail".to_owned());
 
         // Then it returns an error.
         assert!(result.is_err());

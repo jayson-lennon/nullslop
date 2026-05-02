@@ -15,7 +15,7 @@ pub struct CharCounterElement;
 
 impl UiElement<AppState> for CharCounterElement {
     fn name(&self) -> String {
-        "char-counter".to_string()
+        "char-counter".to_owned()
     }
 
     fn render(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppState) {

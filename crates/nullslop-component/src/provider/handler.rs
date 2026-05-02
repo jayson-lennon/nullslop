@@ -20,6 +20,7 @@ define_handler! {
 }
 
 impl ProviderHandler {
+    /// Appends a streaming LLM token to the session, transitioning to streaming on the first token.
     fn on_stream_token(cmd: &StreamToken, state: &mut AppState, _out: &mut Out) -> CommandAction {
         let session = state.session_mut(&cmd.session_id);
 
@@ -64,7 +65,7 @@ mod tests {
             payload: StreamToken {
                 session_id: sid.clone(),
                 index: 0,
-                token: "Hello".to_string(),
+                token: "Hello".to_owned(),
             },
         });
         bus.process_commands(&mut state);
@@ -73,7 +74,7 @@ mod tests {
         assert!(state.active_session().is_streaming());
         assert_eq!(
             state.active_session().history()[0].kind,
-            npr::ChatEntryKind::Assistant("Hello".to_string())
+            npr::ChatEntryKind::Assistant("Hello".to_owned())
         );
 
         // When processing another StreamToken(index=1, token=" world").
@@ -81,7 +82,7 @@ mod tests {
             payload: StreamToken {
                 session_id: sid.clone(),
                 index: 1,
-                token: " world".to_string(),
+                token: " world".to_owned(),
             },
         });
         bus.process_commands(&mut state);
@@ -89,7 +90,7 @@ mod tests {
         // Then the text is "Hello world".
         assert_eq!(
             state.active_session().history()[0].kind,
-            npr::ChatEntryKind::Assistant("Hello world".to_string())
+            npr::ChatEntryKind::Assistant("Hello world".to_owned())
         );
     }
 
@@ -109,7 +110,7 @@ mod tests {
             payload: StreamToken {
                 session_id: sid.clone(),
                 index: 0,
-                token: "Hi".to_string(),
+                token: "Hi".to_owned(),
             },
         });
         bus.process_commands(&mut state);

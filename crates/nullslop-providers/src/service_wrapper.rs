@@ -12,6 +12,7 @@ use crate::service::{LlmService, LlmServiceError, LlmServiceFactory};
 /// Follows the project's service wrapper pattern.
 #[derive(Debug, Clone)]
 pub struct LlmServiceFactoryService {
+    /// The wrapped factory implementation.
     inner: Arc<dyn LlmServiceFactory>,
 }
 
@@ -48,7 +49,7 @@ mod tests {
     #[test]
     fn service_wrapper_delegates_create() {
         // Given a service wrapper around a fake factory.
-        let factory = FakeLlmServiceFactory::new(vec!["token".to_string()]);
+        let factory = FakeLlmServiceFactory::new(vec!["token".to_owned()]);
         let service = LlmServiceFactoryService::new(Arc::new(factory));
 
         // When creating a service instance.

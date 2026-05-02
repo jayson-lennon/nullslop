@@ -49,17 +49,25 @@ use crate::out::Out;
 
 /// Type-erased command handler ready for dispatch.
 struct AnyCommandHandler<S> {
+    /// The type-erased handler instance.
     handler: Box<dyn Any>,
+    /// Function pointer that downcasts and invokes the handler.
     invoke: fn(&dyn Any, &dyn Any, &mut S, &mut Out) -> CommandAction,
 }
 
 /// Type-erased event handler ready for dispatch.
 struct AnyEventHandler<S> {
+    /// The type-erased handler instance.
     handler: Box<dyn Any>,
+    /// Function pointer that downcasts and invokes the handler.
     invoke: fn(&dyn Any, &dyn Any, &mut S, &mut Out),
 }
 
 /// Invokes a command handler with its concrete types.
+#[expect(
+    clippy::expect_used,
+    reason = "type is guaranteed by construction via Bus registration"
+)]
 fn invoke_command<C, H, S>(
     handler: &dyn Any,
     cmd: &dyn Any,
@@ -76,6 +84,10 @@ where
 }
 
 /// Invokes an event handler with its concrete types.
+#[expect(
+    clippy::expect_used,
+    reason = "type is guaranteed by construction via Bus registration"
+)]
 fn invoke_event<E, H, S>(handler: &dyn Any, evt: &dyn Any, state: &mut S, out: &mut Out)
 where
     H: EventHandler<E, S> + 'static,
@@ -88,13 +100,17 @@ where
 
 /// A queued command together with its origin.
 struct QueuedCommand {
+    /// The command payload.
     command: Command,
+    /// The actor that submitted this command, if any.
     source: Option<ActorName>,
 }
 
 /// A queued event together with its origin.
 struct QueuedEvent {
+    /// The event payload.
     event: Event,
+    /// The actor that submitted this event, if any.
     source: Option<ActorName>,
 }
 
@@ -104,9 +120,13 @@ struct QueuedEvent {
 /// message is routed to every handler registered for its type. The processing
 /// model ensures consistent state snapshots across handlers.
 pub struct Bus<S> {
+    /// Registered command handlers keyed by their command type.
     command_handlers: HashMap<TypeId, Vec<AnyCommandHandler<S>>>,
+    /// Registered event handlers keyed by their event type.
     event_handlers: HashMap<TypeId, Vec<AnyEventHandler<S>>>,
+    /// Commands waiting to be dispatched.
     command_queue: Vec<QueuedCommand>,
+    /// Events waiting to be dispatched.
     event_queue: Vec<QueuedEvent>,
     /// Events dispatched during the last processing cycle, with source.
     /// Available via [`drain_processed_events`](Self::drain_processed_events).
@@ -114,6 +134,7 @@ pub struct Bus<S> {
     /// Commands dispatched during the last processing cycle, with source.
     /// Available via [`drain_processed_commands`](Self::drain_processed_commands).
     processed_commands: Vec<ProcessedCommand>,
+    /// Maximum number of processing iterations to prevent infinite loops.
     max_iterations: usize,
 }
 

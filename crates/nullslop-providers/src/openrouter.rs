@@ -19,7 +19,7 @@ pub struct ApiKey(String);
 impl ApiKey {
     /// Create an API key from an explicit string value.
     #[must_use]
-    pub fn new(key: impl Into<String>) -> Self {
+    pub fn new<T: Into<String>>(key: T) -> Self {
         Self(key.into())
     }
 
@@ -33,7 +33,9 @@ impl ApiKey {
 /// Factory that creates `OpenRouter` LLM service instances.
 #[derive(Debug, Clone)]
 pub struct OpenRouterLlmServiceFactory {
+    /// API key for authenticating with [`OpenRouter`].
     api_key: ApiKey,
+    /// Model identifier to use for requests.
     model: String,
 }
 
@@ -53,12 +55,12 @@ impl OpenRouterLlmServiceFactory {
 
 impl LlmServiceFactory for OpenRouterLlmServiceFactory {
     fn create(&self) -> Result<Box<dyn LlmService>, Report<LlmServiceError>> {
-        let provider = LLMBuilder::new()
+        let built = LLMBuilder::new()
             .backend(LLMBackend::OpenRouter)
             .api_key(self.api_key.as_str())
             .model(&self.model)
-            .build()
-            .change_context(LlmServiceError::Config)?;
+            .build();
+        let provider = ResultExt::change_context(built, LlmServiceError::Config)?;
         Ok(Box::new(OpenRouterLlmService { provider }))
     }
 
@@ -69,6 +71,7 @@ impl LlmServiceFactory for OpenRouterLlmServiceFactory {
 
 /// A single `OpenRouter` streaming session.
 struct OpenRouterLlmService {
+    /// The underlying LLM provider for streaming chat.
     provider: Box<dyn llm::LLMProvider>,
 }
 
@@ -83,10 +86,10 @@ impl LlmService for OpenRouterLlmService {
             .chat_stream(&messages)
             .await
             .change_context(LlmServiceError::Provider)?;
-        let mapped: ChatStream = Box::pin(stream.map(
+        let mapped: ChatStream = Box::pin(StreamExt::map(
+            stream,
             |token_result: Result<String, llm::error::LLMError>| {
-                token_result
-                    .change_context(LlmServiceError::Provider)
+                token_result.change_context(LlmServiceError::Provider)
             },
         ));
         Ok(mapped)
@@ -137,7 +140,7 @@ mod tests {
         // Given an API key and model name.
         let factory = OpenRouterLlmServiceFactory::with_key_and_model(
             ApiKey::new("sk-test"),
-            "gpt-4".to_string(),
+            "gpt-4".to_owned(),
         );
 
         // When creating the factory.

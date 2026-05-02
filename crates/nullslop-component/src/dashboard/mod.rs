@@ -13,6 +13,7 @@ pub use state::DashboardState;
 
 use crate::{AppBus, AppUiRegistry};
 
+/// Registers the dashboard handler and UI element.
 pub(crate) fn register(bus: &mut AppBus, registry: &mut AppUiRegistry) {
     handler::DashboardHandler.register(bus);
     registry.register(Box::new(DashboardElement));
