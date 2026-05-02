@@ -38,8 +38,8 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
 use nullslop_protocol::chat_input::{
-    Clear, DeleteGrapheme, DeleteGraphemeForward, MoveCursorLeft, MoveCursorRight, MoveCursorToEnd,
-    MoveCursorToStart, MoveCursorWordLeft, MoveCursorWordRight,
+    Clear, DeleteGrapheme, DeleteGraphemeForward, MoveCursorDown, MoveCursorLeft, MoveCursorRight,
+    MoveCursorToEnd, MoveCursorToStart, MoveCursorUp, MoveCursorWordLeft, MoveCursorWordRight,
 };
 use nullslop_protocol::system::{EditInput, Quit, ScrollDown, ScrollUp, ToggleWhichKey};
 use nullslop_protocol::{ActorName, Command, CommandAction, Event};
@@ -309,6 +309,10 @@ impl<S> Bus<S> {
     }
 
     /// Dispatch a single command to its registered handlers.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "exhaustive match dispatch grows with each command variant"
+    )]
     fn dispatch_command(&mut self, cmd: Command, source: Option<ActorName>, state: &mut S) {
         // Record the command before dispatching so consumers can drain it later.
         self.processed_commands.push(ProcessedCommand {
@@ -357,6 +361,14 @@ impl<S> Bus<S> {
             }
             Command::MoveCursorWordRight => {
                 let cmd = MoveCursorWordRight;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
+            }
+            Command::MoveCursorUp => {
+                let cmd = MoveCursorUp;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
+            }
+            Command::MoveCursorDown => {
+                let cmd = MoveCursorDown;
                 self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
             Command::SetMode { payload } => {

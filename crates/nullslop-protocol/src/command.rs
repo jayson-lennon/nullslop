@@ -21,9 +21,9 @@ pub use crate::custom::CommandMsg;
 // Internal imports for enum definition and Display impl.
 use crate::actor::ProceedWithShutdown;
 use crate::chat_input::{
-    Clear, DeleteGrapheme, DeleteGraphemeForward, EnqueueUserMessage, InsertChar, MoveCursorToEnd,
-    MoveCursorToStart, MoveCursorWordLeft, MoveCursorWordRight, PushChatEntry, SetChatInputText,
-    SubmitMessage,
+    Clear, DeleteGrapheme, DeleteGraphemeForward, EnqueueUserMessage, InsertChar, MoveCursorDown,
+    MoveCursorToEnd, MoveCursorToStart, MoveCursorUp, MoveCursorWordLeft, MoveCursorWordRight,
+    PushChatEntry, SetChatInputText, SubmitMessage,
 };
 use crate::chat_input::{MoveCursorLeft, MoveCursorRight};
 use crate::provider::{CancelStream, SendMessage, SendToLlmProvider, StreamToken};
@@ -82,6 +82,12 @@ pub enum Command {
     /// Move the cursor one word to the right.
     #[serde(rename = "move_cursor_word_right")]
     MoveCursorWordRight,
+    /// Move the cursor up one visual line.
+    #[serde(rename = "move_cursor_up")]
+    MoveCursorUp,
+    /// Move the cursor down one visual line.
+    #[serde(rename = "move_cursor_down")]
+    MoveCursorDown,
     /// Set the application interaction mode.
     #[serde(rename = "set_mode")]
     SetMode {
@@ -188,6 +194,8 @@ impl Command {
             Self::DeleteGraphemeForward => Some(DeleteGraphemeForward::NAME),
             Self::MoveCursorWordLeft => Some(MoveCursorWordLeft::NAME),
             Self::MoveCursorWordRight => Some(MoveCursorWordRight::NAME),
+            Self::MoveCursorUp => Some(MoveCursorUp::NAME),
+            Self::MoveCursorDown => Some(MoveCursorDown::NAME),
             Self::SetMode { .. } => Some(SetMode::NAME),
             Self::Quit
             | Self::EditInput
@@ -221,6 +229,8 @@ impl std::fmt::Display for Command {
             Command::DeleteGraphemeForward => write!(f, "forward delete"),
             Command::MoveCursorWordLeft => write!(f, "cursor word left"),
             Command::MoveCursorWordRight => write!(f, "cursor word right"),
+            Command::MoveCursorUp => write!(f, "cursor up"),
+            Command::MoveCursorDown => write!(f, "cursor down"),
             Command::SetMode { payload } => write!(f, "set mode {}", payload.mode),
             Command::Quit => write!(f, "quit"),
             Command::EditInput => write!(f, "edit in $EDITOR"),
@@ -313,6 +323,8 @@ mod tests {
     #[case::set_chat_input_text(Command::SetChatInputText { payload: SetChatInputText { session_id: SessionId::new(), text: "restored".into() } })]
     #[case::scroll_up(Command::ScrollUp)]
     #[case::scroll_down(Command::ScrollDown)]
+    #[case::move_cursor_up(Command::MoveCursorUp)]
+    #[case::move_cursor_down(Command::MoveCursorDown)]
     fn command_roundtrip_all_variants(#[case] cmd: Command) {
         // Given a command variant.
         let json = serde_json::to_string(&cmd).expect("serialize");

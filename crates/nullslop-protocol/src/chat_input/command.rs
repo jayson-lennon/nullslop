@@ -72,6 +72,16 @@ pub struct MoveCursorWordLeft;
 #[cmd("chat_input")]
 pub struct MoveCursorWordRight;
 
+/// Move the cursor up one visual line.
+#[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
+#[cmd("chat_input")]
+pub struct MoveCursorUp;
+
+/// Move the cursor down one visual line.
+#[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
+#[cmd("chat_input")]
+pub struct MoveCursorDown;
+
 /// Push a chat entry into the conversation history.
 ///
 /// Any component or actor can send this to add an entry to the chat log.

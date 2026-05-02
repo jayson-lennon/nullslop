@@ -56,6 +56,8 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
             .bind("<delete>", Command::DeleteGraphemeForward, KeyCategory::Input)
             .bind("<c-left>", Command::MoveCursorWordLeft, KeyCategory::Input)
             .bind("<c-right>", Command::MoveCursorWordRight, KeyCategory::Input)
+            .bind("<up>", Command::MoveCursorUp, KeyCategory::Input)
+            .bind("<down>", Command::MoveCursorDown, KeyCategory::Input)
             .bind("<c-u>", Command::ScrollUp, KeyCategory::General)
             .bind("<c-d>", Command::ScrollDown, KeyCategory::General)
             .catch_all(|key: KeyEvent| {

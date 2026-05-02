@@ -94,6 +94,10 @@ impl ratatui_which_key::Key for KeyEvent {
             modifiers: Modifiers::none(),
         })
     }
+
+    fn from_special_name(name: &str) -> Option<Self> {
+        Self::parse_notation(name)
+    }
 }
 
 impl KeyEvent {

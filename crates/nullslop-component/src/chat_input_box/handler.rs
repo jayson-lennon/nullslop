@@ -9,8 +9,9 @@
 use crate::AppState;
 use npr::CommandAction;
 use npr::chat_input::{
-    Clear, DeleteGrapheme, DeleteGraphemeForward, InsertChar, MoveCursorLeft, MoveCursorRight,
-    MoveCursorToEnd, MoveCursorToStart, MoveCursorWordLeft, MoveCursorWordRight, SubmitMessage,
+    Clear, DeleteGrapheme, DeleteGraphemeForward, InsertChar, MoveCursorDown, MoveCursorLeft,
+    MoveCursorRight, MoveCursorToEnd, MoveCursorToStart, MoveCursorUp, MoveCursorWordLeft,
+    MoveCursorWordRight, SubmitMessage,
 };
 use npr::system::SetMode;
 use nullslop_component_core::{Out, define_handler};
@@ -31,6 +32,8 @@ define_handler! {
         MoveCursorToEnd: on_move_cursor_to_end,
         MoveCursorWordLeft: on_move_cursor_word_left,
         MoveCursorWordRight: on_move_cursor_word_right,
+        MoveCursorUp: on_move_cursor_up,
+        MoveCursorDown: on_move_cursor_down,
         SetMode: on_set_mode,
     }
 
@@ -165,6 +168,26 @@ impl ChatInputBoxHandler {
         _out: &mut Out,
     ) -> CommandAction {
         state.active_chat_input_mut().move_cursor_word_right();
+        CommandAction::Continue
+    }
+
+    /// Moves the cursor up one visual line.
+    fn on_move_cursor_up(
+        _cmd: &MoveCursorUp,
+        state: &mut AppState,
+        _out: &mut Out,
+    ) -> CommandAction {
+        state.active_chat_input_mut().move_cursor_up();
+        CommandAction::Continue
+    }
+
+    /// Moves the cursor down one visual line.
+    fn on_move_cursor_down(
+        _cmd: &MoveCursorDown,
+        state: &mut AppState,
+        _out: &mut Out,
+    ) -> CommandAction {
+        state.active_chat_input_mut().move_cursor_down();
         CommandAction::Continue
     }
 }
@@ -602,5 +625,85 @@ mod tests {
         // Then the buffer contains "hello\n" and cursor is at 6.
         assert_eq!(state.active_chat_input().text(), "hello\n");
         assert_eq!(state.active_chat_input().cursor_pos(), 6);
+    }
+
+    #[test]
+    fn bus_move_cursor_up_moves_to_previous_line() {
+        // Given a bus with ChatInputBoxHandler registered and "ab\ncd" in buffer.
+        let mut bus: Bus<AppState> = Bus::new();
+        ChatInputBoxHandler.register(&mut bus);
+
+        let mut state = AppState::new();
+        for ch in "ab\ncd".chars() {
+            state.active_chat_input_mut().insert_grapheme_at_cursor(ch);
+        }
+        // cursor at end (5), row=1, col=2
+
+        // When processing MoveCursorUp.
+        bus.submit_command(Command::MoveCursorUp);
+        bus.process_commands(&mut state);
+
+        // Then cursor is at row 0, col 2 (grapheme index 2).
+        assert_eq!(state.active_chat_input().cursor_row_col(), (0, 2));
+    }
+
+    #[test]
+    fn bus_move_cursor_down_moves_to_next_line() {
+        // Given a bus with ChatInputBoxHandler registered and "ab\ncd" in buffer, cursor at start.
+        let mut bus: Bus<AppState> = Bus::new();
+        ChatInputBoxHandler.register(&mut bus);
+
+        let mut state = AppState::new();
+        for ch in "ab\ncd".chars() {
+            state.active_chat_input_mut().insert_grapheme_at_cursor(ch);
+        }
+        state.active_chat_input_mut().move_cursor_to_start();
+        // cursor at 0, row=0, col=0
+
+        // When processing MoveCursorDown.
+        bus.submit_command(Command::MoveCursorDown);
+        bus.process_commands(&mut state);
+
+        // Then cursor is at row 1, col 0 (grapheme index 3).
+        assert_eq!(state.active_chat_input().cursor_row_col(), (1, 0));
+    }
+
+    #[test]
+    fn bus_move_cursor_up_noop_on_first_line() {
+        // Given a bus with ChatInputBoxHandler registered and "hello" (single line).
+        let mut bus: Bus<AppState> = Bus::new();
+        ChatInputBoxHandler.register(&mut bus);
+
+        let mut state = AppState::new();
+        for ch in "hello".chars() {
+            state.active_chat_input_mut().insert_grapheme_at_cursor(ch);
+        }
+        state.active_chat_input_mut().move_cursor_to_start();
+
+        // When processing MoveCursorUp.
+        bus.submit_command(Command::MoveCursorUp);
+        bus.process_commands(&mut state);
+
+        // Then cursor stays at 0.
+        assert_eq!(state.active_chat_input().cursor_pos(), 0);
+    }
+
+    #[test]
+    fn bus_move_cursor_down_noop_on_last_line() {
+        // Given a bus with ChatInputBoxHandler registered and "hello" (single line).
+        let mut bus: Bus<AppState> = Bus::new();
+        ChatInputBoxHandler.register(&mut bus);
+
+        let mut state = AppState::new();
+        for ch in "hello".chars() {
+            state.active_chat_input_mut().insert_grapheme_at_cursor(ch);
+        }
+
+        // When processing MoveCursorDown.
+        bus.submit_command(Command::MoveCursorDown);
+        bus.process_commands(&mut state);
+
+        // Then cursor stays at end (5).
+        assert_eq!(state.active_chat_input().cursor_pos(), 5);
     }
 }
