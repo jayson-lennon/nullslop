@@ -9,9 +9,9 @@
 use crate::AppState;
 use npr::CommandAction;
 use npr::chat_input::{
-    Clear, DeleteGrapheme, DeleteGraphemeForward, InsertChar, MoveCursorDown, MoveCursorLeft,
-    MoveCursorRight, MoveCursorToEnd, MoveCursorToStart, MoveCursorUp, MoveCursorWordLeft,
-    MoveCursorWordRight, SubmitMessage,
+    Clear, DeleteGrapheme, DeleteGraphemeForward, InsertChar, Interrupt, MoveCursorDown,
+    MoveCursorLeft, MoveCursorRight, MoveCursorToEnd, MoveCursorToStart, MoveCursorUp,
+    MoveCursorWordLeft, MoveCursorWordRight, SubmitMessage,
 };
 use npr::system::SetMode;
 use nullslop_component_core::{Out, define_handler};
@@ -26,6 +26,7 @@ define_handler! {
         DeleteGraphemeForward: on_delete_grapheme_forward,
         SubmitMessage: on_submit_message,
         Clear: on_clear,
+        Interrupt: on_interrupt,
         MoveCursorLeft: on_move_cursor_left,
         MoveCursorRight: on_move_cursor_right,
         MoveCursorToStart: on_move_cursor_to_start,
@@ -82,6 +83,16 @@ impl ChatInputBoxHandler {
     /// Clears the input buffer and resets the cursor.
     fn on_clear(_cmd: &Clear, state: &mut AppState, _out: &mut Out) -> CommandAction {
         state.active_chat_input_mut().reset();
+        CommandAction::Continue
+    }
+
+    /// Context-sensitive interrupt: clears the input buffer if non-empty, otherwise quits.
+    fn on_interrupt(_cmd: &Interrupt, state: &mut AppState, out: &mut Out) -> CommandAction {
+        if state.active_chat_input().is_empty() {
+            out.submit_command(npr::Command::Quit);
+        } else {
+            state.active_chat_input_mut().reset();
+        }
         CommandAction::Continue
     }
 
@@ -705,5 +716,43 @@ mod tests {
 
         // Then cursor stays at end (5).
         assert_eq!(state.active_chat_input().cursor_pos(), 5);
+    }
+
+    // --- Interrupt tests ---
+
+    #[test]
+    fn interrupt_clears_buffer_when_non_empty() {
+        // Given a bus with ChatInputBoxHandler registered and "hello" in buffer.
+        let mut bus: Bus<AppState> = Bus::new();
+        ChatInputBoxHandler.register(&mut bus);
+
+        let mut state = AppState::new();
+        for ch in "hello".chars() {
+            state.active_chat_input_mut().insert_grapheme_at_cursor(ch);
+        }
+
+        // When processing Interrupt.
+        bus.submit_command(Command::Interrupt);
+        bus.process_commands(&mut state);
+
+        // Then the buffer is cleared.
+        assert!(state.active_chat_input().is_empty());
+        assert_eq!(state.active_chat_input().cursor_pos(), 0);
+    }
+
+    #[test]
+    fn interrupt_quits_when_buffer_empty() {
+        // Given a bus with ChatInputBoxHandler and AppQuitHandler registered, empty buffer.
+        let mut bus: Bus<AppState> = Bus::new();
+        ChatInputBoxHandler.register(&mut bus);
+        crate::app_quit::AppQuitHandler.register(&mut bus);
+
+        // When processing Interrupt with empty input.
+        bus.submit_command(Command::Interrupt);
+        let mut state = AppState::new();
+        bus.process_commands(&mut state);
+
+        // Then should_quit is true (Interrupt cascaded Quit).
+        assert!(state.should_quit);
     }
 }

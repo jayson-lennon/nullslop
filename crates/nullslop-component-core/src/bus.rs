@@ -38,8 +38,9 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
 use nullslop_protocol::chat_input::{
-    Clear, DeleteGrapheme, DeleteGraphemeForward, MoveCursorDown, MoveCursorLeft, MoveCursorRight,
-    MoveCursorToEnd, MoveCursorToStart, MoveCursorUp, MoveCursorWordLeft, MoveCursorWordRight,
+    Clear, DeleteGrapheme, DeleteGraphemeForward, Interrupt, MoveCursorDown, MoveCursorLeft,
+    MoveCursorRight, MoveCursorToEnd, MoveCursorToStart, MoveCursorUp, MoveCursorWordLeft,
+    MoveCursorWordRight,
 };
 use nullslop_protocol::system::{EditInput, Quit, ScrollDown, ScrollUp, ToggleWhichKey};
 use nullslop_protocol::{ActorName, Command, CommandAction, Event};
@@ -333,6 +334,10 @@ impl<S> Bus<S> {
             }
             Command::Clear => {
                 let cmd = Clear;
+                self.dispatch_command_to_handlers(&cmd, state, &mut out);
+            }
+            Command::Interrupt => {
+                let cmd = Interrupt;
                 self.dispatch_command_to_handlers(&cmd, state, &mut out);
             }
             Command::MoveCursorLeft => {

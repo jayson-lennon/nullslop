@@ -33,6 +33,7 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
         .scope(Scope::Normal, |b| {
             b.bind("i", Command::SetMode { payload: SetMode { mode: Mode::Input } }, KeyCategory::General)
             .bind("q", Command::Quit, KeyCategory::General)
+            .bind("<c-c>", Command::Quit, KeyCategory::General)
             .bind("?", Command::ToggleWhichKey, KeyCategory::General)
             .bind("<c-e>", Command::EditInput, KeyCategory::Input)
             .bind("<c-h>", Command::SwitchTab { payload: SwitchTab { direction: TabDirection::Prev } }, KeyCategory::General)
@@ -46,6 +47,7 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
             .bind("<s-enter>", Command::InsertChar { payload: InsertChar { ch: '\n' } }, KeyCategory::Input)
             .bind("<c-enter>", Command::InsertChar { payload: InsertChar { ch: '\n' } }, KeyCategory::Input)
             .bind("<esc>", Command::SetMode { payload: SetMode { mode: Mode::Normal } }, KeyCategory::General)
+            .bind("<c-c>", Command::Interrupt, KeyCategory::General)
             .bind("<c-e>", Command::EditInput, KeyCategory::Input)
             .bind("<f1>", Command::ToggleWhichKey, KeyCategory::General)
             .bind("<backspace>", Command::DeleteGrapheme, KeyCategory::Input)

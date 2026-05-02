@@ -37,6 +37,11 @@ pub struct SubmitMessage {
 #[cmd("chat_input")]
 pub struct Clear;
 
+/// Context-sensitive interrupt: clear the input buffer if non-empty, otherwise quit.
+#[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
+#[cmd("chat_input")]
+pub struct Interrupt;
+
 /// Move the cursor one grapheme to the left.
 #[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
 #[cmd("chat_input")]

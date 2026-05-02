@@ -21,9 +21,9 @@ pub use crate::custom::CommandMsg;
 // Internal imports for enum definition and Display impl.
 use crate::actor::ProceedWithShutdown;
 use crate::chat_input::{
-    Clear, DeleteGrapheme, DeleteGraphemeForward, EnqueueUserMessage, InsertChar, MoveCursorDown,
-    MoveCursorToEnd, MoveCursorToStart, MoveCursorUp, MoveCursorWordLeft, MoveCursorWordRight,
-    PushChatEntry, SetChatInputText, SubmitMessage,
+    Clear, DeleteGrapheme, DeleteGraphemeForward, EnqueueUserMessage, InsertChar, Interrupt,
+    MoveCursorDown, MoveCursorToEnd, MoveCursorToStart, MoveCursorUp, MoveCursorWordLeft,
+    MoveCursorWordRight, PushChatEntry, SetChatInputText, SubmitMessage,
 };
 use crate::chat_input::{MoveCursorLeft, MoveCursorRight};
 use crate::provider::{CancelStream, SendMessage, SendToLlmProvider, StreamToken};
@@ -61,6 +61,9 @@ pub enum Command {
     /// Clear the chat input buffer.
     #[serde(rename = "clear")]
     Clear,
+    /// Context-sensitive interrupt: clear input if non-empty, otherwise quit.
+    #[serde(rename = "interrupt")]
+    Interrupt,
     /// Move the cursor one grapheme to the left.
     #[serde(rename = "move_cursor_left")]
     MoveCursorLeft,
@@ -187,6 +190,7 @@ impl Command {
             Self::DeleteGrapheme => Some(DeleteGrapheme::NAME),
             Self::SubmitMessage { .. } => Some(SubmitMessage::NAME),
             Self::Clear => Some(Clear::NAME),
+            Self::Interrupt => Some(Interrupt::NAME),
             Self::MoveCursorLeft => Some(MoveCursorLeft::NAME),
             Self::MoveCursorRight => Some(MoveCursorRight::NAME),
             Self::MoveCursorToStart => Some(MoveCursorToStart::NAME),
@@ -222,6 +226,7 @@ impl std::fmt::Display for Command {
             Command::DeleteGrapheme => write!(f, "delete"),
             Command::SubmitMessage { .. } => write!(f, "submit chat"),
             Command::Clear => write!(f, "clear"),
+            Command::Interrupt => write!(f, "interrupt"),
             Command::MoveCursorLeft => write!(f, "cursor left"),
             Command::MoveCursorRight => write!(f, "cursor right"),
             Command::MoveCursorToStart => write!(f, "cursor home"),
@@ -301,6 +306,7 @@ mod tests {
     #[case::delete_grapheme(Command::DeleteGrapheme)]
     #[case::submit_message(Command::SubmitMessage { payload: SubmitMessage { session_id: SessionId::new(), text: "hello".into() } })]
     #[case::clear(Command::Clear)]
+    #[case::interrupt(Command::Interrupt)]
     #[case::set_mode(Command::SetMode { payload: SetMode { mode: Mode::Input } })]
     #[case::quit(Command::Quit)]
     #[case::edit_input(Command::EditInput)]
