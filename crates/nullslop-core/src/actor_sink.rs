@@ -1,7 +1,7 @@
 //! Bridge from actor output to the `AppCore` message channel.
 
 use kanal::Sender;
-use nullslop_actor::{MessageSink, error::SendResult};
+use nullslop_actor::{ActorSendError, MessageSink, SendResult};
 use nullslop_protocol::{Command, Event};
 
 use crate::AppMsg;
@@ -30,7 +30,7 @@ impl MessageSink for ActorMessageSink {
                 command,
                 source: None,
             })
-            .map_err(|_send_error| nullslop_actor::error::ActorSendError)?;
+            .map_err(|_send_error| ActorSendError)?;
         Ok(())
     }
 
@@ -40,7 +40,7 @@ impl MessageSink for ActorMessageSink {
                 event,
                 source: None,
             })
-            .map_err(|_send_error| nullslop_actor::error::ActorSendError)?;
+            .map_err(|_send_error| ActorSendError)?;
         Ok(())
     }
 }

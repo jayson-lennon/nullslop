@@ -5,8 +5,12 @@ use std::sync::Arc;
 use error_stack::Report;
 use nullslop_actor::SystemMessage;
 use nullslop_protocol::{ActorName, Command, Event};
+use wherror::Error;
 
-use crate::error::ActorHostError;
+/// Error type for actor host operations.
+#[derive(Debug, Error)]
+#[error(debug)]
+pub struct ActorHostError;
 
 /// Trait for managing actors.
 ///
@@ -97,7 +101,7 @@ mod tests {
     #[test]
     fn actor_host_error_has_debug_display() {
         // Given an ActorHostError.
-        let err = crate::error::ActorHostError;
+        let err = ActorHostError;
 
         // When formatting the error.
         let _debug = format!("{err:?}");

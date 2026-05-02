@@ -15,12 +15,11 @@ pub mod actor;
 pub mod actor_ref;
 pub mod context;
 pub mod envelope;
-pub mod error;
 pub mod message_sink;
 
 pub use actor::Actor;
 pub use actor_ref::ActorRef;
 pub use context::ActorContext;
 pub use envelope::{ActorEnvelope, SystemMessage};
-pub use error::{ActorSendError, SendResult};
+pub use actor_ref::{ActorSendError, SendResult};
 pub use message_sink::MessageSink;

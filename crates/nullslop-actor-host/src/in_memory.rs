@@ -15,7 +15,7 @@ use nullslop_protocol::{ActorName, Command, CommandName, Event, EventTypeName};
 use parking_lot::Mutex;
 
 use crate::actor_host::ActorHost;
-use crate::error::ActorHostError;
+use crate::actor_host::ActorHostError;
 use crate::routing::RoutingEntry;
 
 /// Maximum time to wait for each actor task to join during shutdown.
@@ -283,7 +283,7 @@ impl ActorHost for InMemoryActorHost {
 mod tests {
     use std::sync::Arc;
 
-    use nullslop_actor::error::SendResult;
+    use nullslop_actor::SendResult;
     use nullslop_actor::{Actor, ActorContext, ActorEnvelope, ActorRef, MessageSink};
     use nullslop_protocol::chat_input::ChatEntrySubmitted;
     use nullslop_protocol::{Command, CommandMsg as _, Event};

@@ -14,7 +14,7 @@ use nullslop_protocol::actor::{ActorShutdownCompleted, ActorStarted};
 use nullslop_protocol::{Command, CommandMsg, CommandName, Event, EventMsg, EventTypeName};
 
 use crate::ActorRef;
-use crate::error::SendResult;
+use crate::actor_ref::SendResult;
 use crate::message_sink::MessageSink;
 
 /// Context provided to actor methods.

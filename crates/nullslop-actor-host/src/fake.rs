@@ -7,7 +7,7 @@ use parking_lot::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::actor_host::ActorHost;
-use crate::error::ActorHostError;
+use crate::actor_host::ActorHostError;
 
 /// A fake actor host that records sent events, commands, and shutdown calls.
 ///

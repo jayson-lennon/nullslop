@@ -8,7 +8,7 @@ use nullslop_protocol::{Command, Event};
 #[cfg(test)]
 use parking_lot::Mutex;
 
-use crate::error::SendResult;
+use crate::actor_ref::SendResult;
 
 /// Trait for sending bus messages from actors to the application.
 ///

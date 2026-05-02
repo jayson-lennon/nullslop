@@ -7,12 +7,37 @@
 
 use std::sync::Arc;
 
-use kanal::Sender;
+use error_stack::Report;
+use kanal::{SendError, Sender};
 use parking_lot::RwLock;
+use wherror::Error;
 
 use crate::envelope::ActorEnvelope;
-use crate::error::SendResult;
-use crate::error::from_kanal_send;
+
+/// Error returned when a message cannot be delivered to an actor.
+///
+/// This wraps the underlying channel failure (e.g. the actor's receiver
+/// was dropped) in a domain error that does not expose internal types.
+#[derive(Debug, Error)]
+#[error(debug)]
+pub struct ActorSendError;
+
+/// Result alias for actor send operations.
+pub type SendResult = Result<(), Report<ActorSendError>>;
+
+/// Converts a kanal send failure into a [`SendResult`].
+///
+/// Attaches a human-readable message to the report for diagnostics.
+pub(crate) fn from_kanal_send(
+    result: Result<(), SendError>,
+    context: &'static str,
+) -> SendResult {
+    result.map_err(|err| {
+        Report::new(ActorSendError)
+            .attach(context)
+            .attach(err.to_string())
+    })
+}
 
 /// Shared inner state for an actor's send handle.
 ///
@@ -149,7 +174,6 @@ impl<M: Send + 'static> std::fmt::Debug for ActorRef<M> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use kanal::Receiver;
     use nullslop_protocol::{Command, Event};
 
     #[test]
