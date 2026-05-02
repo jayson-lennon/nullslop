@@ -16,6 +16,11 @@ pub struct ChatInputBoxState {
     input_buffer: String,
     /// Cursor position as a grapheme-cluster index (0 = before first grapheme).
     cursor_pos: usize,
+    /// The column remembered across consecutive up/down movements.
+    ///
+    /// Set on the first vertical move, preserved across subsequent vertical moves
+    /// (even when clamped by shorter lines). Cleared by any non-vertical operation.
+    desired_col: Option<usize>,
 }
 
 impl ChatInputBoxState {
@@ -25,6 +30,7 @@ impl ChatInputBoxState {
         Self {
             input_buffer: String::new(),
             cursor_pos: 0,
+            desired_col: None,
         }
     }
 
@@ -98,6 +104,7 @@ impl ChatInputBoxState {
             .map_or(self.input_buffer.len(), |(i, _)| i);
         self.input_buffer.insert(byte_offset, ch);
         self.cursor_pos += 1;
+        self.desired_col = None;
     }
 
     /// Delete the grapheme immediately before the cursor and move the cursor back by 1.
@@ -117,12 +124,14 @@ impl ChatInputBoxState {
         let end = start + g.len();
         self.input_buffer.drain(start..end);
         self.cursor_pos -= 1;
+        self.desired_col = None;
     }
 
     /// Clear the buffer and reset the cursor to position 0.
     pub fn reset(&mut self) {
         self.input_buffer.clear();
         self.cursor_pos = 0;
+        self.desired_col = None;
     }
 
     /// Replace the entire buffer content and position cursor at the end.
@@ -131,6 +140,7 @@ impl ChatInputBoxState {
     pub fn replace_all(&mut self, content: String) {
         self.input_buffer = content;
         self.cursor_pos = self.input_buffer.graphemes(true).count();
+        self.desired_col = None;
     }
 
     /// Move the cursor one grapheme to the left.
@@ -140,6 +150,7 @@ impl ChatInputBoxState {
         if self.cursor_pos > 0 {
             self.cursor_pos -= 1;
         }
+        self.desired_col = None;
     }
 
     /// Move the cursor one grapheme to the right.
@@ -149,16 +160,19 @@ impl ChatInputBoxState {
         if self.cursor_pos < self.grapheme_count() {
             self.cursor_pos += 1;
         }
+        self.desired_col = None;
     }
 
     /// Move the cursor to the beginning of the buffer.
     pub fn move_cursor_to_start(&mut self) {
         self.cursor_pos = 0;
+        self.desired_col = None;
     }
 
     /// Move the cursor to the end of the buffer.
     pub fn move_cursor_to_end(&mut self) {
         self.cursor_pos = self.grapheme_count();
+        self.desired_col = None;
     }
 
     /// Delete the grapheme at the cursor position (forward delete).
@@ -177,6 +191,7 @@ impl ChatInputBoxState {
         let (start, g) = graphemes[self.cursor_pos];
         let end = start + g.len();
         self.input_buffer.drain(start..end);
+        self.desired_col = None;
     }
 
     /// Move the cursor one word to the left.
@@ -205,6 +220,7 @@ impl ChatInputBoxState {
             pos -= 1;
         }
         self.cursor_pos = pos;
+        self.desired_col = None;
     }
 
     /// Move the cursor one word to the right.
@@ -234,6 +250,63 @@ impl ChatInputBoxState {
             pos += 1;
         }
         self.cursor_pos = pos;
+        self.desired_col = None;
+    }
+
+    /// Move the cursor up one visual line.
+    ///
+    /// Remembers the column across consecutive vertical moves, even when
+    /// clamped by shorter lines. No-op when the cursor is on the first line.
+    pub fn move_cursor_up(&mut self) {
+        let (row, col) = self.cursor_row_col();
+        if row == 0 {
+            return;
+        }
+        let target_col = *self.desired_col.get_or_insert(col);
+        self.cursor_pos = self.grapheme_index_for_row_col(row - 1, target_col);
+    }
+
+    /// Move the cursor down one visual line.
+    ///
+    /// Remembers the column across consecutive vertical moves, even when
+    /// clamped by shorter lines. No-op when the cursor is on the last line.
+    pub fn move_cursor_down(&mut self) {
+        let (row, col) = self.cursor_row_col();
+        let last_row = self.visual_line_count() - 1;
+        if row >= last_row {
+            return;
+        }
+        let target_col = *self.desired_col.get_or_insert(col);
+        self.cursor_pos = self.grapheme_index_for_row_col(row + 1, target_col);
+    }
+
+    /// Compute the grapheme index for a given `(row, col)` position.
+    ///
+    /// Clamps `col` to the length of the target row's line.
+    fn grapheme_index_for_row_col(&self, target_row: usize, target_col: usize) -> usize {
+        let mut row = 0;
+        let mut col = 0;
+        let mut idx = 0;
+
+        for g in self.input_buffer.graphemes(true) {
+            if row == target_row && col == target_col {
+                return idx;
+            }
+            if g == "\n" {
+                if row == target_row {
+                    // We've reached end of target line; col was too far, clamp.
+                    return idx;
+                }
+                row += 1;
+                col = 0;
+            } else {
+                col += 1;
+            }
+            idx += 1;
+        }
+
+        // If we ran out of graphemes on the target row, return end-of-buffer.
+        idx
     }
 }
 
@@ -417,5 +490,322 @@ mod tests {
         // When reading cursor row/col.
         // Then it is (0, 0).
         assert_eq!(state.cursor_row_col(), (0, 0));
+    }
+
+    #[test]
+    fn move_cursor_up_is_noop_on_first_line() {
+        // Given "hello" with cursor at end (single line).
+        let mut state = ChatInputBoxState::new();
+        for ch in "hello".chars() {
+            state.insert_grapheme_at_cursor(ch);
+        }
+
+        // When moving up.
+        state.move_cursor_up();
+
+        // Then cursor stays at end (5).
+        assert_eq!(state.cursor_pos(), 5);
+    }
+
+    #[test]
+    fn move_cursor_down_is_noop_on_last_line() {
+        // Given "hello" with cursor at start (single line).
+        let mut state = ChatInputBoxState::new();
+        for ch in "hello".chars() {
+            state.insert_grapheme_at_cursor(ch);
+        }
+        state.move_cursor_to_start();
+
+        // When moving down.
+        state.move_cursor_down();
+
+        // Then cursor stays at 0.
+        assert_eq!(state.cursor_pos(), 0);
+    }
+
+    #[test]
+    fn move_cursor_up_goes_to_previous_line() {
+        // Given "hello\nworld" with cursor at end of line 2.
+        let mut state = ChatInputBoxState::new();
+        for ch in "hello\nworld".chars() {
+            state.insert_grapheme_at_cursor(ch);
+        }
+        // cursor at 11 (end), row=1, col=5
+
+        // When moving up.
+        state.move_cursor_up();
+
+        // Then cursor is at row 0, col 5 (grapheme index 5).
+        assert_eq!(state.cursor_row_col(), (0, 5));
+        assert_eq!(state.cursor_pos(), 5);
+    }
+
+    #[test]
+    fn move_cursor_down_goes_to_next_line() {
+        // Given "hello\nworld" with cursor at start of line 1.
+        let mut state = ChatInputBoxState::new();
+        for ch in "hello\nworld".chars() {
+            state.insert_grapheme_at_cursor(ch);
+        }
+        state.move_cursor_to_start();
+        // cursor at 0, row=0, col=0
+
+        // When moving down.
+        state.move_cursor_down();
+
+        // Then cursor is at row 1, col 0 (grapheme index 6, after newline).
+        assert_eq!(state.cursor_row_col(), (1, 0));
+        assert_eq!(state.cursor_pos(), 6);
+    }
+
+    #[test]
+    fn move_cursor_up_clamps_col_to_shorter_line() {
+        // Given "hello\nxy" with cursor at end of line 2 (col=2).
+        let mut state = ChatInputBoxState::new();
+        for ch in "hello\nxy".chars() {
+            state.insert_grapheme_at_cursor(ch);
+        }
+        // Move cursor to col=5 on line 2 — impossible since line 2 has length 2.
+        // Instead, move to col=2 on line 2, then go up.
+        // Actually: cursor is at end (8), row=1, col=2. Go up → row=0, col=2.
+
+        // When moving up from end of line 2.
+        state.move_cursor_up();
+
+        // Then cursor is at row 0, col 2 (grapheme index 2).
+        assert_eq!(state.cursor_row_col(), (0, 2));
+        assert_eq!(state.cursor_pos(), 2);
+    }
+
+    #[test]
+    fn move_cursor_up_preserves_col_on_equal_length_lines() {
+        // Given "abcd\nefgh" with cursor at col 3 on line 2.
+        let mut state = ChatInputBoxState::new();
+        for ch in "abcd\nefgh".chars() {
+            state.insert_grapheme_at_cursor(ch);
+        }
+        // cursor at end (9), row=1, col=4. Move left once → col=3.
+        state.move_cursor_left();
+
+        // When moving up.
+        state.move_cursor_up();
+
+        // Then cursor is at row 0, col 3 (grapheme index 3).
+        assert_eq!(state.cursor_row_col(), (0, 3));
+        assert_eq!(state.cursor_pos(), 3);
+    }
+
+    #[test]
+    fn move_cursor_down_clamps_col_to_shorter_line() {
+        // Given "xy\nhello" with cursor at col 4 on line 1.
+        let mut state = ChatInputBoxState::new();
+        for ch in "xy\nhello".chars() {
+            state.insert_grapheme_at_cursor(ch);
+        }
+        // cursor at end (8), row=1, col=5. Move to row=0, col=5 — impossible (line 0 has length 2).
+        // Let's set up: cursor at start, move right 1 → row=0, col=1.
+        state.move_cursor_to_start();
+        state.move_cursor_right(); // col=1
+
+        // When moving down.
+        state.move_cursor_down();
+
+        // Then cursor is at row 1, col 1 (grapheme index 4, which is 'e').
+        assert_eq!(state.cursor_row_col(), (1, 1));
+        assert_eq!(state.cursor_pos(), 4);
+    }
+
+    #[test]
+    fn move_cursor_up_on_empty_line() {
+        // Given "a\n\nb" with cursor on line 2 (after 'b').
+        let mut state = ChatInputBoxState::new();
+        for ch in "a\n\nb".chars() {
+            state.insert_grapheme_at_cursor(ch);
+        }
+        // cursor at 4 (end), row=2, col=1.
+
+        // When moving up.
+        state.move_cursor_up();
+
+        // Then cursor is on the empty middle line (row=1, col=0 → grapheme index 2).
+        assert_eq!(state.cursor_row_col(), (1, 0));
+        assert_eq!(state.cursor_pos(), 2);
+    }
+
+    #[test]
+    fn move_cursor_down_on_empty_line() {
+        // Given "a\n\nb" with cursor at start of line 1 (empty middle line).
+        let mut state = ChatInputBoxState::new();
+        for ch in "a\n\nb".chars() {
+            state.insert_grapheme_at_cursor(ch);
+        }
+        state.move_cursor_to_start();
+        state.move_cursor_right(); // past 'a'
+        state.move_cursor_right(); // past \n, now on empty line 1
+
+        // When moving down.
+        state.move_cursor_down();
+
+        // Then cursor is at row 2, col 0 (before 'b').
+        assert_eq!(state.cursor_row_col(), (2, 0));
+        assert_eq!(state.cursor_pos(), 3);
+    }
+
+    #[test]
+    fn move_cursor_up_empty_buffer_is_noop() {
+        // Given an empty buffer.
+        let mut state = ChatInputBoxState::new();
+
+        // When moving up.
+        state.move_cursor_up();
+
+        // Then cursor stays at 0.
+        assert_eq!(state.cursor_pos(), 0);
+    }
+
+    #[test]
+    fn move_cursor_down_empty_buffer_is_noop() {
+        // Given an empty buffer.
+        let mut state = ChatInputBoxState::new();
+
+        // When moving down.
+        state.move_cursor_down();
+
+        // Then cursor stays at 0.
+        assert_eq!(state.cursor_pos(), 0);
+    }
+
+    // --- desired column tests ---
+
+    #[test]
+    fn desired_col_preserved_across_shorter_intermediate_line_down() {
+        // Given "abcdefghijkl\nxy\nmnopqrstuvwx" with cursor at col 10 on line 0.
+        let mut state = ChatInputBoxState::new();
+        for ch in "abcdefghijkl\nxy\nmnopqrstuvwx".chars() {
+            state.insert_grapheme_at_cursor(ch);
+        }
+        // cursor at end (27), row=2, col=12. Move to start, then right 10.
+        state.move_cursor_to_start();
+        for _ in 0..10 {
+            state.move_cursor_right();
+        }
+        assert_eq!(state.cursor_row_col(), (0, 10));
+
+        // When moving down twice.
+        state.move_cursor_down();
+        assert_eq!(state.cursor_row_col(), (1, 2)); // clamped to end of "xy"
+        state.move_cursor_down();
+
+        // Then cursor is at row 2, col 10.
+        assert_eq!(state.cursor_row_col(), (2, 10));
+    }
+
+    #[test]
+    fn desired_col_preserved_across_shorter_intermediate_line_up() {
+        // Given "abcdefghijkl\nxy\nmnopqrstuvwx" with cursor at col 10 on line 2.
+        let mut state = ChatInputBoxState::new();
+        for ch in "abcdefghijkl\nxy\nmnopqrstuvwx".chars() {
+            state.insert_grapheme_at_cursor(ch);
+        }
+        // cursor at end (27), row=2, col=12. Move left 2 → col=10.
+        state.move_cursor_left();
+        state.move_cursor_left();
+        assert_eq!(state.cursor_row_col(), (2, 10));
+
+        // When moving up twice.
+        state.move_cursor_up();
+        assert_eq!(state.cursor_row_col(), (1, 2)); // clamped to end of "xy"
+        state.move_cursor_up();
+
+        // Then cursor is at row 0, col 10.
+        assert_eq!(state.cursor_row_col(), (0, 10));
+    }
+
+    #[test]
+    fn desired_col_cleared_by_horizontal_move() {
+        // Given "abcd\nef\nghij" with cursor at col 3 on line 1.
+        let mut state = ChatInputBoxState::new();
+        for ch in "abcd\nef\nghij".chars() {
+            state.insert_grapheme_at_cursor(ch);
+        }
+        state.move_cursor_to_start();
+        state.move_cursor_right(); // col=1
+        state.move_cursor_right(); // col=2
+        state.move_cursor_right(); // col=3
+        assert_eq!(state.cursor_row_col(), (0, 3));
+
+        // When moving down (sets desired_col=3), then right (clears desired_col), then down.
+        state.move_cursor_down();
+        assert_eq!(state.cursor_row_col(), (1, 2)); // clamped
+        state.move_cursor_right(); // clears desired_col, col is now actual position
+        // Now on line 1, actual col is past end of "ef" (col=2). move_cursor_right is noop on end.
+        // Let's use a different setup for clarity.
+
+        // Better: start over with "hello\nab\nworld"
+        let mut state = ChatInputBoxState::new();
+        for ch in "hello\nab\nworld".chars() {
+            state.insert_grapheme_at_cursor(ch);
+        }
+        state.move_cursor_to_start();
+        for _ in 0..3 {
+            state.move_cursor_right();
+        }
+        assert_eq!(state.cursor_row_col(), (0, 3)); // at 'l'
+
+        state.move_cursor_down(); // desired_col = 3, clamped to col 2 on "ab"
+        assert_eq!(state.cursor_row_col(), (1, 2));
+
+        state.move_cursor_left(); // clears desired_col, actual col now 1
+        assert_eq!(state.cursor_row_col(), (1, 1));
+
+        state.move_cursor_down(); // desired_col is None → uses actual col 1
+        assert_eq!(state.cursor_row_col(), (2, 1)); // col 1 on "world" = 'o'
+    }
+
+    #[test]
+    fn desired_col_cleared_by_insert() {
+        // Given "abc\nxy\ndef" with cursor at col 2 on line 1.
+        let mut state = ChatInputBoxState::new();
+        for ch in "abc\nxy\ndef".chars() {
+            state.insert_grapheme_at_cursor(ch);
+        }
+        state.move_cursor_to_start();
+        state.move_cursor_right();
+        state.move_cursor_right();
+        assert_eq!(state.cursor_row_col(), (0, 2)); // at 'c'
+
+        state.move_cursor_down(); // desired_col = 2, clamped to col 2 on "xy" (end)
+        assert_eq!(state.cursor_row_col(), (1, 2));
+
+        // When inserting a char.
+        state.insert_grapheme_at_cursor('z'); // clears desired_col
+
+        // Then moving down uses actual col, not the old desired col.
+        state.move_cursor_down();
+        assert_eq!(state.cursor_row_col(), (2, 3)); // actual col is 3 after insert
+    }
+
+    #[test]
+    fn desired_col_cleared_by_delete() {
+        // Given "abcde\nxy\nfghij" with cursor at col 4 on line 0.
+        let mut state = ChatInputBoxState::new();
+        for ch in "abcde\nxy\nfghij".chars() {
+            state.insert_grapheme_at_cursor(ch);
+        }
+        state.move_cursor_to_start();
+        for _ in 0..4 {
+            state.move_cursor_right();
+        }
+        assert_eq!(state.cursor_row_col(), (0, 4));
+
+        state.move_cursor_down(); // desired_col = 4, clamped to col 2 on "xy"
+        assert_eq!(state.cursor_row_col(), (1, 2));
+
+        // When deleting before cursor.
+        state.delete_grapheme_before_cursor(); // clears desired_col, col now 1
+        assert_eq!(state.cursor_row_col(), (1, 1));
+
+        state.move_cursor_down(); // desired_col is None → uses actual col 1
+        assert_eq!(state.cursor_row_col(), (2, 1));
     }
 }
