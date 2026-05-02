@@ -1,5 +1,7 @@
 //! Actor host trait and service wrapper.
 
+use std::sync::Arc;
+
 use error_stack::Report;
 use nullslop_actor::SystemMessage;
 use nullslop_protocol::{ActorName, Command, Event};
@@ -39,7 +41,7 @@ pub trait ActorHost: Send + Sync + 'static {
 #[derive(Clone)]
 pub struct ActorHostService {
     /// The underlying actor host implementation.
-    svc: std::sync::Arc<dyn ActorHost>,
+    svc: Arc<dyn ActorHost>,
 }
 
 impl std::fmt::Debug for ActorHostService {
@@ -53,7 +55,7 @@ impl std::fmt::Debug for ActorHostService {
 impl ActorHostService {
     /// Creates a new actor host service wrapping the given host.
     #[must_use]
-    pub fn new(host: std::sync::Arc<dyn ActorHost>) -> Self {
+    pub fn new(host: Arc<dyn ActorHost>) -> Self {
         Self { svc: host }
     }
 
@@ -106,7 +108,7 @@ mod tests {
     #[test]
     fn actor_host_service_delegates_to_backend() {
         // Given a FakeActorHost wrapped in a service.
-        let host = std::sync::Arc::new(crate::fake::FakeActorHost::new());
+        let host = Arc::new(crate::fake::FakeActorHost::new());
         let service = ActorHostService::new(host);
 
         // When querying the backend name.

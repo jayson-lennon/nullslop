@@ -1,6 +1,7 @@
 //! The sending end of the message channel.
 
 use derive_more::Debug;
+use kanal::Sender;
 
 use super::Msg;
 
@@ -12,12 +13,12 @@ use super::Msg;
 pub struct MsgSender {
     /// The underlying kanal sender.
     #[debug(skip)]
-    inner: kanal::Sender<Msg>,
+    inner: Sender<Msg>,
 }
 
 impl MsgSender {
     /// Creates a new message sender wrapping the given channel sender.
-    pub(super) fn new(sender: kanal::Sender<Msg>) -> Self {
+    pub(super) fn new(sender: Sender<Msg>) -> Self {
         Self { inner: sender }
     }
 

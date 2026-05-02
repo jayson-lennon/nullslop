@@ -15,6 +15,7 @@
 //! ```
 
 use std::cell::RefCell;
+use std::marker::PhantomData;
 use std::rc::Rc;
 
 use nullslop_protocol::CommandAction;
@@ -32,7 +33,7 @@ pub struct FakeCommandHandler<C, S> {
     /// The action to return from each handle call.
     action: CommandAction,
     /// Marker for the unused state type parameter.
-    _phantom: std::marker::PhantomData<S>,
+    _phantom: PhantomData<S>,
 }
 
 impl<C: Clone + 'static, S> FakeCommandHandler<C, S> {
@@ -45,7 +46,7 @@ impl<C: Clone + 'static, S> FakeCommandHandler<C, S> {
         let handler = Self {
             calls: Rc::clone(&calls),
             action,
-            _phantom: std::marker::PhantomData,
+            _phantom: PhantomData,
         };
         (handler, calls)
     }
@@ -73,7 +74,7 @@ pub struct FakeEventHandler<E, S> {
     /// Recorded event invocations.
     calls: Rc<RefCell<Vec<E>>>,
     /// Marker for the unused state type parameter.
-    _phantom: std::marker::PhantomData<S>,
+    _phantom: PhantomData<S>,
 }
 
 impl<E: Clone + 'static, S> FakeEventHandler<E, S> {
@@ -85,7 +86,7 @@ impl<E: Clone + 'static, S> FakeEventHandler<E, S> {
         let calls = Rc::new(RefCell::new(Vec::new()));
         let handler = Self {
             calls: Rc::clone(&calls),
-            _phantom: std::marker::PhantomData,
+            _phantom: PhantomData,
         };
         (handler, calls)
     }

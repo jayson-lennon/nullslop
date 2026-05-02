@@ -5,6 +5,8 @@
 //! [`AppState`] — handlers mutate state during processing, elements
 //! read state during rendering.
 
+use ratatui::{Frame, layout::Rect};
+
 /// A renderable UI element that draws within an allocated area.
 ///
 /// Elements get full frame access and an allocated area, allowing both
@@ -33,5 +35,5 @@ pub trait UiElement<S>: 'static + std::fmt::Debug {
     /// * `frame` - Full ratatui frame (elements may draw outside `area` if needed).
     /// * `area` - The allocated region where this element should draw.
     /// * `state` - Read-only application state for rendering decisions.
-    fn render(&mut self, frame: &mut ratatui::Frame<'_>, area: ratatui::layout::Rect, state: &S);
+    fn render(&mut self, frame: &mut Frame<'_>, area: Rect, state: &S);
 }

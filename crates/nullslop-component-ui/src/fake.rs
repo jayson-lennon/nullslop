@@ -15,12 +15,15 @@
 //! ```
 
 use std::cell::RefCell;
+use std::marker::PhantomData;
 use std::rc::Rc;
+
+use ratatui::{Frame, layout::Rect};
 
 use crate::element::UiElement;
 
 /// Recorded render call data: the allocated area and a snapshot of the input buffer.
-pub type RenderCall = (ratatui::layout::Rect, String);
+pub type RenderCall = (Rect, String);
 
 /// Fake UI element that records render calls.
 ///
@@ -36,7 +39,7 @@ pub struct FakeUiElement<S> {
     /// Recorded render invocations.
     render_calls: Rc<RefCell<Vec<RenderCall>>>,
     /// Marker for the unused state type parameter.
-    _phantom: std::marker::PhantomData<S>,
+    _phantom: PhantomData<S>,
 }
 
 impl<S> FakeUiElement<S> {
@@ -50,7 +53,7 @@ impl<S> FakeUiElement<S> {
         let element = Self {
             name: name.to_owned(),
             render_calls: Rc::clone(&render_calls),
-            _phantom: std::marker::PhantomData,
+            _phantom: PhantomData,
         };
         (element, render_calls)
     }
@@ -61,14 +64,15 @@ impl<S: std::fmt::Debug + 'static> UiElement<S> for FakeUiElement<S> {
         self.name.clone()
     }
 
-    fn render(&mut self, _frame: &mut ratatui::Frame<'_>, area: ratatui::layout::Rect, _state: &S) {
+    fn render(&mut self, _frame: &mut Frame<'_>, area: Rect, _state: &S) {
         self.render_calls.borrow_mut().push((area, String::new()));
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use ratatui::layout::Rect;
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
 
     use super::*;
 
@@ -77,8 +81,8 @@ mod tests {
     /// Uses `Terminal::draw()` to obtain a frame, which is the standard
     /// way to create a `Frame` in ratatui 0.30+.
     fn render_element(element: &mut dyn crate::UiElement<()>, area: Rect, state: ()) {
-        let backend = ratatui::backend::TestBackend::new(80, 24);
-        let mut terminal = ratatui::Terminal::new(backend).expect("test backend should init");
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).expect("test backend should init");
         terminal
             .draw(|frame| {
                 element.render(frame, area, &state);

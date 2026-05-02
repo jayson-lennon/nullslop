@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use parking_lot::RwLock;
+use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use nullslop_component::AppState;
 
@@ -21,13 +21,13 @@ pub struct State {
 /// Read guard for application data.
 pub struct StateReadGuard<'a> {
     /// The underlying read lock guard.
-    inner: parking_lot::RwLockReadGuard<'a, AppState>,
+    inner: RwLockReadGuard<'a, AppState>,
 }
 
 /// Write guard for application data.
 pub struct StateWriteGuard<'a> {
     /// The underlying write lock guard.
-    inner: parking_lot::RwLockWriteGuard<'a, AppState>,
+    inner: RwLockWriteGuard<'a, AppState>,
 }
 
 impl State {

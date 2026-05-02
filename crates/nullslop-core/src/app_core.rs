@@ -7,6 +7,7 @@
 
 use std::time::{Duration, Instant};
 
+use kanal::{Receiver, Sender};
 use nullslop_actor::SystemMessage;
 use nullslop_actor_host::ActorHostService;
 use nullslop_component::AppState;
@@ -39,9 +40,9 @@ pub struct AppCore {
     /// Shared application state.
     pub state: State,
     /// Sender half of the internal message channel.
-    pub sender: kanal::Sender<AppMsg>,
+    pub sender: Sender<AppMsg>,
     /// Receiver half of the internal message channel.
-    pub receiver: kanal::Receiver<AppMsg>,
+    pub receiver: Receiver<AppMsg>,
     /// Optional actor host for forwarding processed messages.
     pub actor_host: Option<ActorHostService>,
 }
@@ -75,7 +76,7 @@ impl AppCore {
 
     /// Returns a sender for submitting messages to the core.
     #[must_use]
-    pub fn sender(&self) -> kanal::Sender<AppMsg> {
+    pub fn sender(&self) -> Sender<AppMsg> {
         self.sender.clone()
     }
 

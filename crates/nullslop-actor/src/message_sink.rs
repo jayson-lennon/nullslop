@@ -5,6 +5,8 @@
 //! the implementation (e.g. one that submits `AppMsg` to `AppCore`'s channel).
 
 use nullslop_protocol::{Command, Event};
+#[cfg(test)]
+use parking_lot::Mutex;
 
 use crate::error::SendResult;
 
@@ -34,8 +36,8 @@ pub trait MessageSink: Send + Sync + 'static {
 /// Visible within the crate for use in other modules' tests.
 #[cfg(test)]
 pub(crate) struct TestSink {
-    commands: parking_lot::Mutex<Vec<Command>>,
-    events: parking_lot::Mutex<Vec<Event>>,
+    commands: Mutex<Vec<Command>>,
+    events: Mutex<Vec<Event>>,
 }
 
 #[cfg(test)]
@@ -43,8 +45,8 @@ impl TestSink {
     /// Creates a new empty test sink.
     pub(crate) fn new() -> Self {
         Self {
-            commands: parking_lot::Mutex::new(Vec::new()),
-            events: parking_lot::Mutex::new(Vec::new()),
+            commands: Mutex::new(Vec::new()),
+            events: Mutex::new(Vec::new()),
         }
     }
 

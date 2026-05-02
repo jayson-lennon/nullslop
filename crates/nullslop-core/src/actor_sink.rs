@@ -1,5 +1,6 @@
 //! Bridge from actor output to the `AppCore` message channel.
 
+use kanal::Sender;
 use nullslop_actor::{MessageSink, error::SendResult};
 use nullslop_protocol::{Command, Event};
 
@@ -11,13 +12,13 @@ use crate::AppMsg;
 /// in [`AppMsg`] and sending them through the core's message channel.
 pub struct ActorMessageSink {
     /// Channel sender for forwarding messages to [`AppCore`].
-    sender: kanal::Sender<AppMsg>,
+    sender: Sender<AppMsg>,
 }
 
 impl ActorMessageSink {
     /// Creates a new sink wrapping the given channel sender.
     #[must_use]
-    pub fn new(sender: kanal::Sender<AppMsg>) -> Self {
+    pub fn new(sender: Sender<AppMsg>) -> Self {
         Self { sender }
     }
 }

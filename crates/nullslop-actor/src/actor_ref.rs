@@ -7,6 +7,7 @@
 
 use std::sync::Arc;
 
+use kanal::Sender;
 use parking_lot::RwLock;
 
 use crate::envelope::ActorEnvelope;
@@ -19,7 +20,7 @@ use crate::error::from_kanal_send;
 /// All holders of the same [`ActorRef`] share this cell via [`Arc`].
 struct ActorCell<M> {
     /// The underlying channel sender, wrapped for restart swaps.
-    sender: RwLock<kanal::Sender<ActorEnvelope<M>>>,
+    sender: RwLock<Sender<ActorEnvelope<M>>>,
 }
 
 /// A typed, cloneable handle for sending messages to an actor.
@@ -37,7 +38,7 @@ pub struct ActorRef<M: Send + 'static> {
 impl<M: Send + 'static> ActorRef<M> {
     /// Creates a new `ActorRef` wrapping the given sender.
     #[must_use]
-    pub fn new(sender: kanal::Sender<ActorEnvelope<M>>) -> Self {
+    pub fn new(sender: Sender<ActorEnvelope<M>>) -> Self {
         Self {
             cell: Arc::new(ActorCell {
                 sender: RwLock::new(sender),
@@ -110,8 +111,8 @@ impl<M: Send + 'static> ActorRef<M> {
     /// without breaking existing peer references.
     pub fn swap_sender(
         &self,
-        new_sender: kanal::Sender<ActorEnvelope<M>>,
-    ) -> kanal::Sender<ActorEnvelope<M>> {
+        new_sender: Sender<ActorEnvelope<M>>,
+    ) -> Sender<ActorEnvelope<M>> {
         let mut guard = self.cell.sender.write();
         std::mem::replace(&mut *guard, new_sender)
     }
@@ -148,6 +149,7 @@ impl<M: Send + 'static> std::fmt::Debug for ActorRef<M> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use kanal::Receiver;
     use nullslop_protocol::{Command, Event};
 
     #[test]

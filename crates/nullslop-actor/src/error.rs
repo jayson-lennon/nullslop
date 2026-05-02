@@ -4,6 +4,8 @@
 //! with domain-specific error types defined here, keeping internal channel
 //! details from leaking through the public API.
 
+use kanal::SendError;
+use error_stack::Report;
 use wherror::Error;
 
 /// Error returned when a message cannot be delivered to an actor.
@@ -15,17 +17,17 @@ use wherror::Error;
 pub struct ActorSendError;
 
 /// Result alias for actor send operations.
-pub type SendResult = Result<(), error_stack::Report<ActorSendError>>;
+pub type SendResult = Result<(), Report<ActorSendError>>;
 
 /// Converts a kanal send failure into a [`SendResult`].
 ///
 /// Attaches a human-readable message to the report for diagnostics.
 pub(crate) fn from_kanal_send(
-    result: Result<(), kanal::SendError>,
+    result: Result<(), SendError>,
     context: &'static str,
 ) -> SendResult {
     result.map_err(|err| {
-        error_stack::Report::new(ActorSendError)
+        Report::new(ActorSendError)
             .attach(context)
             .attach(err.to_string())
     })

@@ -9,6 +9,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use error_stack::Report;
+use kanal::Receiver;
 use nullslop_actor::{Actor, ActorContext, ActorEnvelope, ActorRef, SystemMessage};
 use nullslop_protocol::{ActorName, Command, CommandName, Event, EventTypeName};
 use parking_lot::Mutex;
@@ -50,7 +51,7 @@ pub fn spawn_actor<M, A>(
     name: &str,
     actor: A,
     actor_ref: &ActorRef<M>,
-    receiver: kanal::Receiver<ActorEnvelope<M>>,
+    receiver: Receiver<ActorEnvelope<M>>,
     mut ctx: ActorContext,
     handle: &tokio::runtime::Handle,
 ) -> ActorSpawnResult
@@ -291,15 +292,15 @@ mod tests {
 
     /// A test message sink that records commands and events.
     struct TestSink {
-        commands: parking_lot::Mutex<Vec<Command>>,
-        events: parking_lot::Mutex<Vec<Event>>,
+        commands: Mutex<Vec<Command>>,
+        events: Mutex<Vec<Event>>,
     }
 
     impl TestSink {
         fn new() -> Self {
             Self {
-                commands: parking_lot::Mutex::new(Vec::new()),
-                events: parking_lot::Mutex::new(Vec::new()),
+                commands: Mutex::new(Vec::new()),
+                events: Mutex::new(Vec::new()),
             }
         }
     }
@@ -332,12 +333,12 @@ mod tests {
 
     /// Actor that records received messages.
     struct RecordingActor {
-        received: Arc<parking_lot::Mutex<Vec<String>>>,
+        received: Arc<Mutex<Vec<String>>>,
     }
 
     impl RecordingActor {
         fn new() -> (Self, Arc<parking_lot::Mutex<Vec<String>>>) {
-            let received = Arc::new(parking_lot::Mutex::new(Vec::new()));
+            let received = Arc::new(Mutex::new(Vec::new()));
             let clone = received.clone();
             (Self { received }, clone)
         }

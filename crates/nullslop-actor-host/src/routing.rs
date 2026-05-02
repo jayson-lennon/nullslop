@@ -31,9 +31,10 @@ pub struct RoutingEntry {
 
 #[cfg(test)]
 mod tests {
+    use kanal::Receiver;
     use nullslop_actor::{ActorEnvelope, ActorRef};
 
-    fn make_actor_ref_and_rx() -> (ActorRef<String>, kanal::Receiver<ActorEnvelope<String>>) {
+    fn make_actor_ref_and_rx() -> (ActorRef<String>, Receiver<ActorEnvelope<String>>) {
         let (tx, rx) = kanal::unbounded::<ActorEnvelope<String>>();
         (ActorRef::new(tx), rx)
     }
