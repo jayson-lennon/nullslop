@@ -4,7 +4,7 @@
 //! is idle, the message is dispatched immediately to the LLM. If the session
 //! is busy (sending or streaming), the message is enqueued for later dispatch.
 //!
-//! On normal stream completion, the next queued message is dispatched automatically.
+//! On normal stream completion, all queued messages are dispatched at once in a single LLM call.
 //! On cancel, the queue is drained and all messages are concatenated back into
 //! the input box so the user doesn't lose their text.
 
@@ -92,30 +92,38 @@ impl MessageQueueHandler {
         CommandAction::Continue
     }
 
-    /// Handles stream completion, dispatching the next queued message if available.
+    /// Handles stream completion, dispatching all queued messages at once if any.
     fn on_stream_completed(evt: &StreamCompleted, state: &mut AppState, out: &mut Out) {
         let session = state.session_mut(&evt.session_id);
         // finish_streaming clears both is_streaming and is_sending.
         session.finish_streaming();
 
-        // Only dispatch next on normal completion.
+        // Only dispatch on normal completion.
         // On cancel, the queue was already drained by on_cancel_stream.
-        if evt.reason == StreamCompletedReason::Finished
-            && let Some(text) = session.dequeue_message()
-        {
-            let entry = npr::ChatEntry::user(&text);
-            session.push_entry(entry);
-            let history = session.history();
-            let messages = entries_to_messages(history);
-            session.begin_sending();
-
-            out.submit_command(npr::Command::SendToLlmProvider {
-                payload: SendToLlmProvider {
-                    session_id: evt.session_id.clone(),
-                    messages,
-                },
-            });
+        if evt.reason != StreamCompletedReason::Finished {
+            return;
         }
+
+        let drained: Vec<String> = session.drain_queue().into_iter().collect();
+        if drained.is_empty() {
+            return;
+        }
+
+        // Push all queued messages as individual user entries.
+        for text in &drained {
+            session.push_entry(npr::ChatEntry::user(text));
+        }
+
+        let history = session.history();
+        let messages = entries_to_messages(history);
+        session.begin_sending();
+
+        out.submit_command(npr::Command::SendToLlmProvider {
+            payload: SendToLlmProvider {
+                session_id: evt.session_id.clone(),
+                messages,
+            },
+        });
     }
 }
 
@@ -300,6 +308,85 @@ mod tests {
             }
             _ => panic!("expected SetChatInputText"),
         }
+    }
+
+    #[test]
+    fn stream_completed_dispatches_all_queued_messages_at_once() {
+        // Given a bus with MessageQueueHandler registered, a busy session with 3 queued messages.
+        let mut bus: Bus<AppState> = Bus::new();
+        MessageQueueHandler.register(&mut bus);
+
+        let mut state = AppState::new();
+        let sid = session_id(&state);
+        state.session_mut(&sid).begin_sending();
+        state.session_mut(&sid).enqueue_message("msg 1".to_owned());
+        state.session_mut(&sid).enqueue_message("msg 2".to_owned());
+        state.session_mut(&sid).enqueue_message("msg 3".to_owned());
+
+        // When processing StreamCompleted(Finished).
+        bus.submit_event(Event::StreamCompleted {
+            payload: StreamCompleted {
+                session_id: sid.clone(),
+                reason: StreamCompletedReason::Finished,
+            },
+        });
+        bus.process_events(&mut state);
+        bus.process_commands(&mut state);
+
+        // Then all 3 messages are in history as individual User entries.
+        assert_eq!(state.session(&sid).history().len(), 3);
+        assert_eq!(
+            state.session(&sid).history()[0].kind,
+            npr::ChatEntryKind::User("msg 1".to_owned())
+        );
+        assert_eq!(
+            state.session(&sid).history()[1].kind,
+            npr::ChatEntryKind::User("msg 2".to_owned())
+        );
+        assert_eq!(
+            state.session(&sid).history()[2].kind,
+            npr::ChatEntryKind::User("msg 3".to_owned())
+        );
+
+        // And the queue is empty.
+        assert_eq!(state.session(&sid).queue_len(), 0);
+
+        // And is_sending is true (a single LLM call was dispatched).
+        assert!(state.session(&sid).is_sending());
+
+        // And exactly one SendToLlmProvider command was submitted.
+        let commands = bus.drain_processed_commands();
+        let send_count = commands
+            .iter()
+            .filter(|c| matches!(c.command, Command::SendToLlmProvider { .. }))
+            .count();
+        assert_eq!(send_count, 1, "expected exactly one SendToLlmProvider command");
+    }
+
+    #[test]
+    fn stream_completed_with_empty_queue_does_not_dispatch() {
+        // Given a bus with MessageQueueHandler registered, a busy session with no queued messages.
+        let mut bus: Bus<AppState> = Bus::new();
+        MessageQueueHandler.register(&mut bus);
+
+        let mut state = AppState::new();
+        let sid = session_id(&state);
+        state.session_mut(&sid).begin_sending();
+
+        // When processing StreamCompleted(Finished) with empty queue.
+        bus.submit_event(Event::StreamCompleted {
+            payload: StreamCompleted {
+                session_id: sid.clone(),
+                reason: StreamCompletedReason::Finished,
+            },
+        });
+        bus.process_events(&mut state);
+        bus.process_commands(&mut state);
+
+        // Then no dispatch happened: no history, no pending commands, session is idle.
+        assert_eq!(state.session(&sid).history().len(), 0);
+        assert!(state.session(&sid).is_idle());
+        assert!(!bus.has_pending());
     }
 
     #[test]
