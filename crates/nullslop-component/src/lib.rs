@@ -78,7 +78,7 @@ pub fn register_tui_elements(registry: &mut AppUiRegistry) {
     registry.register(Box::new(chat_log::ChatLogElement));
     registry.register(Box::new(char_counter::CharCounterElement));
     registry.register(Box::new(dashboard::DashboardElement));
-    registry.register(Box::new(provider::indicator::StreamingIndicatorElement));
+    registry.register(Box::new(provider::indicator::StreamingIndicatorElement::new()));
     registry.register(Box::new(provider::queue_element::QueueDisplayElement));
 }
 

@@ -21,6 +21,6 @@ pub(crate) fn register(bus: &mut Bus<AppState>, registry: &mut UiRegistry<AppSta
     handler::ProviderHandler.register(bus);
     request_handler::MessageQueueHandler.register(bus);
     switch_handler::SwitchHandler.register(bus);
-    registry.register(Box::new(indicator::StreamingIndicatorElement));
+    registry.register(Box::new(indicator::StreamingIndicatorElement::new()));
     registry.register(Box::new(queue_element::QueueDisplayElement));
 }

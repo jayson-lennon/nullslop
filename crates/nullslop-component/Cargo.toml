@@ -10,6 +10,7 @@ nullslop-component-ui = { workspace = true }
 nullslop-services = { workspace = true }
 nullslop-providers = { workspace = true }
 ratatui = { workspace = true }
+throbber-widgets-tui = { workspace = true }
 tracing = { workspace = true }
 unicode-segmentation = { workspace = true }
 
