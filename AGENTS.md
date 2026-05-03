@@ -2,10 +2,11 @@
 
 This document defines the _coding conventions_ and _patterns_ for the `nullslop` codebase. Always load the [ARCHITECTURE.md](./ARCHITECTURE.md) document for more detailed information that will help guide change requests and code reviews.
 
-IMPORTANT NOTE:
+IMPORTANT NOTES:
 
 - Long-running async tasks are handled by actors. See ARCHITECTURE.md for more details.
 - Sync component handlers are mostly for UI concerns with some decision making.
+- Business logic should primarily be handled by _sending a COMMAND_. This allows both sync & async workflows to occur from any point in the application.
 
 ## 1. Overview
 
