@@ -34,3 +34,13 @@ pub struct ProviderSwitched {
     /// The display name of the new provider.
     pub provider_name: String,
 }
+
+/// Models refresh completed with results and errors.
+#[derive(Debug, Clone, Serialize, Deserialize, EventMsg)]
+#[event_msg("provider")]
+pub struct ModelsRefreshed {
+    /// Provider name to list of discovered models.
+    pub results: std::collections::HashMap<String, Vec<String>>,
+    /// Provider name to error message for providers that failed.
+    pub errors: std::collections::HashMap<String, String>,
+}

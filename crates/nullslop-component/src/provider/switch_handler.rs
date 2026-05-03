@@ -40,41 +40,47 @@ impl SwitchHandler {
             let registry = services.provider_registry().read();
             let api_keys = services.api_keys().read();
 
-            // Validate: provider must exist.
-            let Some(entry) = registry.get(&id) else {
-                if let Some(session) = state.sessions.get_mut(&state.active_session) {
-                    session.push_entry(npr::ChatEntry::system(format!(
-                        "Unknown provider: {}",
-                        cmd.provider_id
-                    )));
+            // Try static registry first.
+            if let Some(entry) = registry.get(&id) {
+                if !registry.is_available(&id, &api_keys) {
+                    if let Some(session) = state.sessions.get_mut(&state.active_session) {
+                        session.push_entry(npr::ChatEntry::system(format!(
+                            "Provider '{}' is unavailable (API key not set).",
+                            entry.name
+                        )));
+                    }
+                    return CommandAction::Continue;
                 }
-                return CommandAction::Continue;
-            };
 
-            if !registry.is_available(&id, &api_keys) {
-                if let Some(session) = state.sessions.get_mut(&state.active_session) {
-                    session.push_entry(npr::ChatEntry::system(format!(
-                        "Provider '{}' is unavailable (API key not set).",
-                        entry.name
-                    )));
+                let Ok(new_factory) = registry.create_factory(&id, &api_keys) else {
+                    if let Some(session) = state.sessions.get_mut(&state.active_session) {
+                        session.push_entry(npr::ChatEntry::system(format!(
+                            "Failed to create factory for provider '{}'.",
+                            entry.name
+                        )));
+                    }
+                    return CommandAction::Continue;
+                };
+
+                // Swap the factory while still in scope.
+                services.llm_service().swap(Arc::from(new_factory));
+
+                entry.name.clone()
+            } else {
+                // Not in static registry — try as a remote model.
+                match Self::create_remote_factory(&cmd.provider_id, &registry, &api_keys) {
+                    Ok((factory, name)) => {
+                        services.llm_service().swap(Arc::from(factory));
+                        name
+                    }
+                    Err(msg) => {
+                        if let Some(session) = state.sessions.get_mut(&state.active_session) {
+                            session.push_entry(npr::ChatEntry::system(msg));
+                        }
+                        return CommandAction::Continue;
+                    }
                 }
-                return CommandAction::Continue;
             }
-
-            let Ok(new_factory) = registry.create_factory(&id, &api_keys) else {
-                if let Some(session) = state.sessions.get_mut(&state.active_session) {
-                    session.push_entry(npr::ChatEntry::system(format!(
-                        "Failed to create factory for provider '{}'.",
-                        entry.name
-                    )));
-                }
-                return CommandAction::Continue;
-            };
-
-            // Swap the factory while still in scope (read guards are compatible).
-            services.llm_service().swap(Arc::from(new_factory));
-
-            entry.name.clone()
         };
         // Read guards dropped here.
 
@@ -96,6 +102,48 @@ impl SwitchHandler {
         });
 
         CommandAction::Continue
+    }
+
+    /// Attempts to create a factory for a remote (cache-discovered) model.
+    ///
+    /// Parses the `provider_id` as `{provider_name}/{model}`, finds the `ProviderEntry`
+    /// in the registry config, and creates a `GenericLlmServiceFactory` dynamically.
+    fn create_remote_factory(
+        provider_id: &str,
+        registry: &nullslop_providers::ProviderRegistry,
+        api_keys: &nullslop_providers::ApiKeys,
+    ) -> Result<(Box<dyn nullslop_providers::LlmServiceFactory>, String), String> {
+        // Parse provider_name and model from the ID.
+        // The model may itself contain slashes (e.g., "anthropic/claude-sonnet-4").
+        let (provider_name, model) = provider_id
+            .split_once('/')
+            .ok_or_else(|| format!("Unknown provider: {provider_id}"))?;
+        let provider_name_owned = provider_name.to_owned();
+
+        // Find the ProviderEntry by name and check availability.
+        let entry = registry
+            .config()
+            .providers
+            .iter()
+            .find(|p| p.name == provider_name)
+            .ok_or_else(|| format!("Unknown provider: {provider_id}"))?;
+
+        if entry.requires_key {
+            let Some(ref env_var) = entry.api_key_env else {
+                return Err(format!("Provider '{provider_name}' is unavailable (no key env configured)."));
+            };
+            if !api_keys.is_set(env_var) {
+                return Err(format!(
+                    "Provider '{provider_name}' is unavailable (API key not set)."
+                ));
+            }
+        }
+
+        let factory = registry
+            .create_factory_for_model(provider_name, model, api_keys)
+            .map_err(|e| format!("Failed to create factory for remote model '{provider_id}': {e:?}"))?;
+
+        Ok((factory, provider_name_owned))
     }
 }
 
@@ -293,5 +341,47 @@ mod tests {
             ),
             "expected system entry"
         );
+    }
+
+    #[test]
+    fn provider_switch_handles_remote_model_not_in_static_registry() {
+        // Given a bus with SwitchHandler registered and a keyless provider (ollama).
+        let mut bus: Bus<AppState> = Bus::new();
+        SwitchHandler.register(&mut bus);
+
+        let mut state = state_with_registry();
+
+        // When switching to a remote model "ollama/mistral" that is NOT in the static registry
+        // (only ollama/llama3 is in the static config).
+        bus.submit_command(npr::Command::ProviderSwitch {
+            payload: ProviderSwitch {
+                provider_id: "ollama/mistral".to_owned(),
+            },
+        });
+        bus.process_commands(&mut state);
+
+        // Then the switch succeeds — the factory is created dynamically from the provider config.
+        assert_eq!(state.active_provider, "ollama/mistral");
+    }
+
+    #[test]
+    fn provider_switch_rejects_unknown_remote_provider() {
+        // Given a bus with SwitchHandler registered.
+        let mut bus: Bus<AppState> = Bus::new();
+        SwitchHandler.register(&mut bus);
+
+        let mut state = state_with_registry();
+
+        // When switching to a model under a provider that doesn't exist in config.
+        bus.submit_command(npr::Command::ProviderSwitch {
+            payload: ProviderSwitch {
+                provider_id: "nonexistent/some-model".to_owned(),
+            },
+        });
+        bus.process_commands(&mut state);
+
+        // Then the switch fails with a system error.
+        assert_eq!(state.active_provider, nullslop_providers::NO_PROVIDER_ID);
+        assert_eq!(state.active_session().history().len(), 1);
     }
 }

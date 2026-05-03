@@ -79,7 +79,6 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
             });
         });
 
-    // Picker scope: filter input and provider selection
     keymap
         .scope(Scope::Picker, |b| {
             b.bind("<esc>", Command::SetMode { payload: SetMode { mode: Mode::Normal } }, KeyCategory::General)
@@ -89,6 +88,7 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
             .bind("<left>", Command::PickerMoveCursorLeft, KeyCategory::Input)
             .bind("<right>", Command::PickerMoveCursorRight, KeyCategory::Input)
             .bind("<backspace>", Command::PickerBackspace, KeyCategory::Input)
+            .bind("<c-r>", Command::RefreshModels, KeyCategory::General)
             .catch_all(|key: KeyEvent| {
                 if let Key::Char(c) = key.key {
                     Some(Command::PickerInsertChar {

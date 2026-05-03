@@ -60,6 +60,8 @@ impl RefreshHandler {
             }
         }
 
+        state.last_refreshed_at = Some(std::time::Instant::now());
+
         let msg = format_refresh_summary(&evt.results, &evt.errors);
         state.active_session_mut().push_entry(npr::ChatEntry::system(msg));
     }
@@ -74,12 +76,15 @@ fn format_refresh_summary(
         return "No models discovered.".to_owned();
     }
 
-    let total_models: usize = results.values().map(|v| v.len()).sum();
+    let total_models: usize = results.values().map(std::vec::Vec::len).sum();
     let mut msg = format!("Models refreshed: {} providers, {} models", results.len(), total_models);
 
     if !errors.is_empty() {
         let error_providers: Vec<&str> = errors.keys().map(String::as_str).collect();
-        msg.push_str(&format!(" (errors: {})", error_providers.join(", ")));
+        let _ = std::fmt::write(
+            &mut msg,
+            format_args!(" (errors: {})", error_providers.join(", ")),
+        );
     }
 
     msg

@@ -14,6 +14,7 @@ derive_more = { workspace = true }
 async-trait = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 toml = { workspace = true }
 dirs = { workspace = true }
 parking_lot = { workspace = true }

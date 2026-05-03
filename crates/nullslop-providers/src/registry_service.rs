@@ -112,6 +112,22 @@ impl ProviderRegistryService {
         self.read().create_factory(id, api_keys)
     }
 
+    /// Creates an `LlmServiceFactory` for a remote (cache-discovered) model.
+    ///
+    /// Delegates to [`ProviderRegistry::create_factory_for_model`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the provider is not found or the factory cannot be built.
+    pub fn create_factory_for_model(
+        &self,
+        provider_name: &str,
+        model: &str,
+        api_keys: &ApiKeys,
+    ) -> Result<Box<dyn LlmServiceFactory>, Report<LlmServiceError>> {
+        self.read().create_factory_for_model(provider_name, model, api_keys)
+    }
+
     /// Updates the default provider in the config.
     pub fn set_default_provider(&self, name: Option<String>) {
         self.inner.write().set_default_provider(name);

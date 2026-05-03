@@ -64,6 +64,11 @@ pub struct SendToLlmProvider {
     pub provider_id: Option<String>,
 }
 
+/// Refresh the model list from all providers.
+#[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
+#[cmd("provider")]
+pub struct RefreshModels;
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,0 +1,21 @@
+[package]
+name = "nullslop-llm-discover"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+nullslop-actor = { workspace = true }
+nullslop-protocol = { workspace = true }
+nullslop-services = { workspace = true }
+nullslop-providers = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+llm = { workspace = true }
+wherror = { workspace = true }
+error-stack = { workspace = true }
+
+[lints]
+workspace = true

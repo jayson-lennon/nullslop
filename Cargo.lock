@@ -1442,6 +1442,7 @@ dependencies = [
  "nullslop-core",
  "nullslop-echo",
  "nullslop-llm",
+ "nullslop-llm-discover",
  "nullslop-protocol",
  "nullslop-providers",
  "nullslop-services",
@@ -1577,6 +1578,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "nullslop-llm-discover"
+version = "0.1.0"
+dependencies = [
+ "error-stack",
+ "llm",
+ "nullslop-actor",
+ "nullslop-protocol",
+ "nullslop-providers",
+ "nullslop-services",
+ "tokio",
+ "tracing",
+ "wherror",
+]
+
+[[package]]
 name = "nullslop-protocol"
 version = "0.1.0"
 dependencies = [
@@ -1613,6 +1629,7 @@ dependencies = [
  "parking_lot",
  "rand 0.9.4",
  "serde",
+ "serde_json",
  "tempfile",
  "tokio",
  "toml",

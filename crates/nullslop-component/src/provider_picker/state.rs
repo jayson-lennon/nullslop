@@ -15,9 +15,9 @@ pub struct ProviderPickerState {
     /// Index of the currently highlighted item in the filtered list.
     pub selection: usize,
     /// Cursor position as a grapheme-cluster index within `filter` (0 = before first grapheme).
-    cursor_pos: usize,
+    pub cursor_pos: usize,
     /// Index of the first visible result row (scroll window top).
-    scroll_offset: usize,
+    pub scroll_offset: usize,
 }
 
 impl ProviderPickerState {
@@ -37,6 +37,7 @@ impl ProviderPickerState {
         self.filter.insert(byte_offset, ch);
         self.cursor_pos += 1;
         self.selection = 0;
+        self.scroll_offset = 0;
     }
 
     /// Deletes the grapheme before the cursor, decrementing the cursor and resetting selection.
@@ -57,6 +58,7 @@ impl ProviderPickerState {
         self.filter.drain(start..end);
         self.cursor_pos -= 1;
         self.selection = 0;
+        self.scroll_offset = 0;
     }
 
     /// Moves the cursor one grapheme to the left.
@@ -95,6 +97,8 @@ impl ProviderPickerState {
             self.scroll_offset = self.selection;
         } else if max_visible > 0 && self.selection >= self.scroll_offset + max_visible {
             self.scroll_offset = self.selection - max_visible + 1;
+        } else {
+            // Selection is within the visible window — no adjustment needed.
         }
     }
 
@@ -144,15 +148,17 @@ mod tests {
 
     #[test]
     fn insert_char_resets_selection() {
-        // Given a picker state with selection at 3.
+        // Given a picker state with selection at 3 and scroll_offset at 2.
         let mut state = ProviderPickerState::new();
         state.selection = 3;
+        state.scroll_offset = 2;
 
         // When inserting a character.
         state.insert_char('x');
 
-        // Then selection is reset to 0.
+        // Then selection and scroll_offset are reset to 0.
         assert_eq!(state.selection, 0);
+        assert_eq!(state.scroll_offset, 0);
     }
 
     #[test]
@@ -201,17 +207,19 @@ mod tests {
 
     #[test]
     fn backspace_resets_selection() {
-        // Given a picker state with filter "ab", cursor at end (2), and selection at 3.
+        // Given a picker state with filter "ab", cursor at end (2), selection at 3, and scroll_offset at 2.
         let mut state = ProviderPickerState::new();
         state.filter = "ab".to_owned();
         state.cursor_pos = 2;
         state.selection = 3;
+        state.scroll_offset = 2;
 
         // When pressing backspace.
         state.backspace();
 
-        // Then selection is reset to 0.
+        // Then selection and scroll_offset are reset to 0.
         assert_eq!(state.selection, 0);
+        assert_eq!(state.scroll_offset, 0);
     }
 
     #[test]

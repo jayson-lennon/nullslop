@@ -161,24 +161,29 @@ fn render_which_key(frame: &mut Frame<'_>, state: &mut crate::app::WhichKeyInsta
 
 /// Horizontal padding as a fraction of terminal width (10% each side = 20% total).
 const PICKER_H_PAD_FRAC: f32 = 0.10;
-/// Default number of visible result rows.
-const PICKER_VISIBLE_ROWS: u16 = 8;
 /// Minimum popup width.
 const PICKER_MIN_WIDTH: u16 = 30;
+/// Maximum fraction of terminal height the picker popup may consume.
+const PICKER_MAX_HEIGHT_FRAC: f32 = 0.75;
 
 /// Computes the popup rectangle for the provider picker.
 ///
 /// Uses ~20% total horizontal padding (10% each side) and positions the popup
-/// in the top third of the terminal. Height is fixed regardless of result count.
+/// in the top third of the terminal. Height scales with terminal size.
 #[must_use]
 fn compute_popup_rect(area: Rect) -> Rect {
     let popup_width = ((f32::from(area.width) * (1.0 - 2.0 * PICKER_H_PAD_FRAC)).ceil() as u16)
         .max(PICKER_MIN_WIDTH)
         .min(area.width);
-    // border(2) + input(1) + separator(1) + visible rows
-    let popup_height = (PICKER_VISIBLE_ROWS + 4).min(area.height);
+    // Layout: border(2) + input(1) + separator(1) + results(N) + footer(1)
+    // Reserve at least 4 rows for the chrome, use up to 75% of terminal height.
+    let max_body_rows = (f32::from(area.height) * PICKER_MAX_HEIGHT_FRAC).floor() as u16;
+    let popup_height = (max_body_rows + 4).min(area.height);
 
+    // Integer division is intentional — we're computing cell positions for centering.
+    #[expect(clippy::integer_division, reason = "cell positions are integers")]
     let popup_x = area.width.saturating_sub(popup_width) / 2;
+    #[expect(clippy::integer_division, reason = "cell positions are integers")]
     let popup_y = area.height.saturating_sub(popup_height) / 3; // bias toward top third
 
     Rect::new(popup_x, popup_y, popup_width, popup_height)
@@ -187,7 +192,7 @@ fn compute_popup_rect(area: Rect) -> Rect {
 /// Renders the provider picker overlay.
 ///
 /// Telescope-style layout: bordered popup with filter input at top,
-/// horizontal separator, then fixed-height scrollable results area.
+/// horizontal separator, scrollable results, and a footer line.
 fn render_provider_picker(frame: &mut Frame<'_>, area: Rect, state: &nullslop_component::AppState) {
     use ratatui::widgets::{Block, Borders};
 
@@ -196,8 +201,9 @@ fn render_provider_picker(frame: &mut Frame<'_>, area: Rect, state: &nullslop_co
     let services = &state.services;
     let registry = services.provider_registry().read();
     let api_keys = services.api_keys().read();
+    let unsorted = filtered_entries(&registry, &api_keys, &state.picker.filter, state.model_cache.as_ref());
     let entries = sorted_entries(
-        filtered_entries(&registry, &api_keys, &state.picker.filter),
+        &unsorted,
         &state.picker.filter,
         &state.active_provider,
     );
@@ -209,15 +215,16 @@ fn render_provider_picker(frame: &mut Frame<'_>, area: Rect, state: &nullslop_co
         .title(" Provider ");
     frame.render_widget(block, popup_area);
 
-    // Layout: input line → separator → results.
+    // Layout: input line -> separator -> results -> footer.
     let inner = {
         let b = Block::default().borders(Borders::ALL);
         b.inner(popup_area)
     };
-    let [input_area, separator_area, results_area] = Layout::vertical([
+    let [input_area, separator_area, results_area, footer_area] = Layout::vertical([
         Constraint::Length(1),
         Constraint::Length(1),
         Constraint::Min(0),
+        Constraint::Length(1),
     ])
     .areas(inner);
 
@@ -234,10 +241,15 @@ fn render_provider_picker(frame: &mut Frame<'_>, area: Rect, state: &nullslop_co
     let sep_paragraph = Paragraph::new(separator).style(Style::default().fg(Color::DarkGray));
     frame.render_widget(sep_paragraph, separator_area);
 
-    // Results area — windowed display with scroll_offset.
+    // Results area \u2014 windowed display with scroll_offset.
     let max_visible = results_area.height as usize;
     let result_lines = build_result_lines(&entries, &state.picker, &state.active_provider, max_visible);
     frame.render_widget(Paragraph::new(result_lines), results_area);
+
+    // Footer: last updated timestamp + refresh hint.
+    let footer_text = format_footer(state.last_refreshed_at.as_ref(), footer_area.width as usize);
+    let footer_paragraph = Paragraph::new(footer_text).style(Style::default().fg(Color::DarkGray));
+    frame.render_widget(footer_paragraph, footer_area);
 }
 
 /// Builds the result lines for the picker, using scroll offset for windowed display.
@@ -276,6 +288,8 @@ fn build_result_lines<'a>(
                 "\u{2717} " // ✗
             } else if entry.is_alias {
                 "\u{2192} " // →
+            } else if entry.is_remote {
+                "* "
             } else {
                 "  "
             };
@@ -305,6 +319,40 @@ fn build_result_lines<'a>(
     }
 
     lines
+}
+
+/// Formats the footer text showing last updated time and refresh hint.
+fn format_footer(last_refreshed_at: Option<&std::time::Instant>, width: usize) -> String {
+    let timestamp = match last_refreshed_at {
+        Some(instant) => {
+            let elapsed = instant.elapsed();
+            format_relative_time(elapsed)
+        }
+        None => "never".to_owned(),
+    };
+    let footer = format!("Last updated: {timestamp}   CTRL+R to refresh");
+    // Truncate to fit width.
+    if footer.len() > width {
+        footer.chars().take(width).collect()
+    } else {
+        footer
+    }
+}
+
+/// Formats a duration as a human-readable relative time string.
+fn format_relative_time(duration: std::time::Duration) -> String {
+    let secs = duration.as_secs();
+    if secs < 60 {
+        format!("{secs}s ago")
+    } else if secs < 3600 {
+        #[expect(clippy::integer_division, reason = "intentional truncating division for minute display")]
+        let minutes = secs / 60;
+        format!("{minutes}m ago")
+    } else {
+        #[expect(clippy::integer_division, reason = "intentional truncating division for hour display")]
+        let hours = secs / 3600;
+        format!("{hours}h ago")
+    }
 }
 
 /// Renders a "terminal too small" message.
@@ -446,16 +494,21 @@ mod tests {
     }
 
     #[test]
-    fn render_provider_picker_fixed_height_regardless_of_results() {
-        // Given two states: one with many entries, one with few.
-        // When computing popup rect for the same terminal size.
-        // Then the popup height is the same.
-        let area = Rect::new(0, 0, 80, 24);
-        let popup = compute_popup_rect(area);
+    fn render_provider_picker_height_scales_with_terminal() {
+        // Given two terminal sizes.
+        let small_area = Rect::new(0, 0, 80, 24);
+        let large_area = Rect::new(0, 0, 80, 42);
 
-        // The height is always PICKER_VISIBLE_ROWS + 4 (border + input + separator).
-        let expected_height = PICKER_VISIBLE_ROWS + 4;
-        assert_eq!(popup.height, expected_height);
+        // When computing popup rects.
+        let small_popup = compute_popup_rect(small_area);
+        let large_popup = compute_popup_rect(large_area);
+
+        // Then the larger terminal gets a taller popup.
+        assert!(large_popup.height > small_popup.height);
+
+        // And the small terminal popup uses 75% of height + 4 rows of chrome.
+        // floor(24 * 0.75) = 18, min(18 + 4, 24) = 22.
+        assert_eq!(small_popup.height, 22);
     }
 
     #[test]

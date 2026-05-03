@@ -26,7 +26,7 @@ use crate::chat_input::{
     MoveCursorWordRight, PushChatEntry, SetChatInputText, SubmitMessage,
 };
 use crate::chat_input::{MoveCursorLeft, MoveCursorRight};
-use crate::provider::{CancelStream, ProviderSwitch, SendMessage, SendToLlmProvider, StreamToken};
+use crate::provider::{CancelStream, ProviderSwitch, RefreshModels, SendMessage, SendToLlmProvider, StreamToken};
 use crate::provider_picker::{
     PickerBackspace, PickerConfirm, PickerInsertChar, PickerMoveCursorLeft,
     PickerMoveCursorRight, PickerMoveDown, PickerMoveUp,
@@ -187,6 +187,9 @@ pub enum Command {
     /// Scroll the chat log down (toward newer messages).
     #[serde(rename = "scroll_down")]
     ScrollDown,
+    /// Refresh the model list from all providers.
+    #[serde(rename = "refresh_models")]
+    RefreshModels,
     /// Insert a character into the picker filter.
     #[serde(rename = "picker_insert_char")]
     PickerInsertChar {
@@ -252,6 +255,7 @@ impl Command {
             Self::SetChatInputText { .. } => Some(SetChatInputText::NAME),
             Self::ProceedWithShutdown { .. } => Some(ProceedWithShutdown::NAME),
             Self::ProviderSwitch { .. } => Some(ProviderSwitch::NAME),
+            Self::RefreshModels => Some(RefreshModels::NAME),
             Self::PickerInsertChar { .. } => Some(PickerInsertChar::NAME),
             Self::PickerBackspace => Some(PickerBackspace::NAME),
             Self::PickerConfirm => Some(PickerConfirm::NAME),
@@ -311,6 +315,7 @@ impl std::fmt::Display for Command {
             }
             Command::ScrollUp => write!(f, "scroll up"),
             Command::ScrollDown => write!(f, "scroll down"),
+            Command::RefreshModels => write!(f, "refresh models"),
             Command::PickerInsertChar { payload } => write!(f, "picker insert '{}'", payload.ch),
             Command::PickerBackspace => write!(f, "picker backspace"),
             Command::PickerConfirm => write!(f, "picker confirm"),
@@ -393,6 +398,7 @@ mod tests {
     #[case::picker_move_down(Command::PickerMoveDown)]
     #[case::picker_move_cursor_left(Command::PickerMoveCursorLeft)]
     #[case::picker_move_cursor_right(Command::PickerMoveCursorRight)]
+    #[case::refresh_models(Command::RefreshModels)]
     fn command_roundtrip_all_variants(#[case] cmd: Command) {
         // Given a command variant.
         let json = serde_json::to_string(&cmd).expect("serialize");

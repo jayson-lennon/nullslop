@@ -48,6 +48,12 @@ pub struct AppState {
 
     /// Provider picker state (filter text, selection index).
     pub picker: ProviderPickerState,
+
+    /// Last known model cache from discovery.
+    pub model_cache: Option<nullslop_providers::ModelCache>,
+
+    /// When the model list was last refreshed.
+    pub last_refreshed_at: Option<std::time::Instant>,
 }
 
 impl AppState {
@@ -68,6 +74,8 @@ impl AppState {
             services,
             active_provider: NO_PROVIDER_ID.to_owned(),
             picker: ProviderPickerState::new(),
+            model_cache: None,
+            last_refreshed_at: None,
         }
     }
 

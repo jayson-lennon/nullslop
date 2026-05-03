@@ -56,8 +56,9 @@ impl PickerHandler {
         let services = &state.services;
         let registry = services.provider_registry().read();
         let api_keys = services.api_keys().read();
+        let unsorted = filtered_entries(&registry, &api_keys, &state.picker.filter, state.model_cache.as_ref());
         let entries = sorted_entries(
-            filtered_entries(&registry, &api_keys, &state.picker.filter),
+            &unsorted,
             &state.picker.filter,
             &state.active_provider,
         );
@@ -123,14 +124,18 @@ impl PickerHandler {
     }
 }
 
-/// Maximum number of visible result rows in the picker popup.
-/// Must match the value used by the renderer.
-const PICKER_MAX_VISIBLE: usize = 8;
+/// Maximum number of visible result rows used for scroll clamping in the handler.
+/// The actual visible rows are determined dynamically by the renderer based on
+/// terminal height. This value is a generous upper bound so the handler's scroll
+/// offset tracking stays reasonable.
+const PICKER_MAX_VISIBLE: usize = 100;
+/// Returns the number of entries matching the current picker filter.
+/// Counts the number of picker entries matching the current filter.
 fn picker_entry_count(state: &AppState) -> usize {
     let services = &state.services;
     let registry = services.provider_registry().read();
     let api_keys = services.api_keys().read();
-    filtered_entries(&registry, &api_keys, &state.picker.filter).len()
+    filtered_entries(&registry, &api_keys, &state.picker.filter, state.model_cache.as_ref()).len()
 }
 
 #[cfg(test)]
