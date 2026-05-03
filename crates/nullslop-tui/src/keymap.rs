@@ -43,7 +43,7 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
             .bind("<c-u>", Command::ScrollUp, KeyCategory::General)
         .describe_group("g", "general")
             .describe_group("gm", "model")
-            .bind("gms", Command::SetMode { payload: SetMode { mode: Mode::Picker } }, KeyCategory::General)
+            .bind("gmp", Command::SetMode { payload: SetMode { mode: Mode::Picker } }, KeyCategory::General)
             .bind("gmr", Command::RefreshModels, KeyCategory::General)
             .bind("<c-d>", Command::ScrollDown, KeyCategory::General);
         })
@@ -136,11 +136,11 @@ mod tests {
     }
 
     #[test]
-    fn gms_produces_set_mode_picker() {
+    fn gmp_produces_set_mode_picker() {
         // Given the keymap.
         let keymap = init();
 
-        // When looking up 'g' then 'm' then 's'.
+        // When looking up 'g' then 'm' then 'p'.
         let g_key = KeyEvent {
             key: Key::Char('g'),
             modifiers: Modifiers::none(),
@@ -149,12 +149,12 @@ mod tests {
             key: Key::Char('m'),
             modifiers: Modifiers::none(),
         };
-        let s_key = KeyEvent {
-            key: Key::Char('s'),
+        let p_key = KeyEvent {
+            key: Key::Char('p'),
             modifiers: Modifiers::none(),
         };
 
-        let node = keymap.get_node_at_path(&[g_key, m_key, s_key]);
+        let node = keymap.get_node_at_path(&[g_key, m_key, p_key]);
 
         // Then it's a leaf with the SetMode Picker command.
         assert!(node.is_some());
@@ -167,7 +167,7 @@ mod tests {
                 "expected SetMode Picker, got {cmd:?}"
             );
         } else {
-            panic!("Expected leaf node for 'gms'");
+            panic!("Expected leaf node for 'gmp'");
         }
     }
 

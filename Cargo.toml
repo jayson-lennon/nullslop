@@ -81,6 +81,7 @@ parking_lot = "0.12"
 
 # Time
 jiff = { version = "0.2", features = ["serde"] }
+humantime = "2"
 
 # DX
 derive_more = { version = "2", features = ["debug", "display"] }

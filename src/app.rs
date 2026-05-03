@@ -334,7 +334,9 @@ fn load_model_cache(core: &AppCore) {
     if let Some(ref c) = cache {
         tracing::info!(providers = c.entries.len(), "loaded model cache");
     }
-    core.state.write().model_cache = cache;
+    let mut state = core.state.write();
+    state.last_refreshed_at = cache.as_ref().and_then(|c| c.last_updated_at);
+    state.model_cache = cache;
 }
 
 #[cfg(test)]

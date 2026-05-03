@@ -52,8 +52,9 @@ pub struct AppState {
     /// Last known model cache from discovery.
     pub model_cache: Option<nullslop_providers::ModelCache>,
 
-    /// When the model list was last refreshed.
-    pub last_refreshed_at: Option<std::time::Instant>,
+    /// When the model list was last refreshed (UTC).
+    /// `None` if the model list has never been refreshed.
+    pub last_refreshed_at: Option<jiff::Timestamp>,
 }
 
 impl AppState {

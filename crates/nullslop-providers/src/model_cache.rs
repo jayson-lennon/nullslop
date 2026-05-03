@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use error_stack::{Report, ResultExt as _};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use wherror::Error;
 
@@ -18,11 +19,16 @@ pub struct ModelCacheError;
 
 /// Persisted model discovery results.
 ///
-/// Maps provider names to the list of discovered model IDs.
+/// Maps provider names to the list of discovered model IDs,
+/// along with the timestamp of the last successful refresh.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelCache {
     /// Provider name → list of discovered model IDs.
     pub entries: HashMap<String, Vec<String>>,
+
+    /// When the cache was last written to disk (UTC).
+    /// `None` for caches created before this field existed.
+    pub last_updated_at: Option<Timestamp>,
 }
 
 impl ModelCache {
@@ -31,6 +37,7 @@ impl ModelCache {
     pub fn new() -> Self {
         Self {
             entries: HashMap::new(),
+            last_updated_at: None,
         }
     }
 
@@ -110,18 +117,20 @@ mod tests {
         // Given a new ModelCache.
         let cache = ModelCache::new();
 
-        // Then it has no entries.
+        // Then it has no entries and no timestamp.
         assert!(cache.entries.is_empty());
+        assert!(cache.last_updated_at.is_none());
     }
 
     #[test]
     fn save_and_load_roundtrip() {
-        // Given a cache with entries.
+        // Given a cache with entries and a timestamp.
         let mut cache = ModelCache::new();
         cache.entries.insert(
             "ollama".to_owned(),
             vec!["llama3".to_owned(), "mistral".to_owned()],
         );
+        cache.last_updated_at = Some(Timestamp::now());
 
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("model_cache.json");
@@ -135,6 +144,25 @@ mod tests {
         let loaded = loaded.unwrap();
         assert_eq!(loaded.entries.len(), 1);
         assert_eq!(loaded.entries["ollama"].len(), 2);
+        assert!(loaded.last_updated_at.is_some());
+    }
+
+    #[test]
+    fn load_accepts_cache_without_timestamp() {
+        // Given a cache JSON file without last_updated_at.
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("model_cache.json");
+        let json = r#"{ "entries": { "ollama": ["llama3"] } }"#;
+        std::fs::write(&path, json).expect("write");
+
+        // When loading.
+        let loaded = ModelCache::load(&path).expect("load");
+
+        // Then it deserializes with last_updated_at = None.
+        assert!(loaded.is_some());
+        let cache = loaded.unwrap();
+        assert_eq!(cache.entries["ollama"].len(), 1);
+        assert!(cache.last_updated_at.is_none());
     }
 
     #[test]

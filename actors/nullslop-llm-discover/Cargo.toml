@@ -16,6 +16,7 @@ tracing = { workspace = true }
 llm = { workspace = true }
 wherror = { workspace = true }
 error-stack = { workspace = true }
+jiff = { workspace = true }
 
 [lints]
 workspace = true

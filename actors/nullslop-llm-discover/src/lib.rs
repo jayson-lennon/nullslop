@@ -175,6 +175,7 @@ impl DiscoverActor {
         // Save cache to disk.
         let cache = ModelCache {
             entries: results.clone(),
+            last_updated_at: Some(jiff::Timestamp::now()),
         };
         let path = cache_path();
         if let Err(e) = cache.save(&path) {

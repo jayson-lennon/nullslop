@@ -60,7 +60,7 @@ impl RefreshHandler {
             }
         }
 
-        state.last_refreshed_at = Some(std::time::Instant::now());
+        state.last_refreshed_at = Some(jiff::Timestamp::now());
 
         let msg = format_refresh_summary(&evt.results, &evt.errors);
         state.active_session_mut().push_entry(npr::ChatEntry::system(msg));

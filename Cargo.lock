@@ -873,6 +873,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6dbf3de79e51f3d586ab4cb9d5c3e2c14aa28ed23d180cf89b4df0454a69cc87"
 
 [[package]]
+name = "humantime"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "135b12329e5e3ce057a9f972339ea52bc954fe1e9358ef27f95e89716fbc5424"
+
+[[package]]
 name = "hyper"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1498,6 +1504,7 @@ dependencies = [
 name = "nullslop-component"
 version = "0.1.0"
 dependencies = [
+ "jiff",
  "nullslop-actor-host",
  "nullslop-component-core",
  "nullslop-component-ui",
@@ -1582,6 +1589,7 @@ name = "nullslop-llm-discover"
 version = "0.1.0"
 dependencies = [
  "error-stack",
+ "jiff",
  "llm",
  "nullslop-actor",
  "nullslop-protocol",
@@ -1624,6 +1632,7 @@ dependencies = [
  "dirs",
  "error-stack",
  "futures",
+ "jiff",
  "llm",
  "nullslop-protocol",
  "parking_lot",
@@ -1660,6 +1669,8 @@ dependencies = [
  "dialoguer",
  "error-stack",
  "futures",
+ "humantime",
+ "jiff",
  "kanal",
  "nullslop-actor-host",
  "nullslop-component",

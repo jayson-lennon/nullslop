@@ -3,6 +3,7 @@
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Style};
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
 use ratatui_tabs::{TabManager, TabsBar, TabsStyle};
 use ratatui_which_key::{PopupPosition, WhichKey};
@@ -212,7 +213,7 @@ fn render_provider_picker(frame: &mut Frame<'_>, area: Rect, state: &nullslop_co
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::DarkGray))
-        .title(" Provider ");
+        .title(" Model ");
     frame.render_widget(block, popup_area);
 
     // Layout: input line -> separator -> results -> footer.
@@ -246,9 +247,11 @@ fn render_provider_picker(frame: &mut Frame<'_>, area: Rect, state: &nullslop_co
     let result_lines = build_result_lines(&entries, &state.picker, &state.active_provider, max_visible);
     frame.render_widget(Paragraph::new(result_lines), results_area);
 
-    // Footer: last updated timestamp + refresh hint.
-    let footer_text = format_footer(state.last_refreshed_at.as_ref(), footer_area.width as usize);
-    let footer_paragraph = Paragraph::new(footer_text).style(Style::default().fg(Color::DarkGray));
+    // Footer: last updated timestamp + refresh hint (right-aligned).
+    let footer_line = format_footer(state.last_refreshed_at.as_ref(), footer_area.width as usize);
+    let footer_paragraph = Paragraph::new(footer_line)
+        .style(Style::default().fg(Color::DarkGray))
+        .right_aligned();
     frame.render_widget(footer_paragraph, footer_area);
 }
 
@@ -321,38 +324,95 @@ fn build_result_lines<'a>(
     lines
 }
 
-/// Formats the footer text showing last updated time and refresh hint.
-fn format_footer(last_refreshed_at: Option<&std::time::Instant>, width: usize) -> String {
-    let timestamp = match last_refreshed_at {
-        Some(instant) => {
-            let elapsed = instant.elapsed();
-            format_relative_time(elapsed)
+/// Formats the footer line showing refresh keybind and last update time.
+///
+/// Returns a styled [`Line`] with the pipe separator in dark gray.
+/// Format: `CTRL+R to refresh | Updated <timestamp> (<humantime> ago)`
+fn format_footer(last_refreshed_at: Option<&jiff::Timestamp>, width: usize) -> Line<'static> {
+    let gray = Style::default().fg(Color::DarkGray);
+    let orange = Style::default().fg(Color::Rgb(255, 165, 0));
+
+    match last_refreshed_at {
+        Some(ts) => {
+            let elapsed = jiff::Timestamp::now() - *ts;
+            let secs = elapsed.total(jiff::Unit::Second).unwrap_or(0.0).round() as u64;
+            let duration = std::time::Duration::from_secs(secs);
+            let human = humantime::format_duration(duration);
+            let age_color = age_color(secs);
+
+            // Format timestamp without fractional seconds.
+            let formatted_ts = format!("{ts:.0}");
+
+            let left = "CTRL+R to refresh ";
+            let pipe = "|";
+            let mid = format!(" Updated {formatted_ts} (");
+            let right = format!("{human} ago)");
+
+            let line = Line::from(vec![
+                Span::styled(left.to_owned(), orange),
+                Span::styled(pipe.to_owned(), gray),
+                Span::styled(mid, gray),
+                Span::styled(right, Style::default().fg(age_color)),
+            ]);
+            truncate_line(line, width)
         }
-        None => "never".to_owned(),
-    };
-    let footer = format!("Last updated: {timestamp}   CTRL+R to refresh");
-    // Truncate to fit width.
-    if footer.len() > width {
-        footer.chars().take(width).collect()
-    } else {
-        footer
+        None => {
+            let left = "CTRL+R to refresh ";
+            let pipe = "|";
+            let right = " Updated never";
+
+            let line = Line::from(vec![
+                Span::styled(left.to_owned(), orange),
+                Span::styled(pipe.to_owned(), gray),
+                Span::styled(right.to_owned(), gray),
+            ]);
+            truncate_line(line, width)
+        }
     }
 }
 
-/// Formats a duration as a human-readable relative time string.
-fn format_relative_time(duration: std::time::Duration) -> String {
-    let secs = duration.as_secs();
-    if secs < 60 {
-        format!("{secs}s ago")
-    } else if secs < 3600 {
-        #[expect(clippy::integer_division, reason = "intentional truncating division for minute display")]
-        let minutes = secs / 60;
-        format!("{minutes}m ago")
+/// Returns the age-based color for the "time ago" text.
+///
+/// - `<= 2 weeks` → light green
+/// - `> 2 weeks, <= 4 weeks` → yellow
+/// - `> 4 weeks` → red
+fn age_color(secs: u64) -> Color {
+    const TWO_WEEKS: u64 = 14 * 24 * 60 * 60;
+    const FOUR_WEEKS: u64 = 28 * 24 * 60 * 60;
+    if secs <= TWO_WEEKS {
+        Color::LightGreen
+    } else if secs <= FOUR_WEEKS {
+        Color::Yellow
     } else {
-        #[expect(clippy::integer_division, reason = "intentional truncating division for hour display")]
-        let hours = secs / 3600;
-        format!("{hours}h ago")
+        Color::Red
     }
+}
+
+/// Truncates a styled line to fit within `width` terminal columns.
+fn truncate_line(line: Line<'static>, width: usize) -> Line<'static> {
+    let total_len: usize = line.spans.iter().map(|s| s.content.chars().count()).sum();
+    if total_len <= width {
+        return line;
+    }
+
+    // Rebuild spans, trimming characters that overflow.
+    let mut remaining = width;
+    let mut spans = Vec::new();
+    for span in line.spans {
+        let char_count = span.content.chars().count();
+        if remaining == 0 {
+            break;
+        }
+        if char_count <= remaining {
+            spans.push(span);
+            remaining -= char_count;
+        } else {
+            let truncated: String = span.content.chars().take(remaining).collect();
+            spans.push(Span::styled(truncated, span.style));
+            remaining = 0;
+        }
+    }
+    Line::from(spans)
 }
 
 /// Renders a "terminal too small" message.
