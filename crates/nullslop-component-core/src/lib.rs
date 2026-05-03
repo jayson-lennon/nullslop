@@ -13,5 +13,5 @@ mod macros;
 pub mod out;
 
 pub use bus::Bus;
-pub use handler::{CommandHandler, EventHandler};
+pub use handler::{CommandHandler, EventHandler, HandlerContext};
 pub use out::Out;

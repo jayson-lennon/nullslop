@@ -4,8 +4,9 @@ use crate::AppState;
 use npr::CommandAction;
 use npr::chat_input::PushChatEntry;
 use npr::system::{ScrollDown, ScrollUp};
-use nullslop_component_core::{Out, define_handler};
+use nullslop_component_core::{HandlerContext, define_handler};
 use nullslop_protocol as npr;
+use nullslop_services::Services;
 
 define_handler! {
     pub(crate) struct ChatLogHandler;
@@ -26,12 +27,11 @@ impl ChatLogHandler {
     /// Appends a chat entry to the active session's history.
     fn on_push_chat_entry(
         cmd: &PushChatEntry,
-        state: &mut AppState,
-        out: &mut Out,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
     ) -> CommandAction {
-        state.active_session_mut().push_entry(cmd.entry.clone());
+        ctx.state.active_session_mut().push_entry(cmd.entry.clone());
 
-        out.submit_event(npr::Event::ChatEntrySubmitted {
+        ctx.out.submit_event(npr::Event::ChatEntrySubmitted {
             payload: npr::chat_input::ChatEntrySubmitted {
                 session_id: cmd.session_id.clone(),
                 entry: cmd.entry.clone(),
@@ -42,14 +42,22 @@ impl ChatLogHandler {
     }
 
     /// Scrolls the chat log up by [`SCROLL_STEP`] lines.
-    fn on_scroll_up(_cmd: &ScrollUp, state: &mut AppState, _out: &mut Out) -> CommandAction {
-        state.active_session_mut().scroll_up(Self::SCROLL_STEP);
+    fn on_scroll_up(
+        _cmd: &ScrollUp,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
+    ) -> CommandAction {
+        ctx.state.active_session_mut().scroll_up(Self::SCROLL_STEP);
         CommandAction::Continue
     }
 
     /// Scrolls the chat log down by [`SCROLL_STEP`] lines.
-    fn on_scroll_down(_cmd: &ScrollDown, state: &mut AppState, _out: &mut Out) -> CommandAction {
-        state.active_session_mut().scroll_down(Self::SCROLL_STEP);
+    fn on_scroll_down(
+        _cmd: &ScrollDown,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
+    ) -> CommandAction {
+        ctx.state
+            .active_session_mut()
+            .scroll_down(Self::SCROLL_STEP);
         CommandAction::Continue
     }
 }
@@ -60,6 +68,7 @@ mod tests {
     use npr::Command;
     use nullslop_component_core::Bus;
     use nullslop_protocol as npr;
+    use nullslop_services::Services;
 
     use super::*;
     use crate::test_utils;
@@ -67,7 +76,7 @@ mod tests {
     #[test]
     fn push_chat_entry_adds_to_history() {
         // Given a bus with ChatLogHandler registered.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         ChatLogHandler.register(&mut bus);
 
         // When processing PushChatEntry with a user entry.
@@ -78,8 +87,9 @@ mod tests {
                 entry,
             },
         });
-        let mut state = AppState::new(test_utils::test_services());
-        bus.process_commands(&mut state);
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
+        bus.process_commands(&mut state, &services);
 
         // Then the active session history has one entry.
         assert_eq!(state.active_session().history().len(), 1);
@@ -92,7 +102,7 @@ mod tests {
     #[test]
     fn push_chat_entry_emits_event() {
         // Given a bus with ChatLogHandler registered.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         ChatLogHandler.register(&mut bus);
 
         // When processing PushChatEntry.
@@ -103,12 +113,13 @@ mod tests {
                 entry,
             },
         });
-        let mut state = AppState::new(test_utils::test_services());
-        bus.process_commands(&mut state);
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
+        bus.process_commands(&mut state, &services);
 
         // Then a ChatEntrySubmitted event is queued.
         assert!(bus.has_pending());
-        bus.process_events(&mut state);
+        bus.process_events(&mut state, &services);
 
         let processed = bus.drain_processed_events();
         assert_eq!(processed.len(), 1);
@@ -121,7 +132,7 @@ mod tests {
     #[test]
     fn push_actor_entry_adds_to_history() {
         // Given a bus with ChatLogHandler registered.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         ChatLogHandler.register(&mut bus);
 
         // When processing PushChatEntry with an actor entry.
@@ -132,8 +143,9 @@ mod tests {
                 entry,
             },
         });
-        let mut state = AppState::new(test_utils::test_services());
-        bus.process_commands(&mut state);
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
+        bus.process_commands(&mut state, &services);
 
         // Then the active session history has an Actor entry.
         assert_eq!(state.active_session().history().len(), 1);
@@ -149,10 +161,11 @@ mod tests {
     #[test]
     fn scroll_up_decrements_session_offset() {
         // Given a bus with ChatLogHandler registered and a session with entries.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         ChatLogHandler.register(&mut bus);
 
-        let mut state = AppState::new(test_utils::test_services());
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
         for i in 0..20 {
             state
                 .active_session_mut()
@@ -163,7 +176,7 @@ mod tests {
 
         // When processing ScrollUp.
         bus.submit_command(Command::ScrollUp);
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
 
         // Then the offset decreased by SCROLL_STEP (10).
         assert_eq!(state.active_session().scroll_offset(), u16::MAX - 10);
@@ -172,10 +185,11 @@ mod tests {
     #[test]
     fn scroll_down_increments_session_offset() {
         // Given a bus with ChatLogHandler registered and a session at offset 0.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         ChatLogHandler.register(&mut bus);
 
-        let mut state = AppState::new(test_utils::test_services());
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
         state
             .active_session_mut()
             .push_entry(npr::ChatEntry::user("hello"));
@@ -185,7 +199,7 @@ mod tests {
 
         // When processing ScrollDown.
         bus.submit_command(Command::ScrollDown);
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
 
         // Then the offset increased by SCROLL_STEP (10).
         assert_eq!(state.active_session().scroll_offset(), 10);

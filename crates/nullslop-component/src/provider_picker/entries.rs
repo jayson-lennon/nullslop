@@ -37,7 +37,10 @@ pub fn sorted_entries(
     active_provider: &str,
 ) -> Vec<PickerEntry> {
     if filter.is_empty() && active_provider != nullslop_providers::NO_PROVIDER_ID {
-        if let Some(pos) = entries.iter().position(|e| e.provider_id == active_provider) {
+        if let Some(pos) = entries
+            .iter()
+            .position(|e| e.provider_id == active_provider)
+        {
             if pos > 0 {
                 entries[0..=pos].rotate_right(1);
             }
@@ -80,8 +83,7 @@ pub fn filtered_entries(
 
     for alias in registry.aliases() {
         let resolved = registry.resolve_alias(&alias.name);
-        let is_available = resolved
-            .is_some_and(|r| registry.is_available(&r.id.clone(), api_keys));
+        let is_available = resolved.is_some_and(|r| registry.is_available(&r.id.clone(), api_keys));
 
         let entry = PickerEntry {
             provider_id: resolved.map(|r| r.id.to_string()).unwrap_or_default(),
@@ -354,10 +356,37 @@ mod tests {
     fn sorted_entries_moves_active_to_top_when_filter_empty() {
         // Given entries ["a/model", "b/model", "c/model"] with active_provider "c/model" and empty filter.
         let entries = vec![
-        PickerEntry { provider_id: "a/model".into(), name: "a".into(), provider_name: "a".into(), backend: "a".into(), model: "model".into(), is_alias: false, alias_target: None, is_available: true },
-        PickerEntry { provider_id: "b/model".into(), name: "b".into(), provider_name: "b".into(), backend: "b".into(), model: "model".into(), is_alias: false, alias_target: None, is_available: true },
-        PickerEntry { provider_id: "c/model".into(), name: "c".into(), provider_name: "c".into(), backend: "c".into(), model: "model".into(), is_alias: false, alias_target: None, is_available: true },
-    ];
+            PickerEntry {
+                provider_id: "a/model".into(),
+                name: "a".into(),
+                provider_name: "a".into(),
+                backend: "a".into(),
+                model: "model".into(),
+                is_alias: false,
+                alias_target: None,
+                is_available: true,
+            },
+            PickerEntry {
+                provider_id: "b/model".into(),
+                name: "b".into(),
+                provider_name: "b".into(),
+                backend: "b".into(),
+                model: "model".into(),
+                is_alias: false,
+                alias_target: None,
+                is_available: true,
+            },
+            PickerEntry {
+                provider_id: "c/model".into(),
+                name: "c".into(),
+                provider_name: "c".into(),
+                backend: "c".into(),
+                model: "model".into(),
+                is_alias: false,
+                alias_target: None,
+                is_available: true,
+            },
+        ];
 
         // When sorting with empty filter and active_provider "c/model".
         let result = sorted_entries(entries, "", "c/model");
@@ -372,9 +401,27 @@ mod tests {
     fn sorted_entries_preserves_order_when_filtering() {
         // Given entries ["a/model", "b/model"] with active_provider "b/model" and non-empty filter.
         let entries = vec![
-        PickerEntry { provider_id: "a/model".into(), name: "a".into(), provider_name: "a".into(), backend: "a".into(), model: "model".into(), is_alias: false, alias_target: None, is_available: true },
-        PickerEntry { provider_id: "b/model".into(), name: "b".into(), provider_name: "b".into(), backend: "b".into(), model: "model".into(), is_alias: false, alias_target: None, is_available: true },
-    ];
+            PickerEntry {
+                provider_id: "a/model".into(),
+                name: "a".into(),
+                provider_name: "a".into(),
+                backend: "a".into(),
+                model: "model".into(),
+                is_alias: false,
+                alias_target: None,
+                is_available: true,
+            },
+            PickerEntry {
+                provider_id: "b/model".into(),
+                name: "b".into(),
+                provider_name: "b".into(),
+                backend: "b".into(),
+                model: "model".into(),
+                is_alias: false,
+                alias_target: None,
+                is_available: true,
+            },
+        ];
 
         // When sorting with filter "a" and active_provider "b/model".
         let result = sorted_entries(entries, "a", "b/model");
@@ -388,9 +435,27 @@ mod tests {
     fn sorted_entries_preserves_order_when_no_active() {
         // Given entries with active_provider "__no_provider__" and empty filter.
         let entries = vec![
-        PickerEntry { provider_id: "a/model".into(), name: "a".into(), provider_name: "a".into(), backend: "a".into(), model: "model".into(), is_alias: false, alias_target: None, is_available: true },
-        PickerEntry { provider_id: "b/model".into(), name: "b".into(), provider_name: "b".into(), backend: "b".into(), model: "model".into(), is_alias: false, alias_target: None, is_available: true },
-    ];
+            PickerEntry {
+                provider_id: "a/model".into(),
+                name: "a".into(),
+                provider_name: "a".into(),
+                backend: "a".into(),
+                model: "model".into(),
+                is_alias: false,
+                alias_target: None,
+                is_available: true,
+            },
+            PickerEntry {
+                provider_id: "b/model".into(),
+                name: "b".into(),
+                provider_name: "b".into(),
+                backend: "b".into(),
+                model: "model".into(),
+                is_alias: false,
+                alias_target: None,
+                is_available: true,
+            },
+        ];
 
         // When sorting with empty filter and no active provider.
         let result = sorted_entries(entries, "", "__no_provider__");

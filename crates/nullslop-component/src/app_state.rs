@@ -8,7 +8,6 @@ use std::collections::HashMap;
 
 use nullslop_protocol::{ActiveTab, Mode, SessionId};
 use nullslop_providers::NO_PROVIDER_ID;
-use nullslop_services::Services;
 
 use crate::chat_input_box::ChatInputBoxState;
 use crate::chat_session::ChatSessionState;
@@ -40,9 +39,6 @@ pub struct AppState {
     /// Set to `true` when the user has requested to quit.
     pub should_quit: bool,
 
-    /// Runtime services accessible to bus handlers.
-    pub services: Services,
-
     /// The currently active provider. Always set — starts as [`NO_PROVIDER_ID`].
     pub active_provider: String,
 
@@ -50,10 +46,8 @@ pub struct AppState {
     pub picker: ProviderPickerState,
 }
 
-impl AppState {
-    /// Create a new `AppState` with one default session, normal mode, and empty input.
-    #[must_use]
-    pub fn new(services: Services) -> Self {
+impl Default for AppState {
+    fn default() -> Self {
         let active_session = SessionId::new();
         let mut sessions = HashMap::new();
         sessions.insert(active_session.clone(), ChatSessionState::new());
@@ -65,12 +59,13 @@ impl AppState {
             dashboard: DashboardState::new(),
             active_tab: ActiveTab::Chat,
             should_quit: false,
-            services,
             active_provider: NO_PROVIDER_ID.to_owned(),
             picker: ProviderPickerState::new(),
         }
     }
+}
 
+impl AppState {
     /// Read-only access to the active chat session.
     ///
     /// # Panics
@@ -150,7 +145,6 @@ impl AppState {
     pub fn active_chat_input_mut(&mut self) -> &mut ChatInputBoxState {
         self.active_session_mut().chat_input_mut()
     }
-
 }
 
 #[cfg(test)]
@@ -162,8 +156,7 @@ mod tests {
     #[test]
     fn push_entry_adds_to_history() {
         // Given a new AppState.
-        let services = nullslop_services::test_services::TestServices::builder().build();
-        let mut data = AppState::new(services);
+        let mut data = AppState::default();
         let entry = ChatEntry::user("hello");
 
         // When pushing an entry via the active session.

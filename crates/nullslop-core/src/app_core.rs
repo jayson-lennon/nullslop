@@ -36,9 +36,11 @@ pub struct TickResult {
 /// via [`Self::sender`] and drives processing with [`Self::tick`].
 pub struct AppCore {
     /// Command and event bus for routing between components.
-    pub bus: Bus<AppState>,
+    pub bus: Bus<AppState, nullslop_services::Services>,
     /// Shared application state.
     pub state: State,
+    /// Runtime services passed to handlers during dispatch.
+    pub services: nullslop_services::Services,
     /// Sender half of the internal message channel.
     pub sender: Sender<AppMsg>,
     /// Receiver half of the internal message channel.
@@ -67,7 +69,8 @@ impl AppCore {
         let (sender, receiver) = kanal::unbounded();
         Self {
             bus: Bus::new(),
-            state: State::new(AppState::new(services)),
+            state: State::new(AppState::default()),
+            services,
             sender,
             receiver,
             actor_host: None,
@@ -135,8 +138,8 @@ impl AppCore {
         // Process the bus: commands then events.
         {
             let mut guard = self.state.write();
-            self.bus.process_commands(&mut guard);
-            self.bus.process_events(&mut guard);
+            self.bus.process_commands(&mut guard, &self.services);
+            self.bus.process_events(&mut guard, &self.services);
         }
 
         // Forward processed items to actor host.
@@ -223,8 +226,6 @@ impl AppCore {
         self.bus.submit_command_from(cmd, source);
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {

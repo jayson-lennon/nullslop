@@ -44,7 +44,7 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
         .describe_group("g", "general")
             .describe_group("gm", "model")
             .bind("gms", Command::SetMode { payload: SetMode { mode: Mode::Picker } }, KeyCategory::General)
-            .bind("gmr", Command::RefreshModels, KeyCategory::General)
+            // .bind("gmr", Command::RefreshModels, KeyCategory::General) // TODO: re-enable when type is defined
             .bind("<c-d>", Command::ScrollDown, KeyCategory::General);
         })
         // Input scope: typing into the input buffer
@@ -172,11 +172,11 @@ mod tests {
     }
 
     #[test]
-    fn gmr_produces_refresh_models_command() {
+    fn gms_produces_picker_mode_command() {
         // Given the keymap.
         let keymap = init();
 
-        // When looking up 'g' then 'm' then 'r'.
+        // When looking up 'g' then 'm' then 's'.
         let g_key = KeyEvent {
             key: Key::Char('g'),
             modifiers: Modifiers::none(),
@@ -185,25 +185,25 @@ mod tests {
             key: Key::Char('m'),
             modifiers: Modifiers::none(),
         };
-        let r_key = KeyEvent {
-            key: Key::Char('r'),
+        let s_key = KeyEvent {
+            key: Key::Char('s'),
             modifiers: Modifiers::none(),
         };
 
-        let node = keymap.get_node_at_path(&[g_key, m_key, r_key]);
+        let node = keymap.get_node_at_path(&[g_key, m_key, s_key]);
 
-        // Then it's a leaf with the RefreshModels command.
+        // Then it's a leaf with the SetMode command.
         assert!(node.is_some());
         if let Some(ratatui_which_key::KeyNode::Leaf(entries)) = node {
             let entry = entries.iter().find(|e| e.scope == Scope::Normal);
             assert!(entry.is_some());
             let cmd = &entry.unwrap().action;
             assert!(
-                matches!(cmd, Command::RefreshModels),
-                "expected RefreshModels, got {cmd:?}"
+                matches!(cmd, Command::SetMode { .. }),
+                "expected SetMode, got {cmd:?}"
             );
         } else {
-            panic!("Expected leaf node for 'gmr'");
+            panic!("Expected leaf node for 'gms'");
         }
     }
 }

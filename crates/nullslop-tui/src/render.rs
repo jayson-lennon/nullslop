@@ -134,7 +134,7 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
     render_which_key(frame, &mut app.which_key);
 
     if state.mode == Mode::Picker {
-        render_provider_picker(frame, area, &state);
+        render_provider_picker(frame, area, &state, &app.services);
     }
 }
 
@@ -188,12 +188,16 @@ fn compute_popup_rect(area: Rect) -> Rect {
 ///
 /// Telescope-style layout: bordered popup with filter input at top,
 /// horizontal separator, then fixed-height scrollable results area.
-fn render_provider_picker(frame: &mut Frame<'_>, area: Rect, state: &nullslop_component::AppState) {
+fn render_provider_picker(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    state: &nullslop_component::AppState,
+    services: &nullslop_services::Services,
+) {
     use ratatui::widgets::{Block, Borders};
 
     let popup_area = compute_popup_rect(area);
 
-    let services = &state.services;
     let registry = services.provider_registry().read();
     let api_keys = services.api_keys().read();
     let entries = sorted_entries(
@@ -236,7 +240,8 @@ fn render_provider_picker(frame: &mut Frame<'_>, area: Rect, state: &nullslop_co
 
     // Results area — windowed display with scroll_offset.
     let max_visible = results_area.height as usize;
-    let result_lines = build_result_lines(&entries, &state.picker, &state.active_provider, max_visible);
+    let result_lines =
+        build_result_lines(&entries, &state.picker, &state.active_provider, max_visible);
     frame.render_widget(Paragraph::new(result_lines), results_area);
 }
 
@@ -266,7 +271,9 @@ fn build_result_lines<'a>(
             let active_marker = Span::styled(
                 if is_active { "> " } else { "  " },
                 if is_active {
-                    Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+                    Style::default()
+                        .fg(Color::Green)
+                        .add_modifier(Modifier::BOLD)
                 } else {
                     Style::default()
                 },
@@ -297,7 +304,10 @@ fn build_result_lines<'a>(
                 Style::default()
             };
 
-            lines.push(Line::from(vec![active_marker, Span::styled(label, label_style)]));
+            lines.push(Line::from(vec![
+                active_marker,
+                Span::styled(label, label_style),
+            ]));
         } else {
             // Empty row to maintain fixed height.
             lines.push(Line::from(""));
@@ -390,7 +400,7 @@ mod tests {
 
     // --- Provider picker rendering tests ---
 
-    fn picker_state_with_ollama() -> nullslop_component::AppState {
+    fn picker_state_with_ollama() -> (nullslop_component::AppState, nullslop_services::Services) {
         use nullslop_providers::{ProviderEntry, ProvidersConfig};
         let config = ProvidersConfig {
             providers: vec![ProviderEntry {
@@ -407,7 +417,7 @@ mod tests {
         let services = nullslop_services::test_services::TestServices::builder()
             .with_providers(config)
             .build();
-        nullslop_component::AppState::new(services)
+        (nullslop_component::AppState::default(), services)
     }
 
     #[test]
@@ -416,7 +426,7 @@ mod tests {
         use ratatui::Terminal;
         use ratatui::backend::TestBackend;
 
-        let mut state = picker_state_with_ollama();
+        let (mut state, services) = picker_state_with_ollama();
         state.mode = nullslop_protocol::Mode::Picker;
         state.picker.filter = "ol".to_owned();
 
@@ -427,7 +437,7 @@ mod tests {
         terminal
             .draw(|frame| {
                 let area = frame.area();
-                render_provider_picker(frame, area, &state);
+                render_provider_picker(frame, area, &state, &services);
             })
             .unwrap();
 
@@ -464,7 +474,7 @@ mod tests {
         use ratatui::Terminal;
         use ratatui::backend::TestBackend;
 
-        let state = picker_state_with_ollama();
+        let (state, services) = picker_state_with_ollama();
 
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -472,7 +482,7 @@ mod tests {
         terminal
             .draw(|frame| {
                 let area = frame.area();
-                render_provider_picker(frame, area, &state);
+                render_provider_picker(frame, area, &state, &services);
             })
             .unwrap();
 
@@ -489,7 +499,7 @@ mod tests {
         use ratatui::Terminal;
         use ratatui::backend::TestBackend;
 
-        let mut state = picker_state_with_ollama();
+        let (mut state, services) = picker_state_with_ollama();
         state.mode = nullslop_protocol::Mode::Picker;
         state.active_provider = "ollama/llama3".to_owned();
 
@@ -500,7 +510,7 @@ mod tests {
         terminal
             .draw(|frame| {
                 let area = frame.area();
-                render_provider_picker(frame, area, &state);
+                render_provider_picker(frame, area, &state, &services);
             })
             .unwrap();
 

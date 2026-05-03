@@ -94,10 +94,8 @@ impl ProviderRegistry {
             for model in &entry.models {
                 let id = ProviderId::new(format!("{}/{}", entry.name, model));
                 if resolved_map.contains_key(&id) {
-                    return Err(Report::new(ConfigError::Validation)).attach(format!(
-                        "duplicate expanded provider ID: {}",
-                        id
-                    ));
+                    return Err(Report::new(ConfigError::Validation))
+                        .attach(format!("duplicate expanded provider ID: {}", id));
                 }
                 let resolved = ResolvedProvider {
                     id: id.clone(),
@@ -458,12 +456,16 @@ mod tests {
         assert_eq!(providers[1].model, "mistral");
 
         // And both are individually look-up-able.
-        assert!(registry
-            .get(&ProviderId::new("ollama/llama3".to_owned()))
-            .is_some());
-        assert!(registry
-            .get(&ProviderId::new("ollama/mistral".to_owned()))
-            .is_some());
+        assert!(
+            registry
+                .get(&ProviderId::new("ollama/llama3".to_owned()))
+                .is_some()
+        );
+        assert!(
+            registry
+                .get(&ProviderId::new("ollama/mistral".to_owned()))
+                .is_some()
+        );
     }
 
     #[test]
@@ -569,7 +571,8 @@ mod tests {
         let api_keys = ApiKeys::new();
 
         // When creating a factory.
-        let factory = registry.create_factory(&ProviderId::new("sample/sample".to_owned()), &api_keys);
+        let factory =
+            registry.create_factory(&ProviderId::new("sample/sample".to_owned()), &api_keys);
 
         // Then it succeeds and returns a factory named "Sample".
         assert!(factory.is_ok());

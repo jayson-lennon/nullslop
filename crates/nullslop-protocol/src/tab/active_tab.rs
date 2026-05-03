@@ -5,9 +5,10 @@
 use serde::{Deserialize, Serialize};
 
 /// The currently active tab in the main area.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ActiveTab {
     /// The chat conversation view.
+    #[default]
     Chat,
     /// The dashboard view showing actor status.
     Dashboard,

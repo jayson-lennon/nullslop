@@ -46,7 +46,9 @@ impl ApiKeys {
     where
         K: AsRef<str>,
     {
-        self.keys.get(env_var.as_ref()).is_some_and(|v| !v.is_empty())
+        self.keys
+            .get(env_var.as_ref())
+            .is_some_and(|v| !v.is_empty())
     }
 }
 

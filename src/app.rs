@@ -276,10 +276,11 @@ fn create_core_with_actor_host(
         config_storage,
     );
 
-    // Build AppCore with services in its state.
+    // Build AppCore with services stored separately from state.
     let mut core = AppCore {
         bus: Bus::new(),
-        state: State::new(AppState::new(services.clone())),
+        state: State::new(AppState::default()),
+        services: services.clone(),
         sender,
         receiver,
         actor_host: Some(ActorHostService::new(host_arc)),

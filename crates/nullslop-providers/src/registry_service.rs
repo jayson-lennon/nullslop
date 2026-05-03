@@ -230,7 +230,9 @@ mod tests {
         let service = service_with_providers();
 
         // When looking up a known provider by full expanded ID.
-        let entry = service.get(&crate::provider_id::ProviderId::new("ollama/llama3".to_owned()));
+        let entry = service.get(&crate::provider_id::ProviderId::new(
+            "ollama/llama3".to_owned(),
+        ));
 
         // Then the resolved provider is returned with the correct name and model.
         assert!(entry.is_some());

@@ -28,8 +28,8 @@ use crate::chat_input::{
 use crate::chat_input::{MoveCursorLeft, MoveCursorRight};
 use crate::provider::{CancelStream, ProviderSwitch, SendMessage, SendToLlmProvider, StreamToken};
 use crate::provider_picker::{
-    PickerBackspace, PickerConfirm, PickerInsertChar, PickerMoveCursorLeft,
-    PickerMoveCursorRight, PickerMoveDown, PickerMoveUp,
+    PickerBackspace, PickerConfirm, PickerInsertChar, PickerMoveCursorLeft, PickerMoveCursorRight,
+    PickerMoveDown, PickerMoveUp,
 };
 use crate::system::SetMode;
 use crate::tab::SwitchTab;

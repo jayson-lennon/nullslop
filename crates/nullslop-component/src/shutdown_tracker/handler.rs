@@ -7,8 +7,9 @@
 use crate::AppState;
 use npr::actor::ProceedWithShutdown;
 use npr::actor::{ActorShutdownCompleted, ActorStarted, ActorStarting};
-use nullslop_component_core::{Out, define_handler};
+use nullslop_component_core::{HandlerContext, define_handler};
 use nullslop_protocol as npr;
+use nullslop_services::Services;
 
 define_handler! {
     pub(crate) struct ShutdownTrackerHandler;
@@ -24,28 +25,27 @@ define_handler! {
 
 impl ShutdownTrackerHandler {
     /// Tracks a new actor for shutdown monitoring.
-    fn on_actor_starting(evt: &ActorStarting, state: &mut AppState, _out: &mut Out) {
-        state.shutdown_tracker.track(&evt.name);
+    fn on_actor_starting(evt: &ActorStarting, ctx: &mut HandlerContext<'_, AppState, Services>) {
+        ctx.state.shutdown_tracker.track(&evt.name);
         tracing::info!(name = %evt.name, "actor starting");
     }
 
     /// Logs that an actor has finished starting.
-    fn on_actor_started(evt: &ActorStarted, _state: &mut AppState, _out: &mut Out) {
+    fn on_actor_started(evt: &ActorStarted, _ctx: &mut HandlerContext<'_, AppState, Services>) {
         tracing::info!(name = %evt.name, "actor started");
     }
 
     /// Marks an actor as shut down and signals completion when all actors are done.
     fn on_actor_shutdown_completed(
         evt: &ActorShutdownCompleted,
-        state: &mut AppState,
-        out: &mut Out,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
     ) {
-        let was_tracked = state.shutdown_tracker.complete(&evt.name);
+        let was_tracked = ctx.state.shutdown_tracker.complete(&evt.name);
         if was_tracked {
             tracing::info!(name = %evt.name, "actor shutdown completed");
         }
-        if state.shutdown_tracker.is_complete() {
-            out.submit_command(npr::Command::ProceedWithShutdown {
+        if ctx.state.shutdown_tracker.is_complete() {
+            ctx.out.submit_command(npr::Command::ProceedWithShutdown {
                 payload: ProceedWithShutdown {
                     completed: vec![evt.name.clone()],
                     timed_out: vec![],
@@ -62,6 +62,7 @@ mod tests {
     use npr::actor::{ActorShutdownCompleted, ActorStarting};
     use nullslop_component_core::Bus;
     use nullslop_protocol::Event;
+    use nullslop_services::Services;
 
     use super::*;
     use crate::test_utils;
@@ -69,7 +70,7 @@ mod tests {
     #[test]
     fn shutdown_tracker_tracks_starting_actor() {
         // Given a bus with ShutdownTrackerHandler registered.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         ShutdownTrackerHandler.register(&mut bus);
 
         // When an ActorStarting event is processed.
@@ -78,8 +79,9 @@ mod tests {
                 name: "actor-a".into(),
             },
         });
-        let mut state = AppState::new(test_utils::test_services());
-        bus.process_events(&mut state);
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
+        bus.process_events(&mut state, &services);
 
         // Then the actor is in the tracker's pending set.
         assert_eq!(
@@ -91,9 +93,10 @@ mod tests {
     #[test]
     fn shutdown_tracker_completes_on_last_shutdown() {
         // Given a bus with ShutdownTrackerHandler registered and one tracked actor.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         ShutdownTrackerHandler.register(&mut bus);
-        let mut state = AppState::new(test_utils::test_services());
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
         state.shutdown_tracker.track("actor-a");
         state.shutdown_tracker.begin_shutdown();
 
@@ -103,11 +106,11 @@ mod tests {
                 name: "actor-a".into(),
             },
         });
-        bus.process_events(&mut state);
+        bus.process_events(&mut state, &services);
 
         // Then a ProceedWithShutdown command was queued.
         assert!(bus.has_pending());
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
         let commands = bus.drain_processed_commands();
         assert_eq!(commands.len(), 1);
         assert!(matches!(
@@ -119,9 +122,10 @@ mod tests {
     #[test]
     fn shutdown_tracker_ignores_unknown_completion() {
         // Given a bus with ShutdownTrackerHandler, one tracked actor, and shutdown active.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         ShutdownTrackerHandler.register(&mut bus);
-        let mut state = AppState::new(test_utils::test_services());
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
         state.shutdown_tracker.track("actor-a");
         state.shutdown_tracker.begin_shutdown();
 
@@ -131,7 +135,7 @@ mod tests {
                 name: "unknown".into(),
             },
         });
-        bus.process_events(&mut state);
+        bus.process_events(&mut state, &services);
 
         // Then no ProceedWithShutdown command was submitted (actor-a is still pending).
         assert!(!bus.has_pending());
@@ -144,9 +148,10 @@ mod tests {
     #[test]
     fn shutdown_tracker_not_complete_until_active() {
         // Given a bus with ShutdownTrackerHandler registered and one tracked actor.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         ShutdownTrackerHandler.register(&mut bus);
-        let mut state = AppState::new(test_utils::test_services());
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
         state.shutdown_tracker.track("actor-a");
         // shutdown_active is false (default).
 
@@ -156,7 +161,7 @@ mod tests {
                 name: "actor-a".into(),
             },
         });
-        bus.process_events(&mut state);
+        bus.process_events(&mut state, &services);
 
         // Then no ProceedWithShutdown command was submitted.
         let commands = bus.drain_processed_commands();

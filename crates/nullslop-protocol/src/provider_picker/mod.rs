@@ -3,6 +3,6 @@
 mod command;
 
 pub use command::{
-    PickerBackspace, PickerConfirm, PickerInsertChar, PickerMoveCursorLeft,
-    PickerMoveCursorRight, PickerMoveDown, PickerMoveUp,
+    PickerBackspace, PickerConfirm, PickerInsertChar, PickerMoveCursorLeft, PickerMoveCursorRight,
+    PickerMoveDown, PickerMoveUp,
 };

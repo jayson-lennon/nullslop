@@ -6,9 +6,10 @@ use serde::{Deserialize, Serialize};
 ///
 /// In `Normal` mode, keystrokes trigger commands (quit, enter input, etc.).
 /// In `Input` mode, keystrokes are typed into the input buffer.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Mode {
     /// Command mode — keystrokes trigger actions.
+    #[default]
     Normal,
     /// Text input mode — keystrokes type into the buffer.
     Input,

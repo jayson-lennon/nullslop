@@ -12,16 +12,13 @@ pub mod refresh_handler;
 pub mod request_handler;
 pub mod switch_handler;
 
-use nullslop_component_core::Bus;
-use nullslop_component_ui::UiRegistry;
-
-use crate::AppState;
+use crate::{AppBus, AppUiRegistry};
 
 /// Register the provider component with the bus and UI registry.
-pub(crate) fn register(bus: &mut Bus<AppState>, registry: &mut UiRegistry<AppState>) {
+pub(crate) fn register(bus: &mut AppBus, registry: &mut AppUiRegistry) {
     handler::ProviderHandler.register(bus);
     request_handler::MessageQueueHandler.register(bus);
-    refresh_handler::RefreshHandler.register(bus);
+    // refresh_handler::RefreshHandler.register(bus); // TODO: re-enable when types are defined
     switch_handler::SwitchHandler.register(bus);
     registry.register(Box::new(indicator::StreamingIndicatorElement::new()));
     registry.register(Box::new(queue_element::QueueDisplayElement));

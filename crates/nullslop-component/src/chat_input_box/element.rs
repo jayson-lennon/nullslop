@@ -115,7 +115,7 @@ mod tests {
         // Given a ChatInputBoxElement with "hello" in state (Normal mode).
         let mut element = ChatInputBoxElement;
         let state = {
-            let mut s = AppState::new(test_utils::test_services());
+            let mut s = AppState::default();
             for ch in "hello".chars() {
                 s.active_chat_input_mut().insert_grapheme_at_cursor(ch);
             }
@@ -143,7 +143,7 @@ mod tests {
     fn render_draws_empty_buffer() {
         // Given a ChatInputBoxElement with empty state.
         let mut element = ChatInputBoxElement;
-        let state = AppState::new(test_utils::test_services());
+        let state = AppState::default();
 
         let backend = TestBackend::new(20, 3);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -167,7 +167,7 @@ mod tests {
         // Given a ChatInputBoxElement in Input mode with "hi" in buffer.
         let mut element = ChatInputBoxElement;
         let state = {
-            let mut s = AppState::new(test_utils::test_services());
+            let mut s = AppState::default();
             s.mode = Mode::Input;
             for ch in "hi".chars() {
                 s.active_chat_input_mut().insert_grapheme_at_cursor(ch);
@@ -198,7 +198,7 @@ mod tests {
         // Given a ChatInputBoxElement in Input mode.
         let mut element = ChatInputBoxElement;
         let state = {
-            let mut s = AppState::new(test_utils::test_services());
+            let mut s = AppState::default();
             s.mode = Mode::Input;
             s
         };
@@ -225,7 +225,7 @@ mod tests {
         // Given a ChatInputBoxElement in Input mode with "abc" in buffer.
         let mut element = ChatInputBoxElement;
         let state = {
-            let mut s = AppState::new(test_utils::test_services());
+            let mut s = AppState::default();
             s.mode = Mode::Input;
             for ch in "abc".chars() {
                 s.active_chat_input_mut().insert_grapheme_at_cursor(ch);
@@ -254,7 +254,7 @@ mod tests {
     fn render_normal_mode_no_cursor() {
         // Given a ChatInputBoxElement in Normal mode.
         let mut element = ChatInputBoxElement;
-        let state = AppState::new(test_utils::test_services());
+        let state = AppState::default();
 
         let backend = TestBackend::new(40, 3);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -277,7 +277,7 @@ mod tests {
         // Given a ChatInputBoxElement in Input mode with "abc" and cursor at position 1.
         let mut element = ChatInputBoxElement;
         let state = {
-            let mut s = AppState::new(test_utils::test_services());
+            let mut s = AppState::default();
             s.mode = Mode::Input;
             for ch in "abc".chars() {
                 s.active_chat_input_mut().insert_grapheme_at_cursor(ch);
@@ -309,7 +309,7 @@ mod tests {
         // Given a ChatInputBoxElement in Input mode with "hi" and cursor moved to start.
         let mut element = ChatInputBoxElement;
         let state = {
-            let mut s = AppState::new(test_utils::test_services());
+            let mut s = AppState::default();
             s.mode = Mode::Input;
             for ch in "hi".chars() {
                 s.active_chat_input_mut().insert_grapheme_at_cursor(ch);
@@ -340,7 +340,7 @@ mod tests {
         // Given a ChatInputBoxElement in Input mode with "hi" and cursor at end.
         let mut element = ChatInputBoxElement;
         let state = {
-            let mut s = AppState::new(test_utils::test_services());
+            let mut s = AppState::default();
             s.mode = Mode::Input;
             for ch in "hi".chars() {
                 s.active_chat_input_mut().insert_grapheme_at_cursor(ch);
@@ -371,7 +371,7 @@ mod tests {
         // Given a ChatInputBoxElement with "hello\nworld" in buffer (Normal mode).
         let mut element = ChatInputBoxElement;
         let state = {
-            let mut s = AppState::new(test_utils::test_services());
+            let mut s = AppState::default();
             for ch in "hello\nworld".chars() {
                 s.active_chat_input_mut().insert_grapheme_at_cursor(ch);
             }
@@ -408,7 +408,7 @@ mod tests {
         // Given a ChatInputBoxElement in Input mode with "ab\ncd" and cursor at end.
         let mut element = ChatInputBoxElement;
         let state = {
-            let mut s = AppState::new(test_utils::test_services());
+            let mut s = AppState::default();
             s.mode = Mode::Input;
             for ch in "ab\ncd".chars() {
                 s.active_chat_input_mut().insert_grapheme_at_cursor(ch);
@@ -439,7 +439,7 @@ mod tests {
         // Given a ChatInputBoxElement in Input mode with "a\n\nb" and cursor at the empty middle line.
         let mut element = ChatInputBoxElement;
         let state = {
-            let mut s = AppState::new(test_utils::test_services());
+            let mut s = AppState::default();
             s.mode = Mode::Input;
             for ch in "a\n\nb".chars() {
                 s.active_chat_input_mut().insert_grapheme_at_cursor(ch);

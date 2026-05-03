@@ -20,23 +20,23 @@ use std::rc::Rc;
 
 use nullslop_protocol::CommandAction;
 
-use crate::handler::{CommandHandler, EventHandler};
+use crate::handler::{CommandHandler, EventHandler, HandlerContext};
 use crate::out::Out;
 
 /// Fake command handler that records every command it receives.
 ///
 /// Returns a configurable [`CommandAction`] on each call, allowing tests to
 /// exercise both continuation and stop-propagation paths.
-pub struct FakeCommandHandler<C, S> {
+pub struct FakeCommandHandler<C, S, Sv> {
     /// Recorded command invocations.
     calls: Rc<RefCell<Vec<C>>>,
     /// The action to return from each handle call.
     action: CommandAction,
     /// Marker for the unused state type parameter.
-    _phantom: PhantomData<S>,
+    _phantom: PhantomData<(S, Sv)>,
 }
 
-impl<C, S> FakeCommandHandler<C, S>
+impl<C, S, Sv> FakeCommandHandler<C, S, Sv>
 where
     C: Clone + 'static,
 {
@@ -65,25 +65,25 @@ where
     }
 }
 
-impl<C, S> CommandHandler<C, S> for FakeCommandHandler<C, S>
+impl<C, S, Sv> CommandHandler<C, S, Sv> for FakeCommandHandler<C, S, Sv>
 where
     C: Clone + 'static,
 {
-    fn handle(&self, cmd: &C, _state: &mut S, _out: &mut Out) -> CommandAction {
+    fn handle(&self, cmd: &C, _ctx: &mut HandlerContext<'_, S, Sv>) -> CommandAction {
         self.calls.borrow_mut().push(cmd.clone());
         self.action
     }
 }
 
 /// Fake event handler that records every event it receives.
-pub struct FakeEventHandler<E, S> {
+pub struct FakeEventHandler<E, S, Sv> {
     /// Recorded event invocations.
     calls: Rc<RefCell<Vec<E>>>,
     /// Marker for the unused state type parameter.
-    _phantom: PhantomData<S>,
+    _phantom: PhantomData<(S, Sv)>,
 }
 
-impl<E, S> FakeEventHandler<E, S>
+impl<E, S, Sv> FakeEventHandler<E, S, Sv>
 where
     E: Clone + 'static,
 {
@@ -101,7 +101,7 @@ where
     }
 }
 
-impl<E, S> Default for FakeEventHandler<E, S>
+impl<E, S, Sv> Default for FakeEventHandler<E, S, Sv>
 where
     E: Clone + 'static,
 {
@@ -110,11 +110,11 @@ where
     }
 }
 
-impl<E, S> EventHandler<E, S> for FakeEventHandler<E, S>
+impl<E, S, Sv> EventHandler<E, S, Sv> for FakeEventHandler<E, S, Sv>
 where
     E: Clone + 'static,
 {
-    fn handle(&self, evt: &E, _state: &mut S, _out: &mut Out) {
+    fn handle(&self, evt: &E, _ctx: &mut HandlerContext<'_, S, Sv>) {
         self.calls.borrow_mut().push(evt.clone());
     }
 }
@@ -132,12 +132,14 @@ mod tests {
     #[test]
     fn fake_command_handler_records_call() {
         // Given a continuing fake handler.
-        let (handler, calls) = FakeCommandHandler::<Quit, TestState>::continuing();
+        let (handler, calls) = FakeCommandHandler::<Quit, TestState, ()>::continuing();
         let mut state = TestState;
+        let services = ();
         let mut out = Out::new();
+        let mut ctx = HandlerContext::new(&mut state, &services, &mut out);
 
         // When handling a command.
-        let action = handler.handle(&Quit, &mut state, &mut out);
+        let action = handler.handle(&Quit, &mut ctx);
 
         // Then the action is Continue and the call was recorded.
         assert_eq!(action, CommandAction::Continue);
@@ -147,12 +149,14 @@ mod tests {
     #[test]
     fn fake_command_handler_stopping() {
         // Given a stopping fake handler.
-        let (handler, calls) = FakeCommandHandler::<Quit, TestState>::stopping();
+        let (handler, calls) = FakeCommandHandler::<Quit, TestState, ()>::stopping();
         let mut state = TestState;
+        let services = ();
         let mut out = Out::new();
+        let mut ctx = HandlerContext::new(&mut state, &services, &mut out);
 
         // When handling a command.
-        let action = handler.handle(&Quit, &mut state, &mut out);
+        let action = handler.handle(&Quit, &mut ctx);
 
         // Then the action is Stop.
         assert_eq!(action, CommandAction::Stop);
@@ -162,7 +166,7 @@ mod tests {
     #[test]
     fn fake_command_handler_shared_call_log() {
         // Given a handler whose call_log is cloned.
-        let (handler, calls) = FakeCommandHandler::<Quit, TestState>::continuing();
+        let (handler, calls) = FakeCommandHandler::<Quit, TestState, ()>::continuing();
         let calls_clone = Rc::clone(&calls);
 
         // When moving the handler (simulating bus registration).
@@ -176,9 +180,11 @@ mod tests {
     fn fake_event_handler_records_call() {
         // Given a fake event handler for KeyDown.
         use npr::system::KeyDown;
-        let (handler, calls) = FakeEventHandler::<KeyDown, TestState>::new();
+        let (handler, calls) = FakeEventHandler::<KeyDown, TestState, ()>::new();
         let mut state = TestState;
+        let services = ();
         let mut out = Out::new();
+        let mut ctx = HandlerContext::new(&mut state, &services, &mut out);
 
         // When handling an event.
         handler.handle(
@@ -188,8 +194,7 @@ mod tests {
                     modifiers: npr::Modifiers::none(),
                 },
             },
-            &mut state,
-            &mut out,
+            &mut ctx,
         );
 
         // Then the call was recorded.
