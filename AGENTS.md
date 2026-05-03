@@ -2,6 +2,11 @@
 
 This document defines the _coding conventions_ and _patterns_ for the `nullslop` codebase. Always load the [ARCHITECTURE.md](./ARCHITECTURE.md) document for more detailed information that will help guide change requests and code reviews.
 
+IMPORTANT NOTE:
+
+- Long-running async tasks are handled by actors. See ARCHITECTURE.md for more details.
+- Sync component handlers are mostly for UI concerns with some decision making.
+
 ## 1. Overview
 
 This style guide ensures consistent, maintainable Rust code across the codebase. It covers error handling, trait-based design, testing patterns, documentation standards, and module organization. Following these patterns enables dependency injection for testability and clear separation of concerns.
