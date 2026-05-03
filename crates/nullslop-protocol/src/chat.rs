@@ -35,7 +35,10 @@ pub enum ChatEntryKind {
 impl ChatEntry {
     /// Create a new user chat entry with the current timestamp.
     #[must_use]
-    pub fn user<T: Into<String>>(text: T) -> Self {
+    pub fn user<T>(text: T) -> Self
+    where
+        T: Into<String>,
+    {
         Self {
             timestamp: jiff::Timestamp::now(),
             kind: ChatEntryKind::User(text.into()),
@@ -44,7 +47,10 @@ impl ChatEntry {
 
     /// Create a new system chat entry with the current timestamp.
     #[must_use]
-    pub fn system<T: Into<String>>(text: T) -> Self {
+    pub fn system<T>(text: T) -> Self
+    where
+        T: Into<String>,
+    {
         Self {
             timestamp: jiff::Timestamp::now(),
             kind: ChatEntryKind::System(text.into()),
@@ -53,7 +59,10 @@ impl ChatEntry {
 
     /// Create a new assistant chat entry with the current timestamp.
     #[must_use]
-    pub fn assistant<T: Into<String>>(text: T) -> Self {
+    pub fn assistant<T>(text: T) -> Self
+    where
+        T: Into<String>,
+    {
         Self {
             timestamp: jiff::Timestamp::now(),
             kind: ChatEntryKind::Assistant(text.into()),
@@ -62,7 +71,11 @@ impl ChatEntry {
 
     /// Create a new actor chat entry with the current timestamp.
     #[must_use]
-    pub fn actor<S: Into<String>, T: Into<String>>(source: S, text: T) -> Self {
+    pub fn actor<S, T>(source: S, text: T) -> Self
+    where
+        S: Into<String>,
+        T: Into<String>,
+    {
         Self {
             timestamp: jiff::Timestamp::now(),
             kind: ChatEntryKind::Actor {

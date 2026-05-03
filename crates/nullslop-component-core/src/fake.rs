@@ -36,7 +36,10 @@ pub struct FakeCommandHandler<C, S> {
     _phantom: PhantomData<S>,
 }
 
-impl<C: Clone + 'static, S> FakeCommandHandler<C, S> {
+impl<C, S> FakeCommandHandler<C, S>
+where
+    C: Clone + 'static,
+{
     /// Create a new fake that returns the given action.
     ///
     /// Returns a tuple of `(handler, call_log)`. The handler should be registered
@@ -62,7 +65,10 @@ impl<C: Clone + 'static, S> FakeCommandHandler<C, S> {
     }
 }
 
-impl<C: Clone + 'static, S> CommandHandler<C, S> for FakeCommandHandler<C, S> {
+impl<C, S> CommandHandler<C, S> for FakeCommandHandler<C, S>
+where
+    C: Clone + 'static,
+{
     fn handle(&self, cmd: &C, _state: &mut S, _out: &mut Out) -> CommandAction {
         self.calls.borrow_mut().push(cmd.clone());
         self.action
@@ -77,7 +83,10 @@ pub struct FakeEventHandler<E, S> {
     _phantom: PhantomData<S>,
 }
 
-impl<E: Clone + 'static, S> FakeEventHandler<E, S> {
+impl<E, S> FakeEventHandler<E, S>
+where
+    E: Clone + 'static,
+{
     /// Create a new fake event handler.
     ///
     /// Returns a tuple of `(handler, call_log)`. The handler should be registered
@@ -92,13 +101,19 @@ impl<E: Clone + 'static, S> FakeEventHandler<E, S> {
     }
 }
 
-impl<E: Clone + 'static, S> Default for FakeEventHandler<E, S> {
+impl<E, S> Default for FakeEventHandler<E, S>
+where
+    E: Clone + 'static,
+{
     fn default() -> Self {
         Self::new().0
     }
 }
 
-impl<E: Clone + 'static, S> EventHandler<E, S> for FakeEventHandler<E, S> {
+impl<E, S> EventHandler<E, S> for FakeEventHandler<E, S>
+where
+    E: Clone + 'static,
+{
     fn handle(&self, evt: &E, _state: &mut S, _out: &mut Out) {
         self.calls.borrow_mut().push(evt.clone());
     }

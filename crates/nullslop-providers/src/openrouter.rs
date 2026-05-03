@@ -19,7 +19,10 @@ pub struct ApiKey(String);
 impl ApiKey {
     /// Create an API key from an explicit string value.
     #[must_use]
-    pub fn new<T: Into<String>>(key: T) -> Self {
+    pub fn new<T>(key: T) -> Self
+    where
+        T: Into<String>,
+    {
         Self(key.into())
     }
 

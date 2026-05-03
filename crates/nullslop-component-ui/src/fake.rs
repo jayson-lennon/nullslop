@@ -59,7 +59,10 @@ impl<S> FakeUiElement<S> {
     }
 }
 
-impl<S: std::fmt::Debug + 'static> UiElement<S> for FakeUiElement<S> {
+impl<S> UiElement<S> for FakeUiElement<S>
+where
+    S: std::fmt::Debug + 'static,
+{
     fn name(&self) -> String {
         self.name.clone()
     }

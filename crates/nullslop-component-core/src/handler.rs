@@ -16,7 +16,10 @@ use crate::Out;
 /// Return [`CommandAction::Stop`] to prevent further handlers from seeing
 /// this command. Return [`CommandAction::Continue`] to allow the next handler
 /// to run.
-pub trait CommandHandler<C: 'static, S> {
+pub trait CommandHandler<C, S>
+where
+    C: 'static,
+{
     /// Handle a command.
     ///
     /// # Arguments
@@ -38,7 +41,10 @@ pub trait CommandHandler<C: 'static, S> {
 /// application state. New messages can be submitted via `out`. Events are
 /// fire-and-forget — all registered handlers always run; there is no
 /// interception.
-pub trait EventHandler<E: 'static, S> {
+pub trait EventHandler<E, S>
+where
+    E: 'static,
+{
     /// Handle an event.
     ///
     /// # Arguments

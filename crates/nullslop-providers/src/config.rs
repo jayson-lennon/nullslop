@@ -5,7 +5,7 @@
 //! lives at `~/.config/nullslop/providers.toml` and is auto-created on
 //! first run with commented-out examples for every known backend.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use error_stack::{Report, ResultExt as _};
 use serde::{Deserialize, Serialize};
@@ -107,7 +107,12 @@ pub fn load_config() -> Result<ProvidersConfig, Report<ConfigError>> {
 }
 
 /// Loads config from a specific path (testable without touching real config).
-pub(crate) fn load_config_from(path: &PathBuf) -> Result<ProvidersConfig, Report<ConfigError>> {
+pub(crate) fn load_config_from<P>(path: P) -> Result<ProvidersConfig, Report<ConfigError>>
+where
+    P: AsRef<Path>,
+{
+    let path = path.as_ref();
+
     if !path.exists() {
         create_default_config_to(path)?;
     }
@@ -135,7 +140,12 @@ pub fn create_default_config() -> Result<PathBuf, Report<ConfigError>> {
 }
 
 /// Creates the default config file at an explicit path.
-pub(crate) fn create_default_config_to(path: &PathBuf) -> Result<(), Report<ConfigError>> {
+pub(crate) fn create_default_config_to<P>(path: P) -> Result<(), Report<ConfigError>>
+where
+    P: AsRef<Path>,
+{
+    let path = path.as_ref();
+
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
             .change_context(ConfigError::Io)
@@ -163,15 +173,18 @@ pub fn save_config(config: &ProvidersConfig) -> Result<(), Report<ConfigError>> 
 }
 
 /// Saves config to a specific path.
-pub(crate) fn save_config_to(
+pub(crate) fn save_config_to<P>(
     config: &ProvidersConfig,
-    path: &PathBuf,
-) -> Result<(), Report<ConfigError>> {
+    path: P,
+) -> Result<(), Report<ConfigError>>
+where
+    P: AsRef<Path>,
+{
     let content = toml::to_string_pretty(config)
         .change_context(ConfigError::Parse)
         .attach("failed to serialize providers config")?;
 
-    std::fs::write(path, content)
+    std::fs::write(path.as_ref(), content)
         .change_context(ConfigError::Io)
         .attach("failed to write providers config")
 }

@@ -465,7 +465,10 @@ impl<S> Bus<S> {
     }
 
     /// Look up and invoke handlers for a concrete command type `C`.
-    fn dispatch_command_to_handlers<C: 'static>(&self, cmd: &C, state: &mut S, out: &mut Out) {
+    fn dispatch_command_to_handlers<C>(&self, cmd: &C, state: &mut S, out: &mut Out)
+    where
+        C: 'static,
+    {
         let type_id = TypeId::of::<C>();
         if let Some(handlers) = self.command_handlers.get(&type_id) {
             for h in handlers {
@@ -518,7 +521,10 @@ impl<S> Bus<S> {
     }
 
     /// Look up and invoke handlers for a concrete event type `E`.
-    fn dispatch_event_to_handlers<E: 'static>(&self, evt: &E, state: &mut S, out: &mut Out) {
+    fn dispatch_event_to_handlers<E>(&self, evt: &E, state: &mut S, out: &mut Out)
+    where
+        E: 'static,
+    {
         let type_id = TypeId::of::<E>();
         if let Some(handlers) = self.event_handlers.get(&type_id) {
             for h in handlers {

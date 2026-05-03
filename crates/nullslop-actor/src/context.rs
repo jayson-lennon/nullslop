@@ -68,7 +68,10 @@ impl ActorContext {
     ///
     /// For compile-time-checked subscriptions, prefer
     /// [`subscribe_event`](Self::subscribe_event).
-    pub fn subscribe_event_by_name<N: Into<EventTypeName>>(&mut self, name: N) {
+    pub fn subscribe_event_by_name<N>(&mut self, name: N)
+    where
+        N: Into<EventTypeName>,
+    {
         self.subscriptions.push(name.into());
     }
 
@@ -76,7 +79,10 @@ impl ActorContext {
     ///
     /// Uses the [`EventMsg::TYPE_NAME`] constant for routing,
     /// providing compile-time validation.
-    pub fn subscribe_event<T: EventMsg>(&mut self) {
+    pub fn subscribe_event<T>(&mut self)
+    where
+        T: EventMsg,
+    {
         self.subscriptions.push(T::TYPE_NAME.to_owned());
     }
 
@@ -84,7 +90,10 @@ impl ActorContext {
     ///
     /// For compile-time-checked subscriptions, prefer
     /// [`subscribe_command`](Self::subscribe_command).
-    pub fn subscribe_command_by_name<N: Into<CommandName>>(&mut self, name: N) {
+    pub fn subscribe_command_by_name<N>(&mut self, name: N)
+    where
+        N: Into<CommandName>,
+    {
         self.commands.push(name.into());
     }
 
@@ -92,7 +101,10 @@ impl ActorContext {
     ///
     /// Uses the [`CommandMsg::NAME`] constant for routing,
     /// providing compile-time validation.
-    pub fn subscribe_command<T: CommandMsg>(&mut self) {
+    pub fn subscribe_command<T>(&mut self)
+    where
+        T: CommandMsg,
+    {
         self.commands.push(T::NAME.to_owned());
     }
 
@@ -100,7 +112,10 @@ impl ActorContext {
     ///
     /// The actor retrieves it during activation with
     /// [`take_actor_ref::<M>()`](Self::take_actor_ref).
-    pub fn set_actor_ref<M: Send + 'static>(&mut self, actor_ref: ActorRef<M>) {
+    pub fn set_actor_ref<M>(&mut self, actor_ref: ActorRef<M>)
+    where
+        M: Send + 'static,
+    {
         self.actor_refs
             .insert(TypeId::of::<M>(), Box::new(actor_ref));
     }
@@ -109,7 +124,10 @@ impl ActorContext {
     ///
     /// Returns `None` if no `ActorRef` was stored for this message type.
     /// This is a take (not a clone) — subsequent calls return `None`.
-    pub fn take_actor_ref<M: Send + 'static>(&mut self) -> Option<ActorRef<M>> {
+    pub fn take_actor_ref<M>(&mut self) -> Option<ActorRef<M>>
+    where
+        M: Send + 'static,
+    {
         self.actor_refs
             .remove(&TypeId::of::<M>())
             .and_then(|boxed| boxed.downcast::<ActorRef<M>>().ok())
@@ -121,7 +139,10 @@ impl ActorContext {
     /// Uses the same `TypeId` pattern as [`set_actor_ref`](Self::set_actor_ref).
     /// The wiring code injects data before calling `activate`, and `activate`
     /// extracts it via [`take_data`](Self::take_data).
-    pub fn set_data<T: Send + Sync + 'static>(&mut self, data: T) {
+    pub fn set_data<T>(&mut self, data: T)
+    where
+        T: Send + Sync + 'static,
+    {
         self.data.insert(TypeId::of::<T>(), Box::new(data));
     }
 
@@ -129,7 +150,10 @@ impl ActorContext {
     ///
     /// Returns `None` if no data of this type was stored.
     /// This is a take (not a clone) — subsequent calls return `None`.
-    pub fn take_data<T: Send + Sync + 'static>(&mut self) -> Option<T> {
+    pub fn take_data<T>(&mut self) -> Option<T>
+    where
+        T: Send + Sync + 'static,
+    {
         self.data
             .remove(&TypeId::of::<T>())
             .and_then(|boxed| boxed.downcast::<T>().ok())

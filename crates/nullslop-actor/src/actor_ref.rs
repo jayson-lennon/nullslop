@@ -52,12 +52,18 @@ struct ActorCell<M> {
 /// concrete implementation.
 ///
 /// Cheaply cloneable — clones the inner [`Arc`].
-pub struct ActorRef<M: Send + 'static> {
+pub struct ActorRef<M>
+where
+    M: Send + 'static,
+{
     /// Shared inner cell containing the swappable sender.
     cell: Arc<ActorCell<M>>,
 }
 
-impl<M: Send + 'static> ActorRef<M> {
+impl<M> ActorRef<M>
+where
+    M: Send + 'static,
+{
     /// Creates a new `ActorRef` wrapping the given sender.
     #[must_use]
     pub fn new(sender: Sender<ActorEnvelope<M>>) -> Self {
@@ -151,7 +157,10 @@ impl<M: Send + 'static> ActorRef<M> {
     }
 }
 
-impl<M: Send + 'static> Clone for ActorRef<M> {
+impl<M> Clone for ActorRef<M>
+where
+    M: Send + 'static,
+{
     fn clone(&self) -> Self {
         Self {
             cell: Arc::clone(&self.cell),
@@ -159,7 +168,10 @@ impl<M: Send + 'static> Clone for ActorRef<M> {
     }
 }
 
-impl<M: Send + 'static> std::fmt::Debug for ActorRef<M> {
+impl<M> std::fmt::Debug for ActorRef<M>
+where
+    M: Send + 'static,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ActorRef").finish_non_exhaustive()
     }

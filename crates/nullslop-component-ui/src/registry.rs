@@ -17,7 +17,10 @@ pub struct UiRegistry<S> {
     elements: Vec<Box<dyn UiElement<S>>>,
 }
 
-impl<S: 'static> UiRegistry<S> {
+impl<S> UiRegistry<S>
+where
+    S: 'static,
+{
     /// Create a new empty registry.
     #[must_use]
     pub fn new() -> Self {
@@ -50,7 +53,10 @@ impl<S: 'static> UiRegistry<S> {
     }
 }
 
-impl<S: 'static> Default for UiRegistry<S> {
+impl<S> Default for UiRegistry<S>
+where
+    S: 'static,
+{
     fn default() -> Self {
         Self::new()
     }
