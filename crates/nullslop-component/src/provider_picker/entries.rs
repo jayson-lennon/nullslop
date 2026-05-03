@@ -26,24 +26,44 @@ pub struct PickerEntry {
     pub is_available: bool,
 }
 
-/// Reorders entries so the entry matching `active_provider` appears first.
+/// Reorders entries so that available entries appear first (sorted by model name),
+/// followed by unavailable entries (sorted by model name). When `filter` is empty,
+/// the entry matching `active_provider` is promoted to the very top.
 ///
-/// Only reorders when `filter` is empty — when filtering, entries stay in their
-/// original order. `active_provider` is in `{name}/{model}` format
-/// (e.g., `"ollama/llama3"`).
+/// `active_provider` is in `{name}/{model}` format (e.g., `"ollama/llama3"`).
 pub fn sorted_entries(
-    mut entries: Vec<PickerEntry>,
+    entries: Vec<PickerEntry>,
     filter: &str,
     active_provider: &str,
 ) -> Vec<PickerEntry> {
+    // Split into available and unavailable blocks.
+    let mut available: Vec<PickerEntry> = entries
+        .iter()
+        .filter(|e| e.is_available)
+        .cloned()
+        .collect();
+    let mut unavailable: Vec<PickerEntry> = entries
+        .iter()
+        .filter(|e| !e.is_available)
+        .cloned()
+        .collect();
+
+    // Sort each block alphabetically by model name (case-insensitive).
+    available.sort_by(|a, b| a.model.to_lowercase().cmp(&b.model.to_lowercase()));
+    unavailable.sort_by(|a, b| a.model.to_lowercase().cmp(&b.model.to_lowercase()));
+
+    // Promote active provider to top when filter is empty.
     if filter.is_empty() && active_provider != nullslop_providers::NO_PROVIDER_ID {
-        if let Some(pos) = entries.iter().position(|e| e.provider_id == active_provider) {
+        if let Some(pos) = available.iter().position(|e| e.provider_id == active_provider) {
             if pos > 0 {
-                entries[0..=pos].rotate_right(1);
+                available[0..=pos].rotate_right(1);
             }
         }
     }
-    entries
+
+    // Merge: available first, then unavailable.
+    available.extend(unavailable);
+    available
 }
 ///
 /// Reads the provider registry, API keys, and filter text to produce
@@ -395,8 +415,44 @@ mod tests {
         // When sorting with empty filter and no active provider.
         let result = sorted_entries(entries, "", "__no_provider__");
 
-        // Then order is unchanged.
+        // Then entries are sorted by model name (both "model", so relative order preserved).
         assert_eq!(result[0].provider_id, "a/model");
         assert_eq!(result[1].provider_id, "b/model");
+    }
+
+    #[test]
+    fn sorted_entries_available_before_unavailable() {
+        // Given entries with mixed availability.
+        let entries = vec![
+        PickerEntry { provider_id: "z/model".into(), name: "z".into(), provider_name: "z".into(), backend: "z".into(), model: "model".into(), is_alias: false, alias_target: None, is_available: false },
+        PickerEntry { provider_id: "a/model".into(), name: "a".into(), provider_name: "a".into(), backend: "a".into(), model: "model".into(), is_alias: false, alias_target: None, is_available: true },
+        PickerEntry { provider_id: "b/model".into(), name: "b".into(), provider_name: "b".into(), backend: "b".into(), model: "model".into(), is_alias: false, alias_target: None, is_available: false },
+    ];
+
+        // When sorting with empty filter and no active provider.
+        let result = sorted_entries(entries, "", "__no_provider__");
+
+        // Then available entry comes first, followed by unavailable entries sorted by model.
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].provider_id, "a/model");
+        assert!(result[0].is_available);
+        assert!(!result[1].is_available);
+        assert!(!result[2].is_available);
+    }
+
+    #[test]
+    fn sorted_entries_sorts_by_model_name_within_blocks() {
+        // Given entries with different model names.
+        let entries = vec![
+        PickerEntry { provider_id: "a/zebra".into(), name: "a".into(), provider_name: "a".into(), backend: "a".into(), model: "zebra".into(), is_alias: false, alias_target: None, is_available: true },
+        PickerEntry { provider_id: "b/alpha".into(), name: "b".into(), provider_name: "b".into(), backend: "b".into(), model: "alpha".into(), is_alias: false, alias_target: None, is_available: true },
+    ];
+
+        // When sorting with empty filter and no active provider.
+        let result = sorted_entries(entries, "", "__no_provider__");
+
+        // Then entries are sorted alphabetically by model name.
+        assert_eq!(result[0].provider_id, "b/alpha");
+        assert_eq!(result[1].provider_id, "a/zebra");
     }
 }

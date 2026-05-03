@@ -21,7 +21,7 @@ pub use crate::custom::EventMsg;
 // Internal imports for enum definition, type_name(), and tests.
 use crate::actor::{ActorShutdownCompleted, ActorStarted, ActorStarting};
 use crate::chat_input::ChatEntrySubmitted;
-use crate::provider::{ProviderSwitched, StreamCompleted};
+use crate::provider::{ModelsRefreshed, ProviderSwitched, StreamCompleted};
 use crate::system::{KeyDown, KeyUp, ModeChanged};
 
 /// Every event the host can broadcast.
@@ -98,6 +98,13 @@ pub enum Event {
         #[serde(flatten)]
         payload: ProviderSwitched,
     },
+    /// Models refresh completed.
+    #[serde(rename = "models_refreshed")]
+    ModelsRefreshed {
+        /// Refresh results per provider.
+        #[serde(flatten)]
+        payload: ModelsRefreshed,
+    },
 }
 
 impl Event {
@@ -114,6 +121,7 @@ impl Event {
             Self::ModeChanged { .. } => Some(ModeChanged::TYPE_NAME),
             Self::StreamCompleted { .. } => Some(StreamCompleted::TYPE_NAME),
             Self::ProviderSwitched { .. } => Some(ProviderSwitched::TYPE_NAME),
+            Self::ModelsRefreshed { .. } => Some(ModelsRefreshed::TYPE_NAME),
         }
     }
 }
@@ -161,6 +169,7 @@ mod tests {
     #[case::actor_shutdown_completed(Event::ActorShutdownCompleted { payload: ActorShutdownCompleted { name: "actor-a".into() } })]
     #[case::stream_completed(Event::StreamCompleted { payload: StreamCompleted { session_id: SessionId::new(), reason: StreamCompletedReason::Finished } })]
     #[case::provider_switched(Event::ProviderSwitched { payload: ProviderSwitched { provider_name: "Ollama".into() } })]
+    #[case::models_refreshed(Event::ModelsRefreshed { payload: ModelsRefreshed { results: std::collections::HashMap::new(), errors: std::collections::HashMap::new() } })]
     fn event_roundtrip_all_variants(#[case] event: Event) {
         // Given an event variant.
         let json = serde_json::to_string(&event).expect("serialize");
@@ -272,5 +281,8 @@ mod tests {
 
         // Then ProviderSwitched has the correct TYPE_NAME.
         assert_eq!(ProviderSwitched::TYPE_NAME, "provider::ProviderSwitched");
+
+        // Then ModelsRefreshed has the correct TYPE_NAME.
+        assert_eq!(ModelsRefreshed::TYPE_NAME, "provider::ModelsRefreshed");
     }
 }

@@ -12,6 +12,7 @@ mod config_storage;
 mod convert;
 mod fake;
 mod generic_factory;
+mod model_cache;
 mod no_providers;
 mod openrouter;
 mod provider_id;
@@ -34,6 +35,7 @@ pub use config_storage::{
 pub use convert::llm_messages_to_chat_messages;
 pub use fake::FakeLlmServiceFactory;
 pub use generic_factory::GenericLlmServiceFactory;
+pub use model_cache::{ModelCache, ModelCacheError, cache_path};
 pub use no_providers::{NO_PROVIDER_ID, NoProvidersAvailableFactory};
 pub use openrouter::{ApiKey, OpenRouterLlmServiceFactory};
 pub use provider_id::ProviderId;

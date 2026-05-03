@@ -123,9 +123,11 @@ impl PickerHandler {
     }
 }
 
-/// Maximum number of visible result rows in the picker popup.
-/// Must match the value used by the renderer.
-const PICKER_MAX_VISIBLE: usize = 8;
+/// Maximum number of visible result rows used for scroll clamping in the handler.
+/// The actual visible rows are determined dynamically by the renderer based on
+/// terminal height. This value is a generous upper bound so the handler's scroll
+/// offset tracking stays reasonable.
+const PICKER_MAX_VISIBLE: usize = 100;
 fn picker_entry_count(state: &AppState) -> usize {
     let services = &state.services;
     let registry = services.provider_registry().read();
