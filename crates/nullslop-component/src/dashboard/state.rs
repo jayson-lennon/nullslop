@@ -31,7 +31,11 @@ impl DashboardState {
     }
 
     /// Record that an actor has started the startup process.
-    pub fn mark_starting(&mut self, name: &str) {
+    pub fn mark_starting<S>(&mut self, name: S)
+    where
+        S: AsRef<str>,
+    {
+        let name = name.as_ref();
         if !self.actors.contains_key(name) {
             self.order.push(name.to_owned());
         }
@@ -42,7 +46,11 @@ impl DashboardState {
     ///
     /// If the actor was not previously tracked (no `mark_starting` call),
     /// it is added with `Started` status.
-    pub fn mark_started(&mut self, name: &str) {
+    pub fn mark_started<S>(&mut self, name: S)
+    where
+        S: AsRef<str>,
+    {
+        let name = name.as_ref();
         if !self.actors.contains_key(name) {
             self.order.push(name.to_owned());
         }

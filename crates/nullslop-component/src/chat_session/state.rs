@@ -108,7 +108,10 @@ impl ChatSessionState {
         clippy::panic,
         reason = "streaming invariant violated: entry must be Assistant during active stream"
     )]
-    pub fn append_stream_token(&mut self, token: &str) {
+    pub fn append_stream_token<S>(&mut self, token: S)
+    where
+        S: AsRef<str>,
+    {
         assert!(
             self.is_streaming,
             "append_stream_token called while not streaming"
@@ -121,7 +124,7 @@ impl ChatSessionState {
             ..
         } = self.history[index]
         {
-            text.push_str(token);
+            text.push_str(token.as_ref());
         } else {
             panic!("streaming entry is not an Assistant entry");
         }

@@ -44,14 +44,20 @@ impl ApiKeysService {
     ///
     /// Acquires a read guard and returns a cloned value if found.
     #[must_use]
-    pub fn get(&self, env_var: &str) -> Option<String> {
-        self.read().get(env_var).map(String::from)
+    pub fn get<S>(&self, env_var: S) -> Option<String>
+    where
+        S: AsRef<str>,
+    {
+        self.read().get(env_var.as_ref()).map(String::from)
     }
 
     /// Returns `true` if a non-empty key exists for the given env var name.
     #[must_use]
-    pub fn is_set(&self, env_var: &str) -> bool {
-        self.read().is_set(env_var)
+    pub fn is_set<S>(&self, env_var: S) -> bool
+    where
+        S: AsRef<str>,
+    {
+        self.read().is_set(env_var.as_ref())
     }
 
     /// Inserts a resolved key.

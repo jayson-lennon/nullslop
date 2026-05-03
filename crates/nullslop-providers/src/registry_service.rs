@@ -83,8 +83,11 @@ impl ProviderRegistryService {
     ///
     /// Acquires a read guard and clones the target entry if found.
     #[must_use]
-    pub fn resolve_alias(&self, alias_name: &str) -> Option<ResolvedProvider> {
-        self.read().resolve_alias(alias_name).cloned()
+    pub fn resolve_alias<S>(&self, alias_name: S) -> Option<ResolvedProvider>
+    where
+        S: AsRef<str>,
+    {
+        self.read().resolve_alias(alias_name.as_ref()).cloned()
     }
 
     /// Returns the configured default provider ID, if set and valid.

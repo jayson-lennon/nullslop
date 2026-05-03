@@ -48,10 +48,13 @@ impl<S> FakeUiElement<S> {
     /// Returns a tuple of `(element, call_log)`. The element should be
     /// registered with a [`UiRegistry`](crate::UiRegistry); the call log
     /// is kept by the test for assertions.
-    pub fn new(name: &str) -> (Self, Rc<RefCell<Vec<RenderCall>>>) {
+    pub fn new<S2>(name: S2) -> (Self, Rc<RefCell<Vec<RenderCall>>>)
+    where
+        S2: AsRef<str>,
+    {
         let render_calls = Rc::new(RefCell::new(Vec::new()));
         let element = Self {
-            name: name.to_owned(),
+            name: name.as_ref().to_owned(),
             render_calls: Rc::clone(&render_calls),
             _phantom: PhantomData,
         };

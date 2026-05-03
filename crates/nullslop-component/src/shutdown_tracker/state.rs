@@ -27,15 +27,21 @@ impl ShutdownTrackerState {
     }
 
     /// Record that an actor has started.
-    pub fn track(&mut self, name: &str) {
-        self.pending.insert(name.to_owned());
+    pub fn track<S>(&mut self, name: S)
+    where
+        S: AsRef<str>,
+    {
+        self.pending.insert(name.as_ref().to_owned());
     }
 
     /// Record that an actor has finished shutting down.
     ///
     /// Returns `true` if this actor was known to be running.
-    pub fn complete(&mut self, name: &str) -> bool {
-        self.pending.remove(name)
+    pub fn complete<S>(&mut self, name: S) -> bool
+    where
+        S: AsRef<str>,
+    {
+        self.pending.remove(name.as_ref())
     }
 
     /// Returns `true` when shutdown is in progress and every actor has finished.

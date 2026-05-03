@@ -162,7 +162,11 @@ impl ProviderRegistry {
 
     /// Resolves an alias name to its target resolved provider.
     #[must_use]
-    pub fn resolve_alias(&self, alias_name: &str) -> Option<&ResolvedProvider> {
+    pub fn resolve_alias<S>(&self, alias_name: S) -> Option<&ResolvedProvider>
+    where
+        S: AsRef<str>,
+    {
+        let alias_name = alias_name.as_ref();
         let alias = self.config.aliases.iter().find(|a| a.name == alias_name)?;
         self.get(&ProviderId::new(alias.target.clone()))
     }

@@ -68,7 +68,11 @@ impl UiElement<AppState> for ChatInputBoxElement {
 /// Build visual lines from the input buffer text, splitting on `\n`.
 ///
 /// The first line gets a `> ` prompt prefix, continuation lines get `  ` indentation.
-fn build_lines<'a>(text: &str, prompt_style: Style, text_style: Style) -> Vec<Line<'a>> {
+fn build_lines<'a, S>(text: S, prompt_style: Style, text_style: Style) -> Vec<Line<'a>>
+where
+    S: AsRef<str>,
+{
+    let text = text.as_ref();
     if text.is_empty() {
         return vec![Line::from(vec![Span::styled("> ", prompt_style)])];
     }

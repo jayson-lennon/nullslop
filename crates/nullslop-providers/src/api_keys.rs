@@ -33,14 +33,20 @@ impl ApiKeys {
     ///
     /// Returns `None` if the key was not resolved at startup.
     #[must_use]
-    pub fn get(&self, env_var: &str) -> Option<&str> {
-        self.keys.get(env_var).map(String::as_str)
+    pub fn get<K>(&self, env_var: K) -> Option<&str>
+    where
+        K: AsRef<str>,
+    {
+        self.keys.get(env_var.as_ref()).map(String::as_str)
     }
 
     /// Returns `true` if a non-empty key exists for the given env var name.
     #[must_use]
-    pub fn is_set(&self, env_var: &str) -> bool {
-        self.keys.get(env_var).is_some_and(|v| !v.is_empty())
+    pub fn is_set<K>(&self, env_var: K) -> bool
+    where
+        K: AsRef<str>,
+    {
+        self.keys.get(env_var.as_ref()).is_some_and(|v| !v.is_empty())
     }
 }
 

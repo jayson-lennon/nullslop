@@ -47,9 +47,12 @@ impl ActorContext {
     /// Called by the actor host during startup — actor authors typically
     /// don't construct this directly.
     #[must_use]
-    pub fn new(name: &str, sink: Arc<dyn MessageSink>) -> Self {
+    pub fn new<S>(name: S, sink: Arc<dyn MessageSink>) -> Self
+    where
+        S: AsRef<str>,
+    {
         Self {
-            name: name.to_owned(),
+            name: name.as_ref().to_owned(),
             subscriptions: Vec::new(),
             commands: Vec::new(),
             actor_refs: HashMap::new(),
