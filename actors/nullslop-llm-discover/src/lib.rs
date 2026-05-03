@@ -53,10 +53,7 @@ impl Actor for DiscoverActor {
             .take_data::<ApiKeysService>()
             .expect("ApiKeysService must be injected via ctx.set_data()");
 
-        Self {
-            registry,
-            api_keys,
-        }
+        Self { registry, api_keys }
     }
 
     async fn handle(&mut self, msg: ActorEnvelope<DiscoverDirectMsg>, ctx: &ActorContext) {
@@ -126,8 +123,7 @@ impl DiscoverActor {
                 if let Some(key) = self.api_keys.get(env_var) {
                     Some(key)
                 } else {
-                    errors
-                        .insert(entry.name.clone(), "API key not resolved".to_owned());
+                    errors.insert(entry.name.clone(), "API key not resolved".to_owned());
                     continue;
                 }
             } else {
@@ -135,9 +131,7 @@ impl DiscoverActor {
             };
 
             // Build provider.
-            let mut builder = LLMBuilder::new()
-                .backend(backend)
-                .model(placeholder_model);
+            let mut builder = LLMBuilder::new().backend(backend).model(placeholder_model);
 
             if let Some(ref url) = entry.base_url {
                 builder = builder.base_url(url);
@@ -184,10 +178,7 @@ impl DiscoverActor {
 
         // Emit ModelsRefreshed event.
         let _ = ctx.send_event(Event::ModelsRefreshed {
-            payload: ModelsRefreshed {
-                results,
-                errors,
-            },
+            payload: ModelsRefreshed { results, errors },
         });
     }
 }

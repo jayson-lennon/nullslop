@@ -26,10 +26,12 @@ use crate::chat_input::{
     MoveCursorWordRight, PushChatEntry, SetChatInputText, SubmitMessage,
 };
 use crate::chat_input::{MoveCursorLeft, MoveCursorRight};
-use crate::provider::{CancelStream, ProviderSwitch, RefreshModels, SendMessage, SendToLlmProvider, StreamToken};
+use crate::provider::{
+    CancelStream, ProviderSwitch, RefreshModels, SendMessage, SendToLlmProvider, StreamToken,
+};
 use crate::provider_picker::{
-    PickerBackspace, PickerConfirm, PickerInsertChar, PickerMoveCursorLeft,
-    PickerMoveCursorRight, PickerMoveDown, PickerMoveUp,
+    PickerBackspace, PickerConfirm, PickerInsertChar, PickerMoveCursorLeft, PickerMoveCursorRight,
+    PickerMoveDown, PickerMoveUp,
 };
 use crate::system::SetMode;
 use crate::tab::SwitchTab;

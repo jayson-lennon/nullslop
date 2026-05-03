@@ -135,7 +135,7 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
     render_which_key(frame, &mut app.which_key);
 
     if state.mode == Mode::Picker {
-        render_provider_picker(frame, area, &state);
+        render_provider_picker(frame, area, &state, &app.services);
     }
 }
 
@@ -194,20 +194,25 @@ fn compute_popup_rect(area: Rect) -> Rect {
 ///
 /// Telescope-style layout: bordered popup with filter input at top,
 /// horizontal separator, scrollable results, and a footer line.
-fn render_provider_picker(frame: &mut Frame<'_>, area: Rect, state: &nullslop_component::AppState) {
+fn render_provider_picker(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    state: &nullslop_component::AppState,
+    services: &nullslop_services::Services,
+) {
     use ratatui::widgets::{Block, Borders};
 
     let popup_area = compute_popup_rect(area);
 
-    let services = &state.services;
     let registry = services.provider_registry().read();
     let api_keys = services.api_keys().read();
-    let unsorted = filtered_entries(&registry, &api_keys, &state.picker.filter, state.model_cache.as_ref());
-    let entries = sorted_entries(
-        &unsorted,
+    let unsorted = filtered_entries(
+        &registry,
+        &api_keys,
         &state.picker.filter,
-        &state.active_provider,
+        state.model_cache.as_ref(),
     );
+    let entries = sorted_entries(&unsorted, &state.picker.filter, &state.active_provider);
 
     // Render popup block with muted border.
     let block = Block::default()
@@ -244,7 +249,8 @@ fn render_provider_picker(frame: &mut Frame<'_>, area: Rect, state: &nullslop_co
 
     // Results area \u2014 windowed display with scroll_offset.
     let max_visible = results_area.height as usize;
-    let result_lines = build_result_lines(&entries, &state.picker, &state.active_provider, max_visible);
+    let result_lines =
+        build_result_lines(&entries, &state.picker, &state.active_provider, max_visible);
     frame.render_widget(Paragraph::new(result_lines), results_area);
 
     // Footer: last updated timestamp + refresh hint (right-aligned).
@@ -281,7 +287,9 @@ fn build_result_lines<'a>(
             let active_marker = Span::styled(
                 if is_active { "> " } else { "  " },
                 if is_active {
-                    Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+                    Style::default()
+                        .fg(Color::Green)
+                        .add_modifier(Modifier::BOLD)
                 } else {
                     Style::default()
                 },
@@ -314,7 +322,10 @@ fn build_result_lines<'a>(
                 Style::default()
             };
 
-            lines.push(Line::from(vec![active_marker, Span::styled(label, label_style)]));
+            lines.push(Line::from(vec![
+                active_marker,
+                Span::styled(label, label_style),
+            ]));
         } else {
             // Empty row to maintain fixed height.
             lines.push(Line::from(""));
@@ -332,42 +343,39 @@ fn format_footer(last_refreshed_at: Option<&jiff::Timestamp>, width: usize) -> L
     let gray = Style::default().fg(Color::DarkGray);
     let orange = Style::default().fg(Color::Rgb(255, 165, 0));
 
-    match last_refreshed_at {
-        Some(ts) => {
-            let elapsed = jiff::Timestamp::now() - *ts;
-            let secs = elapsed.total(jiff::Unit::Second).unwrap_or(0.0).round() as u64;
-            let duration = std::time::Duration::from_secs(secs);
-            let human = humantime::format_duration(duration);
-            let age_color = age_color(secs);
+    if let Some(ts) = last_refreshed_at {
+        let elapsed = jiff::Timestamp::now() - *ts;
+        let secs = elapsed.total(jiff::Unit::Second).unwrap_or(0.0).round() as u64;
+        let duration = std::time::Duration::from_secs(secs);
+        let human = humantime::format_duration(duration);
+        let age_color = age_color(secs);
 
-            // Format timestamp without fractional seconds.
-            let formatted_ts = format!("{ts:.0}");
+        // Format timestamp without fractional seconds.
+        let formatted_ts = format!("{ts:.0}");
 
-            let left = "CTRL+R to refresh ";
-            let pipe = "|";
-            let mid = format!(" Updated {formatted_ts} (");
-            let right = format!("{human} ago)");
+        let left = "CTRL+R to refresh ";
+        let pipe = "|";
+        let mid = format!(" Updated {formatted_ts} (");
+        let right = format!("{human} ago)");
 
-            let line = Line::from(vec![
-                Span::styled(left.to_owned(), orange),
-                Span::styled(pipe.to_owned(), gray),
-                Span::styled(mid, gray),
-                Span::styled(right, Style::default().fg(age_color)),
-            ]);
-            truncate_line(line, width)
-        }
-        None => {
-            let left = "CTRL+R to refresh ";
-            let pipe = "|";
-            let right = " Updated never";
+        let line = Line::from(vec![
+            Span::styled(left.to_owned(), orange),
+            Span::styled(pipe.to_owned(), gray),
+            Span::styled(mid, gray),
+            Span::styled(right, Style::default().fg(age_color)),
+        ]);
+        truncate_line(line, width)
+    } else {
+        let left = "CTRL+R to refresh ";
+        let pipe = "|";
+        let right = " Updated never";
 
-            let line = Line::from(vec![
-                Span::styled(left.to_owned(), orange),
-                Span::styled(pipe.to_owned(), gray),
-                Span::styled(right.to_owned(), gray),
-            ]);
-            truncate_line(line, width)
-        }
+        let line = Line::from(vec![
+            Span::styled(left.to_owned(), orange),
+            Span::styled(pipe.to_owned(), gray),
+            Span::styled(right.to_owned(), gray),
+        ]);
+        truncate_line(line, width)
     }
 }
 
@@ -498,7 +506,7 @@ mod tests {
 
     // --- Provider picker rendering tests ---
 
-    fn picker_state_with_ollama() -> nullslop_component::AppState {
+    fn picker_state_with_ollama() -> (nullslop_component::AppState, nullslop_services::Services) {
         use nullslop_providers::{ProviderEntry, ProvidersConfig};
         let config = ProvidersConfig {
             providers: vec![ProviderEntry {
@@ -515,7 +523,7 @@ mod tests {
         let services = nullslop_services::test_services::TestServices::builder()
             .with_providers(config)
             .build();
-        nullslop_component::AppState::new(services)
+        (nullslop_component::AppState::default(), services)
     }
 
     #[test]
@@ -524,7 +532,7 @@ mod tests {
         use ratatui::Terminal;
         use ratatui::backend::TestBackend;
 
-        let mut state = picker_state_with_ollama();
+        let (mut state, services) = picker_state_with_ollama();
         state.mode = nullslop_protocol::Mode::Picker;
         state.picker.filter = "ol".to_owned();
 
@@ -535,7 +543,7 @@ mod tests {
         terminal
             .draw(|frame| {
                 let area = frame.area();
-                render_provider_picker(frame, area, &state);
+                render_provider_picker(frame, area, &state, &services);
             })
             .unwrap();
 
@@ -577,7 +585,7 @@ mod tests {
         use ratatui::Terminal;
         use ratatui::backend::TestBackend;
 
-        let state = picker_state_with_ollama();
+        let (state, services) = picker_state_with_ollama();
 
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -585,7 +593,7 @@ mod tests {
         terminal
             .draw(|frame| {
                 let area = frame.area();
-                render_provider_picker(frame, area, &state);
+                render_provider_picker(frame, area, &state, &services);
             })
             .unwrap();
 
@@ -602,7 +610,7 @@ mod tests {
         use ratatui::Terminal;
         use ratatui::backend::TestBackend;
 
-        let mut state = picker_state_with_ollama();
+        let (mut state, services) = picker_state_with_ollama();
         state.mode = nullslop_protocol::Mode::Picker;
         state.active_provider = "ollama/llama3".to_owned();
 
@@ -613,7 +621,7 @@ mod tests {
         terminal
             .draw(|frame| {
                 let area = frame.area();
-                render_provider_picker(frame, area, &state);
+                render_provider_picker(frame, area, &state, &services);
             })
             .unwrap();
 

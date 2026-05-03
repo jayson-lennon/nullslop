@@ -8,12 +8,13 @@ use crate::provider_picker::entries::{filtered_entries, sorted_entries};
 use npr::CommandAction;
 use npr::provider::ProviderSwitch;
 use npr::provider_picker::{
-    PickerBackspace, PickerConfirm, PickerInsertChar, PickerMoveCursorLeft,
-    PickerMoveCursorRight, PickerMoveDown, PickerMoveUp,
+    PickerBackspace, PickerConfirm, PickerInsertChar, PickerMoveCursorLeft, PickerMoveCursorRight,
+    PickerMoveDown, PickerMoveUp,
 };
 use npr::system::SetMode;
-use nullslop_component_core::{Out, define_handler};
+use nullslop_component_core::{HandlerContext, define_handler};
 use nullslop_protocol as npr;
+use nullslop_services::Services;
 
 define_handler! {
     pub(crate) struct PickerHandler;
@@ -35,16 +36,18 @@ impl PickerHandler {
     /// Inserts a character into the picker filter.
     fn on_insert_char(
         cmd: &PickerInsertChar,
-        state: &mut AppState,
-        _out: &mut Out,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
     ) -> CommandAction {
-        state.picker.insert_char(cmd.ch);
+        ctx.state.picker.insert_char(cmd.ch);
         CommandAction::Continue
     }
 
     /// Deletes the last character from the picker filter.
-    fn on_backspace(_cmd: &PickerBackspace, state: &mut AppState, _out: &mut Out) -> CommandAction {
-        state.picker.backspace();
+    fn on_backspace(
+        _cmd: &PickerBackspace,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
+    ) -> CommandAction {
+        ctx.state.picker.backspace();
         CommandAction::Continue
     }
 
@@ -52,18 +55,26 @@ impl PickerHandler {
     ///
     /// Submits `ProviderSwitch` if the selected entry is available,
     /// then closes the picker by setting mode to Normal.
-    fn on_confirm(_cmd: &PickerConfirm, state: &mut AppState, out: &mut Out) -> CommandAction {
-        let services = &state.services;
+    fn on_confirm(
+        _cmd: &PickerConfirm,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
+    ) -> CommandAction {
+        let services = ctx.services;
         let registry = services.provider_registry().read();
         let api_keys = services.api_keys().read();
-        let unsorted = filtered_entries(&registry, &api_keys, &state.picker.filter, state.model_cache.as_ref());
+        let unsorted = filtered_entries(
+            &registry,
+            &api_keys,
+            &ctx.state.picker.filter,
+            ctx.state.model_cache.as_ref(),
+        );
         let entries = sorted_entries(
             &unsorted,
-            &state.picker.filter,
-            &state.active_provider,
+            &ctx.state.picker.filter,
+            &ctx.state.active_provider,
         );
 
-        let Some(entry) = entries.get(state.picker.selection) else {
+        let Some(entry) = entries.get(ctx.state.picker.selection) else {
             return CommandAction::Continue;
         };
 
@@ -75,12 +86,12 @@ impl PickerHandler {
         let provider_id = entry.provider_id.clone();
 
         // Submit provider switch.
-        out.submit_command(npr::Command::ProviderSwitch {
+        ctx.out.submit_command(npr::Command::ProviderSwitch {
             payload: ProviderSwitch { provider_id },
         });
 
         // Close picker.
-        out.submit_command(npr::Command::SetMode {
+        ctx.out.submit_command(npr::Command::SetMode {
             payload: SetMode {
                 mode: npr::Mode::Normal,
             },
@@ -90,36 +101,40 @@ impl PickerHandler {
     }
 
     /// Moves the picker selection up.
-    fn on_move_up(_cmd: &PickerMoveUp, state: &mut AppState, _out: &mut Out) -> CommandAction {
-        let count = picker_entry_count(state);
-        state.picker.move_up(count, PICKER_MAX_VISIBLE);
+    fn on_move_up(
+        _cmd: &PickerMoveUp,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
+    ) -> CommandAction {
+        let count = picker_entry_count(ctx.services, &*ctx.state);
+        ctx.state.picker.move_up(count, PICKER_MAX_VISIBLE);
         CommandAction::Continue
     }
 
     /// Moves the picker selection down.
-    fn on_move_down(_cmd: &PickerMoveDown, state: &mut AppState, _out: &mut Out) -> CommandAction {
-        let count = picker_entry_count(state);
-        state.picker.move_down(count, PICKER_MAX_VISIBLE);
+    fn on_move_down(
+        _cmd: &PickerMoveDown,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
+    ) -> CommandAction {
+        let count = picker_entry_count(ctx.services, &*ctx.state);
+        ctx.state.picker.move_down(count, PICKER_MAX_VISIBLE);
         CommandAction::Continue
     }
 
     /// Moves the picker filter cursor left.
     fn on_move_cursor_left(
         _cmd: &PickerMoveCursorLeft,
-        state: &mut AppState,
-        _out: &mut Out,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
     ) -> CommandAction {
-        state.picker.move_cursor_left();
+        ctx.state.picker.move_cursor_left();
         CommandAction::Continue
     }
 
     /// Moves the picker filter cursor right.
     fn on_move_cursor_right(
         _cmd: &PickerMoveCursorRight,
-        state: &mut AppState,
-        _out: &mut Out,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
     ) -> CommandAction {
-        state.picker.move_cursor_right();
+        ctx.state.picker.move_cursor_right();
         CommandAction::Continue
     }
 }
@@ -129,13 +144,17 @@ impl PickerHandler {
 /// terminal height. This value is a generous upper bound so the handler's scroll
 /// offset tracking stays reasonable.
 const PICKER_MAX_VISIBLE: usize = 100;
-/// Returns the number of entries matching the current picker filter.
 /// Counts the number of picker entries matching the current filter.
-fn picker_entry_count(state: &AppState) -> usize {
-    let services = &state.services;
+fn picker_entry_count(services: &Services, state: &AppState) -> usize {
     let registry = services.provider_registry().read();
     let api_keys = services.api_keys().read();
-    filtered_entries(&registry, &api_keys, &state.picker.filter, state.model_cache.as_ref()).len()
+    filtered_entries(
+        &registry,
+        &api_keys,
+        &state.picker.filter,
+        state.model_cache.as_ref(),
+    )
+    .len()
 }
 
 #[cfg(test)]
@@ -149,10 +168,11 @@ mod tests {
         ApiKeys, ApiKeysService, ProviderEntry, ProviderRegistry, ProviderRegistryService,
         ProvidersConfig,
     };
+    use nullslop_services::Services;
 
     use super::*;
     use crate::test_utils;
-    fn state_with_ollama() -> AppState {
+    fn state_with_ollama() -> (AppState, Services) {
         let rt = tokio::runtime::Runtime::new().expect("runtime");
         let guard = rt.enter();
 
@@ -188,14 +208,14 @@ mod tests {
                 nullslop_providers::InMemoryConfigStorage::new(),
             )),
         );
-        let state = AppState::new(services);
+        let state = AppState::default();
         drop(guard);
         drop(rt);
-        state
+        (state, services)
     }
 
     /// Creates an `AppState` with a key-required provider but no key set.
-    fn state_with_unavailable() -> AppState {
+    fn state_with_unavailable() -> (AppState, Services) {
         let rt = tokio::runtime::Runtime::new().expect("runtime");
         let guard = rt.enter();
 
@@ -231,24 +251,25 @@ mod tests {
                 nullslop_providers::InMemoryConfigStorage::new(),
             )),
         );
-        let state = AppState::new(services);
+        let state = AppState::default();
         drop(guard);
         drop(rt);
-        state
+        (state, services)
     }
 
     #[test]
     fn insert_char_updates_picker_filter() {
         // Given a bus with PickerHandler registered.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         PickerHandler.register(&mut bus);
 
         // When processing PickerInsertChar('o').
         bus.submit_command(Command::PickerInsertChar {
             payload: PickerInsertChar { ch: 'o' },
         });
-        let mut state = AppState::new(test_utils::test_services());
-        bus.process_commands(&mut state);
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
+        bus.process_commands(&mut state, &services);
 
         // Then the picker filter is "o".
         assert_eq!(state.picker.filter, "o");
@@ -257,7 +278,7 @@ mod tests {
     #[test]
     fn backspace_removes_from_filter() {
         // Given a bus with PickerHandler registered.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         PickerHandler.register(&mut bus);
 
         // When processing PickerInsertChar('o') then PickerInsertChar('l') then PickerBackspace.
@@ -268,8 +289,9 @@ mod tests {
             payload: PickerInsertChar { ch: 'l' },
         });
         bus.submit_command(Command::PickerBackspace);
-        let mut state = AppState::new(test_utils::test_services());
-        bus.process_commands(&mut state);
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
+        bus.process_commands(&mut state, &services);
 
         // Then the filter is "o".
         assert_eq!(state.picker.filter, "o");
@@ -278,15 +300,15 @@ mod tests {
     #[test]
     fn move_up_decrements_selection() {
         // Given a bus with PickerHandler registered and selection at 2.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         PickerHandler.register(&mut bus);
 
-        let mut state = state_with_ollama();
+        let (mut state, services) = state_with_ollama();
         state.picker.selection = 1;
 
         // When processing PickerMoveUp.
         bus.submit_command(Command::PickerMoveUp);
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
 
         // Then selection is 0.
         assert_eq!(state.picker.selection, 0);
@@ -295,14 +317,14 @@ mod tests {
     #[test]
     fn move_down_increments_selection() {
         // Given a bus with PickerHandler registered and selection at 0.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         PickerHandler.register(&mut bus);
 
-        let mut state = state_with_ollama();
+        let (mut state, services) = state_with_ollama();
 
         // When processing PickerMoveDown.
         bus.submit_command(Command::PickerMoveDown);
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
 
         // Then selection is still clamped (only 1 entry, already at 0).
         assert_eq!(state.picker.selection, 0);
@@ -311,17 +333,17 @@ mod tests {
     #[test]
     fn confirm_submits_provider_switch_and_closes() {
         // Given a bus with PickerHandler, SwitchHandler, and ChatInputBoxHandler registered, with "ollama" available.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         PickerHandler.register(&mut bus);
         crate::provider::switch_handler::SwitchHandler.register(&mut bus);
         crate::chat_input_box::ChatInputBoxHandler.register(&mut bus);
 
-        let mut state = state_with_ollama();
+        let (mut state, services) = state_with_ollama();
         state.mode = npr::Mode::Picker;
 
         // When processing PickerConfirm (ollama is selected at index 0).
         bus.submit_command(Command::PickerConfirm);
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
 
         // Then a ProviderSwitch was submitted and processed.
         assert_eq!(state.active_provider, "ollama/llama3");
@@ -333,16 +355,16 @@ mod tests {
     #[test]
     fn confirm_ignores_unavailable_provider() {
         // Given a bus with PickerHandler registered, with unavailable provider.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         PickerHandler.register(&mut bus);
         crate::provider::switch_handler::SwitchHandler.register(&mut bus);
 
-        let mut state = state_with_unavailable();
+        let (mut state, services) = state_with_unavailable();
         state.mode = npr::Mode::Picker;
 
         // When processing PickerConfirm (openrouter is unavailable).
         bus.submit_command(Command::PickerConfirm);
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
 
         // Then no ProviderSwitch was submitted (active_provider still NO_PROVIDER_ID).
         assert_eq!(state.active_provider, nullslop_providers::NO_PROVIDER_ID);
@@ -354,7 +376,7 @@ mod tests {
     #[test]
     fn move_cursor_left_decrements_cursor() {
         // Given a bus with PickerHandler registered.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         PickerHandler.register(&mut bus);
 
         // When inserting "ab" then moving cursor left.
@@ -365,8 +387,9 @@ mod tests {
             payload: PickerInsertChar { ch: 'b' },
         });
         bus.submit_command(Command::PickerMoveCursorLeft);
-        let mut state = AppState::new(test_utils::test_services());
-        bus.process_commands(&mut state);
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
+        bus.process_commands(&mut state, &services);
 
         // Then the cursor position is 1 (was at end after "ab", moved left once).
         assert_eq!(state.picker.cursor_pos(), 1);
@@ -375,7 +398,7 @@ mod tests {
     #[test]
     fn move_cursor_right_increments_cursor() {
         // Given a bus with PickerHandler registered.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         PickerHandler.register(&mut bus);
 
         // When inserting "ab" then moving cursor left twice (to 0) then right once.
@@ -388,8 +411,9 @@ mod tests {
         bus.submit_command(Command::PickerMoveCursorLeft);
         bus.submit_command(Command::PickerMoveCursorLeft);
         bus.submit_command(Command::PickerMoveCursorRight);
-        let mut state = AppState::new(test_utils::test_services());
-        bus.process_commands(&mut state);
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
+        bus.process_commands(&mut state, &services);
 
         // Then the cursor position is 1 (was at 0, moved right once).
         assert_eq!(state.picker.cursor_pos(), 1);

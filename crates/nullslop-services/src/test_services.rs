@@ -8,12 +8,11 @@ use std::sync::Arc;
 
 use nullslop_actor_host::FakeActorHost;
 use nullslop_providers::{
-    ApiKeys, ApiKeysService, ConfigStorageService, InMemoryConfigStorage,
-    LlmServiceFactoryService, ProviderRegistry, ProviderRegistryService, ProvidersConfig,
+    ApiKeys, ApiKeysService, ConfigStorageService, InMemoryConfigStorage, LlmServiceFactoryService,
+    ProviderRegistry, ProviderRegistryService, ProvidersConfig,
 };
 
 use crate::Services;
-
 
 /// A builder for constructing [Services] with fake implementations for tests.
 ///
@@ -26,7 +25,7 @@ use crate::Services;
 ///
 /// ```ignore
 /// let services = TestServices::builder().build();
-/// let state = AppState::new(services);
+/// let state = AppState::default();
 /// ```
 #[derive(Debug)]
 pub struct TestServices {

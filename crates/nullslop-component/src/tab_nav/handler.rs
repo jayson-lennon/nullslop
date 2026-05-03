@@ -1,9 +1,10 @@
 //! Handler for the tab switch command.
 
 use crate::AppState;
-use nullslop_component_core::{Out, define_handler};
+use nullslop_component_core::{HandlerContext, define_handler};
 use nullslop_protocol::tab::SwitchTab;
 use nullslop_protocol::{CommandAction, TabDirection};
+use nullslop_services::Services;
 
 define_handler! {
     pub(crate) struct TabNavHandler;
@@ -17,10 +18,13 @@ define_handler! {
 
 impl TabNavHandler {
     /// Switches the active tab in the given direction.
-    fn on_switch_tab(cmd: &SwitchTab, state: &mut AppState, _out: &mut Out) -> CommandAction {
-        state.active_tab = match cmd.direction {
-            TabDirection::Next => state.active_tab.next(),
-            TabDirection::Prev => state.active_tab.prev(),
+    fn on_switch_tab(
+        cmd: &SwitchTab,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
+    ) -> CommandAction {
+        ctx.state.active_tab = match cmd.direction {
+            TabDirection::Next => ctx.state.active_tab.next(),
+            TabDirection::Prev => ctx.state.active_tab.prev(),
         };
         CommandAction::Continue
     }
@@ -31,6 +35,7 @@ mod tests {
     use crate::AppState;
     use nullslop_component_core::Bus;
     use nullslop_protocol::{ActiveTab, Command, TabDirection};
+    use nullslop_services::Services;
 
     use super::*;
     use crate::test_utils;
@@ -38,7 +43,7 @@ mod tests {
     #[test]
     fn switch_tab_next_from_chat_goes_to_dashboard() {
         // Given a bus with TabNavHandler registered.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         TabNavHandler.register(&mut bus);
 
         // When processing an SwitchTab(Next) command.
@@ -47,8 +52,9 @@ mod tests {
                 direction: TabDirection::Next,
             },
         });
-        let mut state = AppState::new(test_utils::test_services());
-        bus.process_commands(&mut state);
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
+        bus.process_commands(&mut state, &services);
 
         // Then the active tab is Dashboard.
         assert_eq!(state.active_tab, ActiveTab::Dashboard);
@@ -57,10 +63,13 @@ mod tests {
     #[test]
     fn switch_tab_next_wraps_from_dashboard_to_chat() {
         // Given a bus with TabNavHandler registered and state on Dashboard.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         TabNavHandler.register(&mut bus);
-        let mut state = AppState::new(test_utils::test_services());
-        state.active_tab = ActiveTab::Dashboard;
+        let services = test_utils::test_services();
+        let mut state = AppState {
+            active_tab: ActiveTab::Dashboard,
+            ..Default::default()
+        };
 
         // When processing an SwitchTab(Next) command.
         bus.submit_command(Command::SwitchTab {
@@ -68,7 +77,7 @@ mod tests {
                 direction: TabDirection::Next,
             },
         });
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
 
         // Then the active tab wraps back to Chat.
         assert_eq!(state.active_tab, ActiveTab::Chat);
@@ -77,7 +86,7 @@ mod tests {
     #[test]
     fn switch_tab_prev_from_chat_wraps_to_dashboard() {
         // Given a bus with TabNavHandler registered.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         TabNavHandler.register(&mut bus);
 
         // When processing an SwitchTab(Prev) command.
@@ -86,8 +95,9 @@ mod tests {
                 direction: TabDirection::Prev,
             },
         });
-        let mut state = AppState::new(test_utils::test_services());
-        bus.process_commands(&mut state);
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
+        bus.process_commands(&mut state, &services);
 
         // Then the active tab wraps to Dashboard.
         assert_eq!(state.active_tab, ActiveTab::Dashboard);

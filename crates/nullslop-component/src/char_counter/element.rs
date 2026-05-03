@@ -33,7 +33,6 @@ mod tests {
     use ratatui::layout::Rect;
 
     use super::*;
-    use crate::test_utils;
     use crate::AppState;
 
     #[test]
@@ -52,7 +51,7 @@ mod tests {
     fn render_empty_buffer_shows_zero() {
         // Given a CharCounterElement with empty input buffer.
         let mut element = CharCounterElement;
-        let state = AppState::new(test_utils::test_services());
+        let state = AppState::default();
 
         let backend = TestBackend::new(40, 1);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -78,7 +77,7 @@ mod tests {
         // Given a CharCounterElement with "hello" in input buffer.
         let mut element = CharCounterElement;
         let state = {
-            let mut s = AppState::new(test_utils::test_services());
+            let mut s = AppState::default();
             for ch in "hello".chars() {
                 s.active_chat_input_mut().insert_grapheme_at_cursor(ch);
             }
@@ -108,7 +107,7 @@ mod tests {
         // Each accented character is a single grapheme cluster, so count = 5.
         let mut element = CharCounterElement;
         let state = {
-            let mut s = AppState::new(test_utils::test_services());
+            let mut s = AppState::default();
             for ch in "écafé".chars() {
                 s.active_chat_input_mut().insert_grapheme_at_cursor(ch);
             }

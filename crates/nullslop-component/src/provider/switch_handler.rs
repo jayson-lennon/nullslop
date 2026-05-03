@@ -2,14 +2,17 @@
 //!
 //! Validates the target provider against the registry, creates a new factory,
 //! swaps it in, updates `AppState`, and emits a confirmation event.
+//!
+//! Supports both static registry entries and remote (cache-discovered) models.
 
 use std::sync::Arc;
 
-use nullslop_component_core::{Out, define_handler};
+use nullslop_component_core::{HandlerContext, define_handler};
 use nullslop_protocol as npr;
 use nullslop_protocol::CommandAction;
 use nullslop_protocol::provider::{ProviderSwitch, ProviderSwitched};
 use nullslop_providers::ProviderId;
+use nullslop_services::Services;
 
 use crate::AppState;
 
@@ -27,10 +30,9 @@ impl SwitchHandler {
     /// Processes a provider switch command.
     fn on_provider_switch(
         cmd: &ProviderSwitch,
-        state: &mut AppState,
-        out: &mut Out,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
     ) -> CommandAction {
-        let services = &state.services;
+        let services = ctx.services;
 
         let id = ProviderId::new(cmd.provider_id.clone());
 
@@ -43,7 +45,7 @@ impl SwitchHandler {
             // Try static registry first.
             if let Some(entry) = registry.get(&id) {
                 if !registry.is_available(&id, &api_keys) {
-                    if let Some(session) = state.sessions.get_mut(&state.active_session) {
+                    if let Some(session) = ctx.state.sessions.get_mut(&ctx.state.active_session) {
                         session.push_entry(npr::ChatEntry::system(format!(
                             "Provider '{}' is unavailable (API key not set).",
                             entry.name
@@ -53,7 +55,7 @@ impl SwitchHandler {
                 }
 
                 let Ok(new_factory) = registry.create_factory(&id, &api_keys) else {
-                    if let Some(session) = state.sessions.get_mut(&state.active_session) {
+                    if let Some(session) = ctx.state.sessions.get_mut(&ctx.state.active_session) {
                         session.push_entry(npr::ChatEntry::system(format!(
                             "Failed to create factory for provider '{}'.",
                             entry.name
@@ -74,7 +76,8 @@ impl SwitchHandler {
                         name
                     }
                     Err(msg) => {
-                        if let Some(session) = state.sessions.get_mut(&state.active_session) {
+                        if let Some(session) = ctx.state.sessions.get_mut(&ctx.state.active_session)
+                        {
                             session.push_entry(npr::ChatEntry::system(msg));
                         }
                         return CommandAction::Continue;
@@ -85,7 +88,7 @@ impl SwitchHandler {
         // Read guards dropped here.
 
         // Update active provider.
-        state.active_provider.clone_from(&cmd.provider_id);
+        ctx.state.active_provider.clone_from(&cmd.provider_id);
 
         // Persist the selection to config (best-effort).
         services
@@ -97,7 +100,7 @@ impl SwitchHandler {
         }
 
         // Emit confirmation event.
-        out.submit_event(npr::Event::ProviderSwitched {
+        ctx.out.submit_event(npr::Event::ProviderSwitched {
             payload: ProviderSwitched { provider_name },
         });
 
@@ -130,7 +133,9 @@ impl SwitchHandler {
 
         if entry.requires_key {
             let Some(ref env_var) = entry.api_key_env else {
-                return Err(format!("Provider '{provider_name}' is unavailable (no key env configured)."));
+                return Err(format!(
+                    "Provider '{provider_name}' is unavailable (no key env configured)."
+                ));
             };
             if !api_keys.is_set(env_var) {
                 return Err(format!(
@@ -141,7 +146,9 @@ impl SwitchHandler {
 
         let factory = registry
             .create_factory_for_model(provider_name, model, api_keys)
-            .map_err(|e| format!("Failed to create factory for remote model '{provider_id}': {e:?}"))?;
+            .map_err(|e| {
+                format!("Failed to create factory for remote model '{provider_id}': {e:?}")
+            })?;
 
         Ok((factory, provider_name_owned))
     }
@@ -156,6 +163,7 @@ mod tests {
         ApiKeys, ApiKeysService, ConfigStorageService, InMemoryConfigStorage, ProviderEntry,
         ProviderRegistry, ProviderRegistryService, ProvidersConfig,
     };
+    use nullslop_services::Services;
 
     use super::*;
     use crate::AppState;
@@ -165,11 +173,8 @@ mod tests {
         ConfigStorageService::new(std::sync::Arc::new(InMemoryConfigStorage::new()))
     }
 
-    /// Helper: create an [`AppState`] with a registry containing an "ollama" provider.
-    fn state_with_registry() -> AppState {
-        let rt = tokio::runtime::Runtime::new().expect("runtime");
-        let guard = rt.enter();
-
+    /// Helper: create services with a registry containing an "ollama" provider.
+    fn services_with_registry() -> Services {
         let config = ProvidersConfig {
             providers: vec![ProviderEntry {
                 name: "ollama".to_owned(),
@@ -185,7 +190,7 @@ mod tests {
         let registry =
             ProviderRegistryService::new(ProviderRegistry::from_config(config).expect("registry"));
         let api_keys = ApiKeysService::new(ApiKeys::new());
-        let services = nullslop_services::Services::new(
+        nullslop_services::Services::new(
             tokio::runtime::Handle::current(),
             std::sync::Arc::new(
                 nullslop_actor_host::InMemoryActorHost::from_actors_with_handle(
@@ -199,20 +204,20 @@ mod tests {
             registry,
             api_keys,
             test_config_storage(),
-        );
-        let state = AppState::new(services);
-        drop(guard);
-        drop(rt);
-        state
+        )
     }
 
     #[test]
     fn provider_switch_updates_active_provider() {
         // Given a bus with SwitchHandler registered and an AppState with services.
-        let mut bus: Bus<AppState> = Bus::new();
+        let rt = tokio::runtime::Runtime::new().expect("runtime");
+        let _guard = rt.enter();
+
+        let mut bus: Bus<AppState, Services> = Bus::new();
         SwitchHandler.register(&mut bus);
 
-        let mut state = state_with_registry();
+        let services = services_with_registry();
+        let mut state = AppState::default();
 
         // When processing ProviderSwitch for "ollama/llama3".
         bus.submit_command(npr::Command::ProviderSwitch {
@@ -220,7 +225,7 @@ mod tests {
                 provider_id: "ollama/llama3".to_owned(),
             },
         });
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
 
         // Then active_provider is set.
         assert_eq!(state.active_provider, "ollama/llama3");
@@ -229,10 +234,14 @@ mod tests {
     #[test]
     fn provider_switch_emits_switched_event() {
         // Given a bus with SwitchHandler registered and an AppState with services.
-        let mut bus: Bus<AppState> = Bus::new();
+        let rt = tokio::runtime::Runtime::new().expect("runtime");
+        let _guard = rt.enter();
+
+        let mut bus: Bus<AppState, Services> = Bus::new();
         SwitchHandler.register(&mut bus);
 
-        let mut state = state_with_registry();
+        let services = services_with_registry();
+        let mut state = AppState::default();
 
         // When processing ProviderSwitch for "ollama/llama3".
         bus.submit_command(npr::Command::ProviderSwitch {
@@ -240,8 +249,8 @@ mod tests {
                 provider_id: "ollama/llama3".to_owned(),
             },
         });
-        bus.process_commands(&mut state);
-        bus.process_events(&mut state);
+        bus.process_commands(&mut state, &services);
+        bus.process_events(&mut state, &services);
 
         // Then a ProviderSwitched event is emitted.
         let events = bus.drain_processed_events();
@@ -254,10 +263,14 @@ mod tests {
     #[test]
     fn provider_switch_rejects_unknown_provider() {
         // Given a bus with SwitchHandler registered and an AppState with services.
-        let mut bus: Bus<AppState> = Bus::new();
+        let rt = tokio::runtime::Runtime::new().expect("runtime");
+        let _guard = rt.enter();
+
+        let mut bus: Bus<AppState, Services> = Bus::new();
         SwitchHandler.register(&mut bus);
 
-        let mut state = state_with_registry();
+        let services = services_with_registry();
+        let mut state = AppState::default();
 
         // When processing ProviderSwitch for an unknown provider.
         bus.submit_command(npr::Command::ProviderSwitch {
@@ -265,7 +278,7 @@ mod tests {
                 provider_id: "nonexistent".to_owned(),
             },
         });
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
 
         // Then active_provider is NOT set and a system error is pushed.
         assert_eq!(state.active_provider, nullslop_providers::NO_PROVIDER_ID);
@@ -283,7 +296,7 @@ mod tests {
     fn provider_switch_rejects_unavailable_provider() {
         // Given a bus with SwitchHandler registered and an AppState with a key-required provider.
         let rt = tokio::runtime::Runtime::new().expect("runtime");
-        let guard = rt.enter();
+        let _guard = rt.enter();
 
         let config = ProvidersConfig {
             providers: vec![ProviderEntry {
@@ -315,12 +328,9 @@ mod tests {
             api_keys,
             test_config_storage(),
         );
-        let mut state = AppState::new(services);
+        let mut state = AppState::default();
 
-        drop(guard);
-        drop(rt);
-
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         SwitchHandler.register(&mut bus);
 
         // When processing ProviderSwitch for "openrouter/gpt-4" (no API key).
@@ -329,7 +339,7 @@ mod tests {
                 provider_id: "openrouter/gpt-4".to_owned(),
             },
         });
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
 
         // Then active_provider is NOT set and a system error is pushed.
         assert_eq!(state.active_provider, nullslop_providers::NO_PROVIDER_ID);
@@ -346,10 +356,14 @@ mod tests {
     #[test]
     fn provider_switch_handles_remote_model_not_in_static_registry() {
         // Given a bus with SwitchHandler registered and a keyless provider (ollama).
-        let mut bus: Bus<AppState> = Bus::new();
+        let rt = tokio::runtime::Runtime::new().expect("runtime");
+        let _guard = rt.enter();
+
+        let mut bus: Bus<AppState, Services> = Bus::new();
         SwitchHandler.register(&mut bus);
 
-        let mut state = state_with_registry();
+        let services = services_with_registry();
+        let mut state = AppState::default();
 
         // When switching to a remote model "ollama/mistral" that is NOT in the static registry
         // (only ollama/llama3 is in the static config).
@@ -358,7 +372,7 @@ mod tests {
                 provider_id: "ollama/mistral".to_owned(),
             },
         });
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
 
         // Then the switch succeeds — the factory is created dynamically from the provider config.
         assert_eq!(state.active_provider, "ollama/mistral");
@@ -367,10 +381,14 @@ mod tests {
     #[test]
     fn provider_switch_rejects_unknown_remote_provider() {
         // Given a bus with SwitchHandler registered.
-        let mut bus: Bus<AppState> = Bus::new();
+        let rt = tokio::runtime::Runtime::new().expect("runtime");
+        let _guard = rt.enter();
+
+        let mut bus: Bus<AppState, Services> = Bus::new();
         SwitchHandler.register(&mut bus);
 
-        let mut state = state_with_registry();
+        let services = services_with_registry();
+        let mut state = AppState::default();
 
         // When switching to a model under a provider that doesn't exist in config.
         bus.submit_command(npr::Command::ProviderSwitch {
@@ -378,7 +396,7 @@ mod tests {
                 provider_id: "nonexistent/some-model".to_owned(),
             },
         });
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
 
         // Then the switch fails with a system error.
         assert_eq!(state.active_provider, nullslop_providers::NO_PROVIDER_ID);

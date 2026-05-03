@@ -6,8 +6,9 @@
 use crate::AppState;
 use npr::CommandAction;
 use npr::provider::StreamToken;
-use nullslop_component_core::{Out, define_handler};
+use nullslop_component_core::{HandlerContext, define_handler};
 use nullslop_protocol as npr;
+use nullslop_services::Services;
 
 define_handler! {
     pub(crate) struct ProviderHandler;
@@ -21,8 +22,11 @@ define_handler! {
 
 impl ProviderHandler {
     /// Appends a streaming LLM token to the session, transitioning to streaming on the first token.
-    fn on_stream_token(cmd: &StreamToken, state: &mut AppState, _out: &mut Out) -> CommandAction {
-        let session = state.session_mut(&cmd.session_id);
+    fn on_stream_token(
+        cmd: &StreamToken,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
+    ) -> CommandAction {
+        let session = ctx.state.session_mut(&cmd.session_id);
 
         if cmd.index == 0 && !session.is_streaming() {
             // First token arrived — transition from sending to streaming.
@@ -44,6 +48,7 @@ mod tests {
     use npr::provider::StreamToken;
     use nullslop_component_core::Bus;
     use nullslop_protocol as npr;
+    use nullslop_services::Services;
 
     use super::*;
     use crate::test_utils;
@@ -55,10 +60,11 @@ mod tests {
     #[test]
     fn stream_token_appends_to_assistant_entry() {
         // Given a bus with ProviderHandler registered.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         ProviderHandler.register(&mut bus);
 
-        let mut state = AppState::new(test_utils::test_services());
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
         let sid = session_id(&state);
 
         // When processing StreamToken(index=0, token="Hello").
@@ -69,7 +75,7 @@ mod tests {
                 token: "Hello".to_owned(),
             },
         });
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
 
         // Then the session has an Assistant entry with "Hello".
         assert!(state.active_session().is_streaming());
@@ -86,7 +92,7 @@ mod tests {
                 token: " world".to_owned(),
             },
         });
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
 
         // Then the text is "Hello world".
         assert_eq!(
@@ -98,10 +104,11 @@ mod tests {
     #[test]
     fn stream_token_clears_sending_on_first_token() {
         // Given a bus with ProviderHandler registered and a session that is sending.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         ProviderHandler.register(&mut bus);
 
-        let mut state = AppState::new(test_utils::test_services());
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
         let sid = session_id(&state);
         state.session_mut(&sid).begin_sending();
         assert!(state.session(&sid).is_sending());
@@ -114,7 +121,7 @@ mod tests {
                 token: "Hi".to_owned(),
             },
         });
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
 
         // Then is_sending is cleared and is_streaming is set.
         assert!(!state.session(&sid).is_sending());

@@ -13,9 +13,10 @@ use npr::chat_input::{EnqueueUserMessage, SetChatInputText};
 use npr::provider::{
     CancelStream, SendToLlmProvider, StreamCompleted, StreamCompletedReason, entries_to_messages,
 };
-use nullslop_component_core::{Out, define_handler};
+use nullslop_component_core::{HandlerContext, define_handler};
 use nullslop_protocol as npr;
 use nullslop_protocol::CommandAction;
+use nullslop_services::Services;
 
 define_handler! {
     pub(crate) struct MessageQueueHandler;
@@ -35,10 +36,9 @@ impl MessageQueueHandler {
     /// Enqueues a user message, dispatching immediately if idle or queuing if busy.
     fn on_enqueue_user_message(
         cmd: &EnqueueUserMessage,
-        state: &mut AppState,
-        out: &mut Out,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
     ) -> CommandAction {
-        let session = state.session_mut(&cmd.session_id);
+        let session = ctx.state.session_mut(&cmd.session_id);
 
         if session.is_idle() {
             // Dispatch immediately: push to history, convert, send to LLM.
@@ -48,7 +48,7 @@ impl MessageQueueHandler {
             let messages = entries_to_messages(history);
             session.begin_sending();
 
-            out.submit_command(npr::Command::SendToLlmProvider {
+            ctx.out.submit_command(npr::Command::SendToLlmProvider {
                 payload: SendToLlmProvider {
                     session_id: cmd.session_id.clone(),
                     messages,
@@ -64,14 +64,17 @@ impl MessageQueueHandler {
     }
 
     /// Cancels the active stream and restores queued messages to the input box.
-    fn on_cancel_stream(cmd: &CancelStream, state: &mut AppState, out: &mut Out) -> CommandAction {
-        let session = state.session_mut(&cmd.session_id);
+    fn on_cancel_stream(
+        cmd: &CancelStream,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
+    ) -> CommandAction {
+        let session = ctx.state.session_mut(&cmd.session_id);
         session.cancel_streaming();
 
         let drained: Vec<String> = session.drain_queue().into_iter().collect();
         if !drained.is_empty() {
             let restored = drained.join("\n");
-            out.submit_command(npr::Command::SetChatInputText {
+            ctx.out.submit_command(npr::Command::SetChatInputText {
                 payload: SetChatInputText {
                     session_id: cmd.session_id.clone(),
                     text: restored,
@@ -85,17 +88,19 @@ impl MessageQueueHandler {
     /// Replaces the chat input text for a session.
     fn on_set_chat_input_text(
         cmd: &SetChatInputText,
-        state: &mut AppState,
-        _out: &mut Out,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
     ) -> CommandAction {
-        let session = state.session_mut(&cmd.session_id);
+        let session = ctx.state.session_mut(&cmd.session_id);
         session.chat_input_mut().replace_all(cmd.text.clone());
         CommandAction::Continue
     }
 
     /// Handles stream completion, dispatching all queued messages at once if any.
-    fn on_stream_completed(evt: &StreamCompleted, state: &mut AppState, out: &mut Out) {
-        let session = state.session_mut(&evt.session_id);
+    fn on_stream_completed(
+        evt: &StreamCompleted,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
+    ) {
+        let session = ctx.state.session_mut(&evt.session_id);
         // finish_streaming clears both is_streaming and is_sending.
         session.finish_streaming();
 
@@ -119,7 +124,7 @@ impl MessageQueueHandler {
         let messages = entries_to_messages(history);
         session.begin_sending();
 
-        out.submit_command(npr::Command::SendToLlmProvider {
+        ctx.out.submit_command(npr::Command::SendToLlmProvider {
             payload: SendToLlmProvider {
                 session_id: evt.session_id.clone(),
                 messages,
@@ -138,6 +143,7 @@ mod tests {
     use npr::provider::{StreamCompleted, StreamCompletedReason};
     use nullslop_component_core::Bus;
     use nullslop_protocol as npr;
+    use nullslop_services::Services;
 
     use super::*;
     use crate::test_utils;
@@ -149,11 +155,14 @@ mod tests {
     #[test]
     fn enqueue_when_idle_dispatches_immediately() {
         // Given a bus with MessageQueueHandler registered.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         MessageQueueHandler.register(&mut bus);
 
-        let mut state = AppState::new(test_utils::test_services());
-        state.active_provider = "test".to_owned();
+        let services = test_utils::test_services();
+        let mut state = AppState {
+            active_provider: "test".to_owned(),
+            ..Default::default()
+        };
         let sid = session_id(&state);
 
         // When processing EnqueueUserMessage while idle.
@@ -163,7 +172,7 @@ mod tests {
                 text: "hello".to_owned(),
             },
         });
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
 
         // Then the entry is in history and is_sending is true.
         assert_eq!(state.session(&sid).history().len(), 1);
@@ -184,10 +193,11 @@ mod tests {
     #[test]
     fn enqueue_when_busy_queues_message() {
         // Given a bus with MessageQueueHandler registered and a busy session.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         MessageQueueHandler.register(&mut bus);
 
-        let mut state = AppState::new(test_utils::test_services());
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
         let sid = session_id(&state);
         state.session_mut(&sid).begin_sending();
 
@@ -198,7 +208,7 @@ mod tests {
                 text: "queued msg".to_owned(),
             },
         });
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
 
         // Then no new entry is added to history.
         assert_eq!(state.session(&sid).history().len(), 0);
@@ -211,11 +221,14 @@ mod tests {
     #[test]
     fn stream_completed_dispatches_next_from_queue() {
         // Given a bus with MessageQueueHandler registered, a busy session with a queued message.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         MessageQueueHandler.register(&mut bus);
 
-        let mut state = AppState::new(test_utils::test_services());
-        state.active_provider = "test".to_owned();
+        let services = test_utils::test_services();
+        let mut state = AppState {
+            active_provider: "test".to_owned(),
+            ..Default::default()
+        };
         let sid = session_id(&state);
         state.session_mut(&sid).begin_sending();
         state
@@ -229,8 +242,8 @@ mod tests {
                 reason: StreamCompletedReason::Finished,
             },
         });
-        bus.process_events(&mut state);
-        bus.process_commands(&mut state);
+        bus.process_events(&mut state, &services);
+        bus.process_commands(&mut state, &services);
 
         // Then the queued message was dispatched: history has it, queue is empty, is_sending is true.
         assert_eq!(state.session(&sid).history().len(), 1);
@@ -252,10 +265,11 @@ mod tests {
     #[test]
     fn stream_completed_canceled_does_not_dispatch() {
         // Given a bus with MessageQueueHandler registered, a session that was cancelled.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         MessageQueueHandler.register(&mut bus);
 
-        let mut state = AppState::new(test_utils::test_services());
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
         let sid = session_id(&state);
         state.session_mut(&sid).begin_sending();
         // Cancel already drained the queue in the cancel handler.
@@ -269,8 +283,8 @@ mod tests {
                 reason: StreamCompletedReason::Canceled,
             },
         });
-        bus.process_events(&mut state);
-        bus.process_commands(&mut state);
+        bus.process_events(&mut state, &services);
+        bus.process_commands(&mut state, &services);
 
         // Then no dispatch happened: no history, no pending commands.
         assert_eq!(state.session(&sid).history().len(), 0);
@@ -280,10 +294,11 @@ mod tests {
     #[test]
     fn cancel_stream_drains_queue_and_restores_input() {
         // Given a bus with MessageQueueHandler registered and queued messages.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         MessageQueueHandler.register(&mut bus);
 
-        let mut state = AppState::new(test_utils::test_services());
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
         let sid = session_id(&state);
         state.session_mut(&sid).begin_streaming();
         state.session_mut(&sid).enqueue_message("first".to_owned());
@@ -295,7 +310,7 @@ mod tests {
                 session_id: sid.clone(),
             },
         });
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
 
         // Then queue is drained and streaming is cancelled.
         assert_eq!(state.session(&sid).queue_len(), 0);
@@ -318,11 +333,14 @@ mod tests {
     #[test]
     fn stream_completed_dispatches_all_queued_messages_at_once() {
         // Given a bus with MessageQueueHandler registered, a busy session with 3 queued messages.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         MessageQueueHandler.register(&mut bus);
 
-        let mut state = AppState::new(test_utils::test_services());
-        state.active_provider = "test".to_owned();
+        let services = test_utils::test_services();
+        let mut state = AppState {
+            active_provider: "test".to_owned(),
+            ..Default::default()
+        };
         let sid = session_id(&state);
         state.session_mut(&sid).begin_sending();
         state.session_mut(&sid).enqueue_message("msg 1".to_owned());
@@ -336,8 +354,8 @@ mod tests {
                 reason: StreamCompletedReason::Finished,
             },
         });
-        bus.process_events(&mut state);
-        bus.process_commands(&mut state);
+        bus.process_events(&mut state, &services);
+        bus.process_commands(&mut state, &services);
 
         // Then all 3 messages are in history as individual User entries.
         assert_eq!(state.session(&sid).history().len(), 3);
@@ -375,10 +393,11 @@ mod tests {
     #[test]
     fn stream_completed_with_empty_queue_does_not_dispatch() {
         // Given a bus with MessageQueueHandler registered, a busy session with no queued messages.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         MessageQueueHandler.register(&mut bus);
 
-        let mut state = AppState::new(test_utils::test_services());
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
         let sid = session_id(&state);
         state.session_mut(&sid).begin_sending();
 
@@ -389,8 +408,8 @@ mod tests {
                 reason: StreamCompletedReason::Finished,
             },
         });
-        bus.process_events(&mut state);
-        bus.process_commands(&mut state);
+        bus.process_events(&mut state, &services);
+        bus.process_commands(&mut state, &services);
 
         // Then no dispatch happened: no history, no pending commands, session is idle.
         assert_eq!(state.session(&sid).history().len(), 0);
@@ -401,10 +420,11 @@ mod tests {
     #[test]
     fn set_chat_input_text_replaces_input_buffer() {
         // Given a bus with MessageQueueHandler registered.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         MessageQueueHandler.register(&mut bus);
 
-        let mut state = AppState::new(test_utils::test_services());
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
         let sid = session_id(&state);
 
         // When processing SetChatInputText.
@@ -414,7 +434,7 @@ mod tests {
                 text: "restored text".to_owned(),
             },
         });
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
 
         // Then the input buffer is updated.
         assert_eq!(state.active_chat_input().text(), "restored text");
@@ -423,10 +443,11 @@ mod tests {
     #[test]
     fn enqueue_when_no_provider_dispatches_to_llm() {
         // Given a bus with MessageQueueHandler registered and no real provider.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         MessageQueueHandler.register(&mut bus);
 
-        let mut state = AppState::new(test_utils::test_services());
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
         let sid = session_id(&state);
         // active_provider defaults to NO_PROVIDER_ID.
 
@@ -437,7 +458,7 @@ mod tests {
                 text: "hello".to_owned(),
             },
         });
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
 
         // Then the message is dispatched to the LLM
         // (the NoProvidersAvailableFactory will stream a help message).

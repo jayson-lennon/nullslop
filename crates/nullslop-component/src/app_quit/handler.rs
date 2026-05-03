@@ -6,8 +6,9 @@
 use crate::AppState;
 use npr::CommandAction;
 use npr::system::Quit;
-use nullslop_component_core::{Out, define_handler};
+use nullslop_component_core::{HandlerContext, define_handler};
 use nullslop_protocol as npr;
+use nullslop_services::Services;
 
 define_handler! {
     pub(crate) struct AppQuitHandler;
@@ -21,8 +22,8 @@ define_handler! {
 
 impl AppQuitHandler {
     /// Handles the Quit command — flags the application for exit and stops processing.
-    fn on_quit(_cmd: &Quit, state: &mut AppState, _out: &mut Out) -> CommandAction {
-        state.should_quit = true;
+    fn on_quit(_cmd: &Quit, ctx: &mut HandlerContext<'_, AppState, Services>) -> CommandAction {
+        ctx.state.should_quit = true;
         CommandAction::Stop
     }
 }
@@ -33,6 +34,7 @@ mod tests {
     use npr::Command;
     use nullslop_component_core::Bus;
     use nullslop_protocol as npr;
+    use nullslop_services::Services;
 
     use super::*;
     use crate::test_utils;
@@ -40,13 +42,14 @@ mod tests {
     #[test]
     fn quit_sets_should_quit() {
         // Given a bus with AppQuitHandler registered.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         AppQuitHandler.register(&mut bus);
 
         // When processing Quit.
         bus.submit_command(Command::Quit);
-        let mut state = AppState::new(test_utils::test_services());
-        bus.process_commands(&mut state);
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
+        bus.process_commands(&mut state, &services);
 
         // Then should_quit is true.
         assert!(state.should_quit);

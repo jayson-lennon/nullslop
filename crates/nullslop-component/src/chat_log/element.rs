@@ -127,8 +127,8 @@ mod tests {
     use ratatui::layout::Rect;
 
     use super::*;
-    use crate::test_utils;
     use crate::AppState;
+
     use nullslop_protocol::ChatEntry;
 
     #[test]
@@ -147,7 +147,7 @@ mod tests {
     fn render_empty_history() {
         // Given a ChatLogElement with empty chat history.
         let mut element = ChatLogElement;
-        let state = AppState::new(test_utils::test_services());
+        let state = AppState::default();
 
         let backend = TestBackend::new(40, 10);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -171,7 +171,7 @@ mod tests {
         // Given a ChatLogElement with a user entry "hello".
         let mut element = ChatLogElement;
         let state = {
-            let mut s = AppState::new(test_utils::test_services());
+            let mut s = AppState::default();
             s.active_session_mut().push_entry(ChatEntry::user("hello"));
             s
         };
@@ -199,7 +199,7 @@ mod tests {
         // Given a ChatLogElement with a system entry "ready".
         let mut element = ChatLogElement;
         let state = {
-            let mut s = AppState::new(test_utils::test_services());
+            let mut s = AppState::default();
             s.active_session_mut()
                 .push_entry(ChatEntry::system("ready"));
             s
@@ -228,7 +228,7 @@ mod tests {
         // Given a ChatLogElement with an actor entry.
         let mut element = ChatLogElement;
         let state = {
-            let mut s = AppState::new(test_utils::test_services());
+            let mut s = AppState::default();
             s.active_session_mut()
                 .push_entry(ChatEntry::actor("nullslop-echo", "HELLO"));
             s
@@ -257,7 +257,7 @@ mod tests {
         // Given a ChatLogElement with an assistant entry "hello world".
         let mut element = ChatLogElement;
         let state = {
-            let mut s = AppState::new(test_utils::test_services());
+            let mut s = AppState::default();
             s.active_session_mut()
                 .push_entry(ChatEntry::assistant("hello world"));
             s
@@ -286,7 +286,7 @@ mod tests {
         // Given a ChatLogElement with system, user, actor, and assistant entries.
         let mut element = ChatLogElement;
         let state = {
-            let mut s = AppState::new(test_utils::test_services());
+            let mut s = AppState::default();
             s.active_session_mut()
                 .push_entry(ChatEntry::system("welcome"));
             s.active_session_mut().push_entry(ChatEntry::user("hello"));
@@ -335,7 +335,7 @@ mod tests {
         // Given a ChatLogElement with a user entry containing "hello\nworld".
         let mut element = ChatLogElement;
         let state = {
-            let mut s = AppState::new(test_utils::test_services());
+            let mut s = AppState::default();
             s.active_session_mut()
                 .push_entry(ChatEntry::user("hello\nworld"));
             s
@@ -369,7 +369,7 @@ mod tests {
         // Given a ChatLogElement with an assistant entry containing "line1\nline2".
         let mut element = ChatLogElement;
         let state = {
-            let mut s = AppState::new(test_utils::test_services());
+            let mut s = AppState::default();
             s.active_session_mut()
                 .push_entry(ChatEntry::assistant("line1\nline2"));
             s
@@ -403,7 +403,7 @@ mod tests {
         // Given a user entry "a\n\nb".
         let mut element = ChatLogElement;
         let state = {
-            let mut s = AppState::new(test_utils::test_services());
+            let mut s = AppState::default();
             s.active_session_mut().push_entry(ChatEntry::user("a\n\nb"));
             s
         };
@@ -436,7 +436,7 @@ mod tests {
         // Given a ChatLogElement with one user entry in a 40x10 viewport.
         let mut element = ChatLogElement;
         let state = {
-            let mut s = AppState::new(test_utils::test_services());
+            let mut s = AppState::default();
             s.active_session_mut().push_entry(ChatEntry::user("hello"));
             s
         };

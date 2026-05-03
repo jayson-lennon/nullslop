@@ -81,14 +81,14 @@ mod tests {
     use super::*;
     use nullslop_protocol::ChatEntry;
 
-    fn test_services() -> nullslop_services::Services {
+    fn _test_services() -> nullslop_services::Services {
         nullslop_services::test_services::TestServices::builder().build()
     }
 
     #[test]
     fn state_read_returns_app_state() {
         // Given a State with a chat entry.
-        let mut data = AppState::new(test_services());
+        let mut data = AppState::default();
         data.active_session_mut()
             .push_entry(ChatEntry::user("hello"));
         let state = State::new(data);
@@ -103,7 +103,7 @@ mod tests {
     #[test]
     fn state_write_allows_mutation() {
         // Given a State.
-        let state = State::new(AppState::new(test_services()));
+        let state = State::new(AppState::default());
 
         // When writing and pushing an entry.
         {
@@ -121,7 +121,7 @@ mod tests {
     #[test]
     fn state_is_cloneable() {
         // Given a State.
-        let state = State::new(AppState::new(test_services()));
+        let state = State::new(AppState::default());
 
         // When cloning.
         let clone = state.clone();

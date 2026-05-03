@@ -9,15 +9,12 @@ pub mod state;
 
 pub use state::ProviderPickerState;
 
-use nullslop_component_core::Bus;
-use nullslop_component_ui::UiRegistry;
-
-use crate::AppState;
+use crate::{AppBus, AppUiRegistry};
 
 /// Register the provider picker component with the bus.
 ///
 /// The picker has no UI element — it is rendered as an overlay in
 /// `nullslop-tui/src/render.rs`.
-pub(crate) fn register(bus: &mut Bus<AppState>, _registry: &mut UiRegistry<AppState>) {
+pub(crate) fn register(bus: &mut AppBus, _registry: &mut AppUiRegistry) {
     handler::PickerHandler.register(bus);
 }

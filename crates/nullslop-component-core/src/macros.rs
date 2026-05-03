@@ -33,16 +33,16 @@
 /// # Handler methods
 ///
 /// Command handler methods must have this signature:
-/// `fn method(cmd: &C, state: &mut AppState, out: &mut Out) -> CommandAction`
+/// `fn method(cmd: &C, ctx: &mut HandlerContext<'_, AppState, Services>) -> CommandAction`
 ///
 /// Event handler methods must have this signature:
-/// `fn method(evt: &E, state: &mut AppState, out: &mut Out)`
+/// `fn method(evt: &E, ctx: &mut HandlerContext<'_, AppState, Services>)`
 ///
 /// Command methods return `CommandAction` directly — the macro forwards the return value.
 /// Event methods return `()`.
 ///
-/// `AppState` is a bare identifier that resolves at the call site — it must be in scope
-/// wherever this macro is invoked.
+/// `AppState` and `Services` are bare identifiers that resolve at the call site — they must be
+/// in scope wherever this macro is invoked.
 #[macro_export]
 macro_rules! define_handler {
     (
@@ -63,30 +63,28 @@ macro_rules! define_handler {
 
         // Generate CommandHandler impls (forward return value)
         $(
-            impl $crate::CommandHandler<$cmd_type, AppState> for $name {
+            impl $crate::CommandHandler<$cmd_type, AppState, Services> for $name {
                 #[allow(clippy::unused_self, clippy::trivially_copy_pass_by_ref)]
                 fn handle(
                     &self,
                     cmd: &$cmd_type,
-                    state: &mut AppState,
-                    out: &mut $crate::Out,
+                    ctx: &mut $crate::HandlerContext<'_, AppState, Services>,
                 ) -> ::nullslop_protocol::CommandAction {
-                    Self::$cmd_method(cmd, state, out)
+                    Self::$cmd_method(cmd, ctx)
                 }
             }
         )*
 
         // Generate EventHandler impls
         $(
-            impl $crate::EventHandler<$evt_type, AppState> for $name {
+            impl $crate::EventHandler<$evt_type, AppState, Services> for $name {
                 #[allow(clippy::unused_self, clippy::trivially_copy_pass_by_ref)]
                 fn handle(
                     &self,
                     evt: &$evt_type,
-                    state: &mut AppState,
-                    out: &mut $crate::Out,
+                    ctx: &mut $crate::HandlerContext<'_, AppState, Services>,
                 ) {
-                    Self::$evt_method(evt, state, out);
+                    Self::$evt_method(evt, ctx);
                 }
             }
         )*
@@ -94,7 +92,7 @@ macro_rules! define_handler {
         // Generate register method
         impl $name {
             #[doc = concat!("Register all handlers with the bus.\n\n⚠️ This must be called during application startup. Add a `", stringify!($name), ".register(&mut bus);` call in the component registration section of `run.rs`.")]
-            pub fn register(&self, bus: &mut $crate::Bus<AppState>) {
+            pub fn register(&self, bus: &mut $crate::Bus<AppState, Services>) {
                 $(
                     bus.register_command_handler::<$cmd_type, Self>(*self);
                 )*

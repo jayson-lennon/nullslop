@@ -46,9 +46,10 @@ pub(crate) mod test_utils {
 
 use nullslop_component_core::Bus;
 use nullslop_component_ui::UiRegistry;
+use nullslop_services::Services;
 
 /// Standard bus type for the nullslop application.
-pub type AppBus = Bus<AppState>;
+pub type AppBus = Bus<AppState, Services>;
 
 /// Standard UI registry type for the nullslop application.
 pub type AppUiRegistry = UiRegistry<AppState>;
@@ -78,7 +79,9 @@ pub fn register_tui_elements(registry: &mut AppUiRegistry) {
     registry.register(Box::new(chat_log::ChatLogElement));
     registry.register(Box::new(char_counter::CharCounterElement));
     registry.register(Box::new(dashboard::DashboardElement));
-    registry.register(Box::new(provider::indicator::StreamingIndicatorElement::new()));
+    registry.register(Box::new(
+        provider::indicator::StreamingIndicatorElement::new(),
+    ));
     registry.register(Box::new(provider::queue_element::QueueDisplayElement));
 }
 
@@ -88,8 +91,9 @@ mod macro_tests {
     use npr::system::{ModeChanged, Quit};
     use npr::{Command, CommandAction, Event};
     use nullslop_component_core::fake::FakeCommandHandler;
-    use nullslop_component_core::{Bus, Out};
+    use nullslop_component_core::{Bus, HandlerContext};
     use nullslop_protocol as npr;
+    use nullslop_services::Services;
 
     use crate::AppState;
     use crate::test_utils;
@@ -107,8 +111,8 @@ mod macro_tests {
     }
 
     impl StopHandler {
-        fn on_quit(_cmd: &Quit, state: &mut AppState, _out: &mut Out) -> CommandAction {
-            state.should_quit = true;
+        fn on_quit(_cmd: &Quit, ctx: &mut HandlerContext<'_, AppState, Services>) -> CommandAction {
+            ctx.state.should_quit = true;
             CommandAction::Stop
         }
     }
@@ -116,15 +120,16 @@ mod macro_tests {
     #[test]
     fn command_handler_returning_stop_prevents_later_handlers() {
         // Given a StopHandler and a fake handler both registered for Quit.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         StopHandler.register(&mut bus);
-        let (fake, fake_calls) = FakeCommandHandler::<Quit, AppState>::continuing();
+        let (fake, fake_calls) = FakeCommandHandler::<Quit, AppState, Services>::continuing();
         bus.register_command_handler::<Quit, _>(fake);
 
         // When processing a Quit command.
         bus.submit_command(Command::Quit);
-        let mut state = AppState::new(test_utils::test_services());
-        bus.process_commands(&mut state);
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
+        bus.process_commands(&mut state, &services);
 
         // Then the stop handler ran and prevented the fake from running.
         assert!(state.should_quit);
@@ -144,15 +149,15 @@ mod macro_tests {
     }
 
     impl EventHandlerTest {
-        fn on_mode_changed(_evt: &ModeChanged, state: &mut AppState, _out: &mut Out) {
-            state.should_quit = true;
+        fn on_mode_changed(_evt: &ModeChanged, ctx: &mut HandlerContext<'_, AppState, Services>) {
+            ctx.state.should_quit = true;
         }
     }
 
     #[test]
     fn event_handler_mutates_state() {
         // Given an EventHandlerTest registered with the bus.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         EventHandlerTest.register(&mut bus);
 
         // When processing a ModeChanged event.
@@ -162,8 +167,9 @@ mod macro_tests {
                 to: npr::Mode::Input,
             },
         });
-        let mut state = AppState::new(test_utils::test_services());
-        bus.process_events(&mut state);
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
+        bus.process_events(&mut state, &services);
 
         // Then the handler ran and mutated state.
         assert!(state.should_quit);
@@ -186,35 +192,41 @@ mod macro_tests {
     }
 
     impl MultiHandler {
-        fn on_insert_char(cmd: &InsertChar, state: &mut AppState, _out: &mut Out) -> CommandAction {
-            state
+        fn on_insert_char(
+            cmd: &InsertChar,
+            ctx: &mut HandlerContext<'_, AppState, Services>,
+        ) -> CommandAction {
+            ctx.state
                 .active_chat_input_mut()
                 .insert_grapheme_at_cursor(cmd.ch);
             CommandAction::Continue
         }
 
-        fn on_quit(_cmd: &Quit, state: &mut AppState, _out: &mut Out) -> CommandAction {
-            state.should_quit = true;
+        fn on_quit(_cmd: &Quit, ctx: &mut HandlerContext<'_, AppState, Services>) -> CommandAction {
+            ctx.state.should_quit = true;
             CommandAction::Continue
         }
 
-        fn on_mode_changed(_evt: &ModeChanged, state: &mut AppState, _out: &mut Out) {
-            state.active_chat_input_mut().insert_grapheme_at_cursor('!');
+        fn on_mode_changed(_evt: &ModeChanged, ctx: &mut HandlerContext<'_, AppState, Services>) {
+            ctx.state
+                .active_chat_input_mut()
+                .insert_grapheme_at_cursor('!');
         }
     }
 
     #[test]
     fn multiple_handlers_dispatch_correctly() {
         // Given a MultiHandler with 2 command handlers and 1 event handler.
-        let mut bus: Bus<AppState> = Bus::new();
+        let mut bus: Bus<AppState, Services> = Bus::new();
         MultiHandler.register(&mut bus);
 
         // When processing an InsertChar command.
         bus.submit_command(Command::InsertChar {
             payload: InsertChar { ch: 'h' },
         });
-        let mut state = AppState::new(test_utils::test_services());
-        bus.process_commands(&mut state);
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
+        bus.process_commands(&mut state, &services);
 
         // Then the command handler ran.
         assert_eq!(state.active_chat_input().text(), "h");
@@ -222,7 +234,7 @@ mod macro_tests {
 
         // When also processing Quit.
         bus.submit_command(Command::Quit);
-        bus.process_commands(&mut state);
+        bus.process_commands(&mut state, &services);
 
         // Then should_quit is now true.
         assert!(state.should_quit);
@@ -234,7 +246,7 @@ mod macro_tests {
                 to: npr::Mode::Input,
             },
         });
-        bus.process_events(&mut state);
+        bus.process_events(&mut state, &services);
 
         // Then the event handler ran (chat_input.text() has "h!").
         assert_eq!(state.active_chat_input().text(), "h!");
