@@ -27,8 +27,9 @@ pub struct GenericLlmServiceFactory {
     model: String,
     /// Optional base URL override (for local providers).
     base_url: Option<String>,
-    /// Resolved API key (empty string if not required).
-    api_key: String,
+    /// Resolved API key. `None` means no key was provided.
+    /// Will cause build failure for backends that require a key.
+    api_key: Option<String>,
 }
 
 impl GenericLlmServiceFactory {
@@ -39,7 +40,7 @@ impl GenericLlmServiceFactory {
         backend: LLMBackend,
         model: String,
         base_url: Option<String>,
-        api_key: String,
+        api_key: Option<String>,
     ) -> Self {
         Self {
             name,
@@ -61,8 +62,8 @@ impl LlmServiceFactory for GenericLlmServiceFactory {
             builder = builder.base_url(url);
         }
 
-        if !self.api_key.is_empty() {
-            builder = builder.api_key(&self.api_key);
+        if let Some(ref key) = self.api_key {
+            builder = builder.api_key(key);
         }
 
         let provider = builder
@@ -117,11 +118,29 @@ mod tests {
             LLMBackend::OpenRouter,
             "gpt-4".to_owned(),
             None,
-            String::new(),
+            None,
         );
 
         // When asking for the name.
         // Then it returns the configured name.
         assert_eq!(factory.name(), "my-provider");
+    }
+
+    #[test]
+    fn create_returns_error_when_no_key_for_keyed_backend() {
+        // Given a factory with no API key targeting a key-required backend.
+        let factory = GenericLlmServiceFactory::new(
+            "openai".to_owned(),
+            LLMBackend::OpenAI,
+            "gpt-4".to_owned(),
+            None,
+            None,
+        );
+
+        // When creating the service.
+        let result = factory.create();
+
+        // Then it returns an error (key-required backend fails without a key).
+        assert!(result.is_err());
     }
 }

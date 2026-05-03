@@ -246,9 +246,9 @@ impl ProviderRegistry {
         // Resolve the API key.
         let api_key = if resolved.requires_key {
             let env_var = resolved.api_key_env.as_deref().unwrap_or("");
-            api_keys.get(env_var).unwrap_or("").to_owned()
+            api_keys.get(env_var).map(String::from)
         } else {
-            String::new()
+            Some("dummy-key".to_owned())
         };
 
         let factory = GenericLlmServiceFactory::new(
@@ -574,6 +574,35 @@ mod tests {
         // Then it succeeds and returns a factory named "Sample".
         assert!(factory.is_ok());
         assert_eq!(factory.unwrap().name(), "Sample");
+    }
+
+    #[test]
+    fn create_factory_succeeds_for_keyless_openai_backend() {
+        // Given a registry with an LMStudio-like provider (OpenAI backend, no key required).
+        let config = make_config(
+            vec![ProviderEntry {
+                name: "lmstudio".to_owned(),
+                backend: "openai".to_owned(),
+                models: vec!["local-model".to_owned()],
+                base_url: Some("http://localhost:1234/v1".to_owned()),
+                api_key_env: None,
+                requires_key: false,
+            }],
+            vec![],
+            None,
+        );
+        let registry = ProviderRegistry::from_config(config).expect("registry");
+        let api_keys = ApiKeys::new();
+
+        // When creating a factory with no API keys resolved.
+        // Note: create() only builds the provider struct — no network request is made.
+        let factory = registry.create_factory(
+            &ProviderId::new("lmstudio/local-model".to_owned()),
+            &api_keys,
+        );
+
+        // Then it succeeds (dummy key is substituted for keyless providers).
+        assert!(factory.is_ok());
     }
 
     #[test]
