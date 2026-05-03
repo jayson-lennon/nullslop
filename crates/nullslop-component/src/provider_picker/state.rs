@@ -15,9 +15,9 @@ pub struct ProviderPickerState {
     /// Index of the currently highlighted item in the filtered list.
     pub selection: usize,
     /// Cursor position as a grapheme-cluster index within `filter` (0 = before first grapheme).
-    cursor_pos: usize,
+    pub cursor_pos: usize,
     /// Index of the first visible result row (scroll window top).
-    scroll_offset: usize,
+    pub scroll_offset: usize,
 }
 
 impl ProviderPickerState {
@@ -97,6 +97,8 @@ impl ProviderPickerState {
             self.scroll_offset = self.selection;
         } else if max_visible > 0 && self.selection >= self.scroll_offset + max_visible {
             self.scroll_offset = self.selection - max_visible + 1;
+        } else {
+            // Selection is within the visible window — no adjustment needed.
         }
     }
 

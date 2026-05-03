@@ -32,7 +32,7 @@ use crate::service::{LlmServiceError, LlmServiceFactory};
 pub struct ProviderRegistry {
     /// The original config (for persistence — `config()`, `config_snapshot()`).
     config: ProvidersConfig,
-    /// Expanded per-model entries, indexed by ProviderId.
+    /// Expanded per-model entries, indexed by `ProviderId`.
     resolved_map: HashMap<ProviderId, ResolvedProvider>,
     /// All expanded entries in order.
     resolved_list: Vec<ResolvedProvider>,
@@ -95,8 +95,7 @@ impl ProviderRegistry {
                 let id = ProviderId::new(format!("{}/{}", entry.name, model));
                 if resolved_map.contains_key(&id) {
                     return Err(Report::new(ConfigError::Validation)).attach(format!(
-                        "duplicate expanded provider ID: {}",
-                        id
+                        "duplicate expanded provider ID: {id}"
                     ));
                 }
                 let resolved = ResolvedProvider {
@@ -135,6 +134,63 @@ impl ProviderRegistry {
     #[must_use]
     pub fn config(&self) -> &ProvidersConfig {
         &self.config
+    }
+
+    /// Creates an `LlmServiceFactory` for a remote (cache-discovered) model.
+    ///
+    /// Unlike [`create_factory`](Self::create_factory), this takes raw provider name
+    /// and model strings rather than a resolved `ProviderId`. It looks up the
+    /// `ProviderEntry` by name, parses the backend, resolves the API key, and
+    /// builds a `GenericLlmServiceFactory`.
+    ///
+    /// Used for models discovered at runtime that are not in the static config's
+    /// model list.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LlmServiceError::Config`] if the provider is not found or the
+    /// backend is invalid.
+    pub fn create_factory_for_model(
+        &self,
+        provider_name: &str,
+        model: &str,
+        api_keys: &ApiKeys,
+    ) -> Result<Box<dyn LlmServiceFactory>, Report<LlmServiceError>> {
+        let entry = self
+            .config
+            .providers
+            .iter()
+            .find(|p| p.name == provider_name)
+            .ok_or_else(|| {
+                Report::new(LlmServiceError::Config)
+                    .attach(format!("unknown provider: {provider_name}"))
+            })?;
+
+        let backend: LLMBackend = entry
+            .backend
+            .parse()
+            .change_context(LlmServiceError::Config)
+            .attach(format!(
+                "invalid backend '{}' for provider '{}'",
+                entry.backend, provider_name
+            ))?;
+
+        let api_key = if entry.requires_key {
+            let env_var = entry.api_key_env.as_deref().unwrap_or("");
+            api_keys.get(env_var).map(String::from)
+        } else {
+            Some("dummy-key".to_owned())
+        };
+
+        let factory = GenericLlmServiceFactory::new(
+            entry.name.clone(),
+            backend,
+            model.to_owned(),
+            entry.base_url.clone(),
+            api_key,
+        );
+
+        Ok(Box::new(factory))
     }
 
     /// Updates the default provider in the config (for persistence on switch).
@@ -683,5 +739,34 @@ mod tests {
         // Then it has the expected provider blocks and default.
         assert_eq!(config.providers.len(), 2);
         assert_eq!(config.default_provider.as_deref(), Some("ollama/llama3"));
+    }
+
+    #[test]
+    fn create_factory_for_model_succeeds_for_known_provider() {
+        // Given a registry with ollama.
+        let config = make_config(vec![ollama_entry()], vec![], None);
+        let registry = ProviderRegistry::from_config(config).expect("registry");
+        let api_keys = ApiKeys::new();
+
+        // When creating a factory for a remote model.
+        let factory = registry.create_factory_for_model("ollama", "mistral", &api_keys);
+
+        // Then it succeeds.
+        assert!(factory.is_ok());
+        assert_eq!(factory.unwrap().name(), "ollama");
+    }
+
+    #[test]
+    fn create_factory_for_model_fails_for_unknown_provider() {
+        // Given a registry with ollama.
+        let config = make_config(vec![ollama_entry()], vec![], None);
+        let registry = ProviderRegistry::from_config(config).expect("registry");
+        let api_keys = ApiKeys::new();
+
+        // When creating a factory for an unknown provider.
+        let factory = registry.create_factory_for_model("unknown", "model", &api_keys);
+
+        // Then it fails.
+        assert!(factory.is_err());
     }
 }

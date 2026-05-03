@@ -15,6 +15,7 @@ use nullslop_component_core::Bus;
 use nullslop_core::{ActorMessageSink, AppCore, AppMsg, State};
 use nullslop_echo::EchoActor;
 use nullslop_llm::LlmActor;
+use nullslop_llm_discover::DiscoverActor;
 use nullslop_protocol::Event;
 use nullslop_protocol::actor::{ActorStarted, ActorStarting};
 use nullslop_providers::ApiKeys;
@@ -22,10 +23,12 @@ use nullslop_providers::ApiKeysService;
 use nullslop_providers::ConfigStorageService;
 use nullslop_providers::FilesystemConfigStorage;
 use nullslop_providers::LlmServiceFactoryService;
+use nullslop_providers::ModelCache;
 use nullslop_providers::NoProvidersAvailableFactory;
 use nullslop_providers::ProviderId;
 use nullslop_providers::ProviderRegistry;
 use nullslop_providers::ProviderRegistryService;
+use nullslop_providers::cache_path;
 use nullslop_services::Services;
 use tokio::runtime::Runtime;
 use wherror::Error;
@@ -114,6 +117,7 @@ impl App {
                     config_storage.clone(),
                 );
                 core.state.write().active_provider = initial_provider;
+                load_model_cache(&core);
                 let runner = Runner::Tui(Box::new(nullslop_tui::TuiApp::new_with_core(
                     services, core,
                 )));
@@ -128,6 +132,7 @@ impl App {
                     config_storage,
                 );
                 core.state.write().active_provider = initial_provider;
+                load_model_cache(&core);
                 let mut headless = HeadlessApp::new(core, services);
                 match command {
                     Some(HeadlessCommands::SendChat { message }) => {
@@ -240,6 +245,23 @@ fn create_core_with_actor_host(
     let llm_actor = LlmActor::activate(&mut llm_ctx);
     let llm_result = spawn_actor("nullslop-llm", llm_actor, &llm_ref, llm_rx, llm_ctx, handle);
 
+    // Create discover actor with data injection.
+    let (discover_tx, discover_rx) =
+        kanal::unbounded::<ActorEnvelope<nullslop_llm_discover::DiscoverDirectMsg>>();
+    let discover_ref = ActorRef::new(discover_tx);
+    let mut discover_ctx = ActorContext::new("nullslop-llm-discover", sink.clone());
+    discover_ctx.set_data(provider_registry.clone());
+    discover_ctx.set_data(api_keys.clone());
+    let discover_actor = DiscoverActor::activate(&mut discover_ctx);
+    let discover_result = spawn_actor(
+        "nullslop-llm-discover",
+        discover_actor,
+        &discover_ref,
+        discover_rx,
+        discover_ctx,
+        handle,
+    );
+
     // Emit lifecycle events.
     let _ = sink.send_event(Event::ActorStarting {
         payload: ActorStarting {
@@ -261,9 +283,19 @@ fn create_core_with_actor_host(
             name: "nullslop-llm".to_string(),
         },
     });
+    let _ = sink.send_event(Event::ActorStarting {
+        payload: ActorStarting {
+            name: "nullslop-llm-discover".to_string(),
+        },
+    });
+    let _ = sink.send_event(Event::ActorStarted {
+        payload: ActorStarted {
+            name: "nullslop-llm-discover".to_string(),
+        },
+    });
 
     let host =
-        InMemoryActorHost::from_actors_with_handle(vec![echo_result, llm_result], handle.clone());
+        InMemoryActorHost::from_actors_with_handle(vec![echo_result, llm_result, discover_result], handle.clone());
     let host_arc: Arc<dyn nullslop_actor_host::ActorHost> = Arc::new(host);
 
     // Build services with the actor host.
@@ -288,6 +320,21 @@ fn create_core_with_actor_host(
     nullslop_component::register_all(&mut core.bus, &mut registry);
 
     (core, services)
+}
+
+/// Loads the model cache from disk into the application state.
+///
+/// Called once after core creation. Failures are logged but not fatal —
+/// the cache is optional and will be populated on first refresh.
+fn load_model_cache(core: &AppCore) {
+    let cache = ModelCache::load(&cache_path()).unwrap_or_else(|e| {
+        tracing::warn!("failed to load model cache: {e:?}");
+        None
+    });
+    if let Some(ref c) = cache {
+        tracing::info!(providers = c.entries.len(), "loaded model cache");
+    }
+    core.state.write().model_cache = cache;
 }
 
 #[cfg(test)]

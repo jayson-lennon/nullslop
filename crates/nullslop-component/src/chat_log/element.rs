@@ -98,7 +98,7 @@ fn entry_to_lines(entry: &nullslop_protocol::ChatEntry) -> Vec<Line<'static>> {
 }
 
 /// Split text on `\n` and produce styled lines with the given prefix/indent.
-fn multiline_styled<T, P, I>(text: T, prefix: P, _indent: I, style: Style) -> Vec<Line<'static>>
+fn multiline_styled<T, P, I>(text: T, prefix: P, indent: I, style: Style) -> Vec<Line<'static>>
 where
     T: AsRef<str>,
     P: AsRef<str>,
@@ -106,7 +106,7 @@ where
 {
     let text = text.as_ref();
     let prefix = prefix.as_ref();
-    let _indent = _indent.as_ref();
+    let _ = indent.as_ref();
     let segments = text.split('\n');
     let mut lines = Vec::new();
     for (i, segment) in segments.enumerate() {

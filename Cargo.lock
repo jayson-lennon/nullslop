@@ -1442,6 +1442,7 @@ dependencies = [
  "nullslop-core",
  "nullslop-echo",
  "nullslop-llm",
+ "nullslop-llm-discover",
  "nullslop-protocol",
  "nullslop-providers",
  "nullslop-services",
@@ -1574,6 +1575,21 @@ dependencies = [
  "nullslop-services",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "nullslop-llm-discover"
+version = "0.1.0"
+dependencies = [
+ "error-stack",
+ "llm",
+ "nullslop-actor",
+ "nullslop-protocol",
+ "nullslop-providers",
+ "nullslop-services",
+ "tokio",
+ "tracing",
+ "wherror",
 ]
 
 [[package]]

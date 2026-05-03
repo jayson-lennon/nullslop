@@ -180,7 +180,10 @@ fn compute_popup_rect(area: Rect) -> Rect {
     let max_body_rows = (f32::from(area.height) * PICKER_MAX_HEIGHT_FRAC).floor() as u16;
     let popup_height = (max_body_rows + 4).min(area.height);
 
+    // Integer division is intentional — we're computing cell positions for centering.
+    #[expect(clippy::integer_division, reason = "cell positions are integers")]
     let popup_x = area.width.saturating_sub(popup_width) / 2;
+    #[expect(clippy::integer_division, reason = "cell positions are integers")]
     let popup_y = area.height.saturating_sub(popup_height) / 3; // bias toward top third
 
     Rect::new(popup_x, popup_y, popup_width, popup_height)
@@ -198,8 +201,9 @@ fn render_provider_picker(frame: &mut Frame<'_>, area: Rect, state: &nullslop_co
     let services = &state.services;
     let registry = services.provider_registry().read();
     let api_keys = services.api_keys().read();
+    let unsorted = filtered_entries(&registry, &api_keys, &state.picker.filter, state.model_cache.as_ref());
     let entries = sorted_entries(
-        filtered_entries(&registry, &api_keys, &state.picker.filter),
+        &unsorted,
         &state.picker.filter,
         &state.active_provider,
     );
@@ -243,7 +247,7 @@ fn render_provider_picker(frame: &mut Frame<'_>, area: Rect, state: &nullslop_co
     frame.render_widget(Paragraph::new(result_lines), results_area);
 
     // Footer: last updated timestamp + refresh hint.
-    let footer_text = format_footer(&state.last_refreshed_at, footer_area.width as usize);
+    let footer_text = format_footer(state.last_refreshed_at.as_ref(), footer_area.width as usize);
     let footer_paragraph = Paragraph::new(footer_text).style(Style::default().fg(Color::DarkGray));
     frame.render_widget(footer_paragraph, footer_area);
 }
@@ -284,6 +288,8 @@ fn build_result_lines<'a>(
                 "\u{2717} " // ✗
             } else if entry.is_alias {
                 "\u{2192} " // →
+            } else if entry.is_remote {
+                "* "
             } else {
                 "  "
             };
@@ -316,7 +322,7 @@ fn build_result_lines<'a>(
 }
 
 /// Formats the footer text showing last updated time and refresh hint.
-fn format_footer(last_refreshed_at: &Option<std::time::Instant>, width: usize) -> String {
+fn format_footer(last_refreshed_at: Option<&std::time::Instant>, width: usize) -> String {
     let timestamp = match last_refreshed_at {
         Some(instant) => {
             let elapsed = instant.elapsed();
@@ -324,7 +330,7 @@ fn format_footer(last_refreshed_at: &Option<std::time::Instant>, width: usize) -
         }
         None => "never".to_owned(),
     };
-    let footer = format!("Last updated: {}   CTRL+R to refresh", timestamp);
+    let footer = format!("Last updated: {timestamp}   CTRL+R to refresh");
     // Truncate to fit width.
     if footer.len() > width {
         footer.chars().take(width).collect()
@@ -337,11 +343,15 @@ fn format_footer(last_refreshed_at: &Option<std::time::Instant>, width: usize) -
 fn format_relative_time(duration: std::time::Duration) -> String {
     let secs = duration.as_secs();
     if secs < 60 {
-        format!("{}s ago", secs)
+        format!("{secs}s ago")
     } else if secs < 3600 {
-        format!("{}m ago", secs / 60)
+        #[expect(clippy::integer_division, reason = "intentional truncating division for minute display")]
+        let minutes = secs / 60;
+        format!("{minutes}m ago")
     } else {
-        format!("{}h ago", secs / 3600)
+        #[expect(clippy::integer_division, reason = "intentional truncating division for hour display")]
+        let hours = secs / 3600;
+        format!("{hours}h ago")
     }
 }
 
