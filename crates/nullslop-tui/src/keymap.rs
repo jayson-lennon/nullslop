@@ -42,8 +42,10 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
             .bind("<c-l>", Command::SwitchTab { payload: SwitchTab { direction: TabDirection::Next } }, KeyCategory::General)
             .bind("<c-u>", Command::ScrollUp, KeyCategory::General)
         .describe_group("g", "general")
-            .bind("<c-d>", Command::ScrollDown, KeyCategory::General)
-            .bind("gm", Command::SetMode { payload: SetMode { mode: Mode::Picker } }, KeyCategory::General);
+            .describe_group("gm", "model")
+            .bind("gms", Command::SetMode { payload: SetMode { mode: Mode::Picker } }, KeyCategory::General)
+            .bind("gmr", Command::RefreshModels, KeyCategory::General)
+            .bind("<c-d>", Command::ScrollDown, KeyCategory::General);
         })
         // Input scope: typing into the input buffer
         .scope(Scope::Input, |b| {
@@ -112,7 +114,7 @@ mod tests {
     use ratatui_which_key::Key as _;
 
     #[test]
-    fn gm_shows_in_which_key_with_general_description() {
+    fn g_shows_in_which_key_with_general_description() {
         // Given the keymap.
         let keymap = init();
 
@@ -134,11 +136,11 @@ mod tests {
     }
 
     #[test]
-    fn gm_produces_set_mode_picker() {
+    fn gms_produces_set_mode_picker() {
         // Given the keymap.
         let keymap = init();
 
-        // When looking up 'g' then 'm'.
+        // When looking up 'g' then 'm' then 's'.
         let g_key = KeyEvent {
             key: Key::Char('g'),
             modifiers: Modifiers::none(),
@@ -147,8 +149,12 @@ mod tests {
             key: Key::Char('m'),
             modifiers: Modifiers::none(),
         };
+        let s_key = KeyEvent {
+            key: Key::Char('s'),
+            modifiers: Modifiers::none(),
+        };
 
-        let node = keymap.get_node_at_path(&[g_key, m_key]);
+        let node = keymap.get_node_at_path(&[g_key, m_key, s_key]);
 
         // Then it's a leaf with the SetMode Picker command.
         assert!(node.is_some());
@@ -161,7 +167,43 @@ mod tests {
                 "expected SetMode Picker, got {cmd:?}"
             );
         } else {
-            panic!("Expected leaf node for 'gm'");
+            panic!("Expected leaf node for 'gms'");
+        }
+    }
+
+    #[test]
+    fn gmr_produces_refresh_models_command() {
+        // Given the keymap.
+        let keymap = init();
+
+        // When looking up 'g' then 'm' then 'r'.
+        let g_key = KeyEvent {
+            key: Key::Char('g'),
+            modifiers: Modifiers::none(),
+        };
+        let m_key = KeyEvent {
+            key: Key::Char('m'),
+            modifiers: Modifiers::none(),
+        };
+        let r_key = KeyEvent {
+            key: Key::Char('r'),
+            modifiers: Modifiers::none(),
+        };
+
+        let node = keymap.get_node_at_path(&[g_key, m_key, r_key]);
+
+        // Then it's a leaf with the RefreshModels command.
+        assert!(node.is_some());
+        if let Some(ratatui_which_key::KeyNode::Leaf(entries)) = node {
+            let entry = entries.iter().find(|e| e.scope == Scope::Normal);
+            assert!(entry.is_some());
+            let cmd = &entry.unwrap().action;
+            assert!(
+                matches!(cmd, Command::RefreshModels),
+                "expected RefreshModels, got {cmd:?}"
+            );
+        } else {
+            panic!("Expected leaf node for 'gmr'");
         }
     }
 }
