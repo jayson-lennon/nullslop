@@ -10,4 +10,4 @@ pub use command::{
 };
 pub use convert::entries_to_messages;
 pub use event::{ModelsRefreshed, ProviderSwitched, StreamCompleted, StreamCompletedReason};
-pub use message::{LlmMessage, LlmRole};
+pub use message::LlmMessage;

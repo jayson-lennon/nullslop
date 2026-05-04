@@ -21,6 +21,7 @@ mod registry_service;
 mod resolved_provider;
 mod sample;
 mod service;
+mod stream_event;
 mod service_wrapper;
 
 pub use api_keys::ApiKeys;
@@ -32,7 +33,7 @@ pub use config::{
 pub use config_storage::{
     ConfigStorage, ConfigStorageService, FilesystemConfigStorage, InMemoryConfigStorage,
 };
-pub use convert::llm_messages_to_chat_messages;
+pub use stream_event::StreamEvent;
 pub use fake::FakeLlmServiceFactory;
 pub use generic_factory::GenericLlmServiceFactory;
 pub use model_cache::{ModelCache, ModelCacheError, cache_path};
@@ -43,5 +44,5 @@ pub use registry::ProviderRegistry;
 pub use registry_service::ProviderRegistryService;
 pub use resolved_provider::ResolvedProvider;
 pub use sample::SampleLlmServiceFactory;
-pub use service::{ChatStream, LlmService, LlmServiceError, LlmServiceFactory};
+pub use service::{ChatStream, LlmService, LlmServiceError, LlmServiceFactory, ToolStream};
 pub use service_wrapper::LlmServiceFactoryService;

@@ -1,9 +1,9 @@
 //! State for a single chat session — history, input box, and streaming progress.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 use crate::chat_input_box::ChatInputBoxState;
-use nullslop_protocol::ChatEntry;
+use nullslop_protocol::{ChatEntry, ChatEntryKind};
 
 /// The state of a single chat session.
 ///
@@ -25,6 +25,8 @@ pub struct ChatSessionState {
     message_queue: VecDeque<String>,
     /// Whether a message has been dispatched to the LLM but no tokens have arrived yet.
     is_sending: bool,
+    /// Maps stream tool call index to history index for in-progress tool calls.
+    streaming_tool_call_indices: HashMap<usize, usize>,
     /// Number of lines to skip from the top when rendering (ratatui scroll offset).
     scroll_offset: u16,
 }
@@ -40,6 +42,7 @@ impl ChatSessionState {
             is_streaming: false,
             message_queue: VecDeque::new(),
             is_sending: false,
+            streaming_tool_call_indices: HashMap::new(),
             scroll_offset: 0,
         }
     }
@@ -135,6 +138,7 @@ impl ChatSessionState {
         self.is_streaming = false;
         self.is_sending = false; // defensive: clear both on finish
         self.streaming_entry_index = None;
+        self.streaming_tool_call_indices.clear();
     }
 
     /// Cancel streaming but keep partial text in history.
@@ -142,11 +146,77 @@ impl ChatSessionState {
         self.is_streaming = false;
         self.is_sending = false; // defensive: clear both on cancel
         self.streaming_entry_index = None;
+        self.streaming_tool_call_indices.clear();
     }
 
     /// Whether an LLM stream is actively producing tokens.
     pub fn is_streaming(&self) -> bool {
         self.is_streaming
+    }
+
+    // --- Tool call streaming ---
+
+    /// Create a placeholder `ToolCall` entry and record its history index.
+    ///
+    /// Called when `ToolUseStarted` arrives — the tool name is known but arguments
+    /// are still streaming in.
+    pub fn begin_tool_call(&mut self, index: usize, id: &str, name: &str) {
+        let entry = ChatEntry::tool_call(id, name, "");
+        let history_index = self.push_entry(entry);
+        self.streaming_tool_call_indices
+            .insert(index, history_index);
+    }
+
+    /// Append an incremental delta to a streaming tool call's arguments.
+    ///
+    /// `partial_json` is appended to the existing arguments string — it is *not*
+    /// the accumulated total.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no tool call entry is tracked for the given stream index.
+    #[expect(
+        clippy::indexing_slicing,
+        reason = "index comes from push_entry which always returns a valid index"
+    )]
+    pub fn append_tool_call_delta(&mut self, index: usize, partial_json: &str) {
+        let history_index = self
+            .streaming_tool_call_indices
+            .get(&index)
+            .copied()
+            .expect("append_tool_call_delta: no entry tracked for this stream index");
+        if let ChatEntryKind::ToolCall {
+            ref mut arguments,
+            ..
+        } = self.history[history_index].kind
+        {
+            arguments.push_str(partial_json);
+        }
+    }
+
+    /// Overwrite a tool call entry with the final complete arguments.
+    ///
+    /// Searches recent history for a `ToolCall` entry matching the given ID.
+    /// If not found (shouldn't happen in normal flow), pushes a new entry.
+    pub(crate) fn finalize_tool_call(&mut self, id: &str, name: &str, arguments: &str) {
+        for entry in self.history.iter_mut().rev() {
+            if let ChatEntryKind::ToolCall {
+                id: ref entry_id,
+                ..
+            } = entry.kind
+            {
+                if entry_id == id {
+                    entry.kind = ChatEntryKind::ToolCall {
+                        id: id.to_owned(),
+                        name: name.to_owned(),
+                        arguments: arguments.to_owned(),
+                    };
+                    return;
+                }
+            }
+        }
+        // If not found (shouldn't happen), push a new entry.
+        self.push_entry(ChatEntry::tool_call(id, name, arguments));
     }
 
     // --- Queue ---
@@ -615,5 +685,159 @@ mod tests {
         // Then both flags are cleared.
         assert!(!session.is_sending());
         assert!(!session.is_streaming());
+    }
+
+    // --- Tool call streaming tests ---
+
+    #[test]
+    fn begin_tool_call_creates_entry_with_empty_arguments() {
+        // Given a streaming session.
+        let mut session = ChatSessionState::new();
+        session.begin_streaming();
+
+        // When beginning a tool call.
+        session.begin_tool_call(0, "call_1", "echo");
+
+        // Then history has an assistant entry and a tool call entry with empty arguments.
+        assert_eq!(session.history().len(), 2);
+        assert!(matches!(
+            session.history()[0].kind,
+            ChatEntryKind::Assistant(_)
+        ));
+        assert_eq!(
+            session.history()[1].kind,
+            ChatEntryKind::ToolCall {
+                id: "call_1".to_owned(),
+                name: "echo".to_owned(),
+                arguments: String::new(),
+            }
+        );
+    }
+
+    #[test]
+    fn append_tool_call_delta_accumulates_arguments() {
+        // Given a streaming session with a tool call entry.
+        let mut session = ChatSessionState::new();
+        session.begin_streaming();
+        session.begin_tool_call(0, "call_1", "echo");
+
+        // When appending tool call deltas.
+        session.append_tool_call_delta(0, r#"{"input":"#);
+        session.append_tool_call_delta(0, r#""hello"}"#);
+
+        // Then the tool call entry has the accumulated arguments.
+        assert_eq!(
+            session.history()[1].kind,
+            ChatEntryKind::ToolCall {
+                id: "call_1".to_owned(),
+                name: "echo".to_owned(),
+                arguments: r#"{"input":"hello"}"#.to_owned(),
+            }
+        );
+    }
+
+    #[test]
+    fn finalize_tool_call_overwrites_arguments() {
+        // Given a streaming session with a tool call that has partial arguments.
+        let mut session = ChatSessionState::new();
+        session.begin_streaming();
+        session.begin_tool_call(0, "call_1", "echo");
+        session.append_tool_call_delta(0, r#"{"input":"#);
+
+        // When finalizing the tool call with the complete arguments.
+        session.finalize_tool_call("call_1", "echo", r#"{"input":"world"}"#);
+
+        // Then the arguments are overwritten with the final value.
+        assert_eq!(
+            session.history()[1].kind,
+            ChatEntryKind::ToolCall {
+                id: "call_1".to_owned(),
+                name: "echo".to_owned(),
+                arguments: r#"{"input":"world"}"#.to_owned(),
+            }
+        );
+    }
+
+    #[test]
+    fn finalize_tool_call_pushes_new_entry_when_not_found() {
+        // Given a streaming session with no tool call entry for the given ID.
+        let mut session = ChatSessionState::new();
+        session.begin_streaming();
+
+        // When finalizing a tool call that was never started (shouldn't happen normally).
+        session.finalize_tool_call("call_99", "echo", r#"{"input":"hi"}"#);
+
+        // Then a new entry is pushed to history.
+        assert_eq!(session.history().len(), 2); // assistant + new tool call
+        assert_eq!(
+            session.history()[1].kind,
+            ChatEntryKind::ToolCall {
+                id: "call_99".to_owned(),
+                name: "echo".to_owned(),
+                arguments: r#"{"input":"hi"}"#.to_owned(),
+            }
+        );
+    }
+
+    #[test]
+    fn multiple_tool_calls_track_independently() {
+        // Given a streaming session.
+        let mut session = ChatSessionState::new();
+        session.begin_streaming();
+
+        // When beginning two tool calls with different indices.
+        session.begin_tool_call(0, "call_1", "echo");
+        session.append_tool_call_delta(0, r#"{"a":1}"#);
+
+        session.begin_tool_call(1, "call_2", "get_time");
+        session.append_tool_call_delta(1, "{}");
+
+        // Then each entry tracks its own arguments.
+        assert_eq!(
+            session.history()[1].kind,
+            ChatEntryKind::ToolCall {
+                id: "call_1".to_owned(),
+                name: "echo".to_owned(),
+                arguments: r#"{"a":1}"#.to_owned(),
+            }
+        );
+        assert_eq!(
+            session.history()[2].kind,
+            ChatEntryKind::ToolCall {
+                id: "call_2".to_owned(),
+                name: "get_time".to_owned(),
+                arguments: "{}".to_owned(),
+            }
+        );
+    }
+
+    #[test]
+    fn finish_streaming_clears_tool_call_indices() {
+        // Given a streaming session with a tool call entry.
+        let mut session = ChatSessionState::new();
+        session.begin_streaming();
+        session.begin_tool_call(0, "call_1", "echo");
+
+        // When finishing streaming.
+        session.finish_streaming();
+
+        // Then the tool call indices are cleared (entries remain in history).
+        assert!(!session.is_streaming());
+        assert_eq!(session.history().len(), 2); // assistant + tool call still there
+    }
+
+    #[test]
+    fn cancel_streaming_clears_tool_call_indices() {
+        // Given a streaming session with a tool call entry.
+        let mut session = ChatSessionState::new();
+        session.begin_streaming();
+        session.begin_tool_call(0, "call_1", "echo");
+
+        // When cancelling streaming.
+        session.cancel_streaming();
+
+        // Then the tool call indices are cleared (entries remain in history).
+        assert!(!session.is_streaming());
+        assert_eq!(session.history().len(), 2); // assistant + tool call still there
     }
 }

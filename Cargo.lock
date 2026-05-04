@@ -1452,6 +1452,7 @@ dependencies = [
  "nullslop-protocol",
  "nullslop-providers",
  "nullslop-services",
+ "nullslop-tool-orchestrator",
  "nullslop-tui",
  "ratatui-which-key",
  "tempfile",
@@ -1576,10 +1577,11 @@ name = "nullslop-llm"
 version = "0.1.0"
 dependencies = [
  "futures",
- "llm",
  "nullslop-actor",
  "nullslop-protocol",
+ "nullslop-providers",
  "nullslop-services",
+ "serde_json",
  "tokio",
  "tracing",
 ]
@@ -1658,6 +1660,19 @@ dependencies = [
  "nullslop-providers",
  "tokio",
  "wherror",
+]
+
+[[package]]
+name = "nullslop-tool-orchestrator"
+version = "0.1.0"
+dependencies = [
+ "jiff",
+ "nullslop-actor",
+ "nullslop-protocol",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

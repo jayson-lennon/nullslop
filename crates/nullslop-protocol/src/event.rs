@@ -23,6 +23,7 @@ use crate::actor::{ActorShutdownCompleted, ActorStarted, ActorStarting};
 use crate::chat_input::ChatEntrySubmitted;
 use crate::provider::{ModelsRefreshed, ProviderSwitched, StreamCompleted};
 use crate::system::{KeyDown, KeyUp, ModeChanged};
+use crate::tool::{ToolBatchCompleted, ToolExecutionCompleted, ToolsRegistered};
 
 /// Every event the host can broadcast.
 ///
@@ -105,6 +106,27 @@ pub enum Event {
         #[serde(flatten)]
         payload: ModelsRefreshed,
     },
+    /// All tool calls in a batch have completed execution.
+    #[serde(rename = "tool_batch_completed")]
+    ToolBatchCompleted {
+        /// The batch completion payload.
+        #[serde(flatten)]
+        payload: ToolBatchCompleted,
+    },
+    /// A single tool execution completed.
+    #[serde(rename = "tool_execution_completed")]
+    ToolExecutionCompleted {
+        /// The execution completion payload.
+        #[serde(flatten)]
+        payload: ToolExecutionCompleted,
+    },
+    /// Tools were registered by an actor.
+    #[serde(rename = "tools_registered")]
+    ToolsRegistered {
+        /// The registration confirmation payload.
+        #[serde(flatten)]
+        payload: ToolsRegistered,
+    },
 }
 
 impl Event {
@@ -122,6 +144,9 @@ impl Event {
             Self::StreamCompleted { .. } => Some(StreamCompleted::TYPE_NAME),
             Self::ProviderSwitched { .. } => Some(ProviderSwitched::TYPE_NAME),
             Self::ModelsRefreshed { .. } => Some(ModelsRefreshed::TYPE_NAME),
+            Self::ToolBatchCompleted { .. } => Some(ToolBatchCompleted::TYPE_NAME),
+            Self::ToolExecutionCompleted { .. } => Some(ToolExecutionCompleted::TYPE_NAME),
+            Self::ToolsRegistered { .. } => Some(ToolsRegistered::TYPE_NAME),
         }
     }
 }
@@ -167,9 +192,12 @@ mod tests {
     #[case::actor_starting(Event::ActorStarting { payload: ActorStarting { name: "actor-a".into() } })]
     #[case::actor_started(Event::ActorStarted { payload: ActorStarted { name: "actor-a".into() } })]
     #[case::actor_shutdown_completed(Event::ActorShutdownCompleted { payload: ActorShutdownCompleted { name: "actor-a".into() } })]
-    #[case::stream_completed(Event::StreamCompleted { payload: StreamCompleted { session_id: SessionId::new(), reason: StreamCompletedReason::Finished } })]
+    #[case::stream_completed(Event::StreamCompleted { payload: StreamCompleted { session_id: SessionId::new(), reason: StreamCompletedReason::Finished, assistant_content: None, tool_calls: None } })]
     #[case::provider_switched(Event::ProviderSwitched { payload: ProviderSwitched { provider_name: "Ollama".into() } })]
     #[case::models_refreshed(Event::ModelsRefreshed { payload: ModelsRefreshed { results: std::collections::HashMap::new(), errors: std::collections::HashMap::new() } })]
+    #[case::tool_batch_completed(Event::ToolBatchCompleted { payload: ToolBatchCompleted { session_id: SessionId::new(), results: vec![crate::ToolResult { tool_call_id: "call_1".into(), name: "echo".into(), content: "hi".into(), success: true }] } })]
+    #[case::tool_execution_completed(Event::ToolExecutionCompleted { payload: ToolExecutionCompleted { session_id: SessionId::new(), result: crate::ToolResult { tool_call_id: "call_1".into(), name: "echo".into(), content: "hi".into(), success: true } } })]
+    #[case::tools_registered(Event::ToolsRegistered { payload: ToolsRegistered { provider: "echo-actor".into(), definitions: vec![crate::ToolDefinition { name: "echo".into(), description: "echoes".into(), parameters: serde_json::json!({}) }] } })]
     fn event_roundtrip_all_variants(#[case] event: Event) {
         // Given an event variant.
         let json = serde_json::to_string(&event).expect("serialize");
@@ -284,5 +312,13 @@ mod tests {
 
         // Then ModelsRefreshed has the correct TYPE_NAME.
         assert_eq!(ModelsRefreshed::TYPE_NAME, "provider::ModelsRefreshed");
+
+        // Then tool events have the correct TYPE_NAME.
+        assert_eq!(ToolBatchCompleted::TYPE_NAME, "tool::ToolBatchCompleted");
+        assert_eq!(
+            ToolExecutionCompleted::TYPE_NAME,
+            "tool::ToolExecutionCompleted"
+        );
+        assert_eq!(ToolsRegistered::TYPE_NAME, "tool::ToolsRegistered");
     }
 }

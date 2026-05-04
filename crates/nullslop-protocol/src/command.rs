@@ -35,6 +35,10 @@ use crate::provider_picker::{
 };
 use crate::system::SetMode;
 use crate::tab::SwitchTab;
+use crate::tool::{
+    ExecuteTool, ExecuteToolBatch, PushToolResult, RegisterTools, ToolCallReceived,
+    ToolCallStreaming, ToolUseStarted,
+};
 
 /// Every command the host can receive.
 ///
@@ -192,6 +196,55 @@ pub enum Command {
     /// Refresh the model list from all providers.
     #[serde(rename = "refresh_models")]
     RefreshModels,
+    /// Register tools that an actor can execute.
+    #[serde(rename = "register_tools")]
+    RegisterTools {
+        /// The registration payload.
+        #[serde(flatten)]
+        payload: RegisterTools,
+    },
+    /// Request execution of a batch of tool calls.
+    #[serde(rename = "execute_tool_batch")]
+    ExecuteToolBatch {
+        /// The batch execution payload.
+        #[serde(flatten)]
+        payload: ExecuteToolBatch,
+    },
+    /// Execute a single tool call (routed to provider actor).
+    #[serde(rename = "execute_tool")]
+    ExecuteTool {
+        /// The single tool execution payload.
+        #[serde(flatten)]
+        payload: ExecuteTool,
+    },
+    /// A tool call has started in the LLM stream.
+    #[serde(rename = "tool_use_started")]
+    ToolUseStarted {
+        /// The tool use started payload.
+        #[serde(flatten)]
+        payload: ToolUseStarted,
+    },
+    /// A complete tool call was received from the LLM stream.
+    #[serde(rename = "tool_call_received")]
+    ToolCallReceived {
+        /// The received tool call payload.
+        #[serde(flatten)]
+        payload: ToolCallReceived,
+    },
+    /// Streaming update for a tool call's arguments being assembled.
+    #[serde(rename = "tool_call_streaming")]
+    ToolCallStreaming {
+        /// The streaming tool call payload.
+        #[serde(flatten)]
+        payload: ToolCallStreaming,
+    },
+    /// Push a tool result into the chat log.
+    #[serde(rename = "push_tool_result")]
+    PushToolResult {
+        /// The tool result payload.
+        #[serde(flatten)]
+        payload: PushToolResult,
+    },
     /// Insert a character into the picker filter.
     #[serde(rename = "picker_insert_char")]
     PickerInsertChar {
@@ -265,6 +318,13 @@ impl Command {
             Self::PickerMoveDown => Some(PickerMoveDown::NAME),
             Self::PickerMoveCursorLeft => Some(PickerMoveCursorLeft::NAME),
             Self::PickerMoveCursorRight => Some(PickerMoveCursorRight::NAME),
+            Self::RegisterTools { .. } => Some(RegisterTools::NAME),
+            Self::ExecuteToolBatch { .. } => Some(ExecuteToolBatch::NAME),
+            Self::ExecuteTool { .. } => Some(ExecuteTool::NAME),
+            Self::ToolUseStarted { .. } => Some(ToolUseStarted::NAME),
+            Self::ToolCallReceived { .. } => Some(ToolCallReceived::NAME),
+            Self::ToolCallStreaming { .. } => Some(ToolCallStreaming::NAME),
+            Self::PushToolResult { .. } => Some(PushToolResult::NAME),
         }
     }
 }
@@ -325,6 +385,52 @@ impl std::fmt::Display for Command {
             Command::PickerMoveDown => write!(f, "picker move down"),
             Command::PickerMoveCursorLeft => write!(f, "picker cursor left"),
             Command::PickerMoveCursorRight => write!(f, "picker cursor right"),
+            Command::RegisterTools { payload } => {
+                write!(
+                    f,
+                    "register {} tools from '{}'",
+                    payload.definitions.len(),
+                    payload.provider
+                )
+            }
+            Command::ExecuteToolBatch { payload } => {
+                write!(
+                    f,
+                    "execute {} tool calls",
+                    payload.tool_calls.len()
+                )
+            }
+            Command::ExecuteTool { payload } => {
+                write!(
+                    f,
+                    "execute tool '{}' ({})",
+                    payload.tool_call.name, payload.tool_call.id
+                )
+            }
+            Command::ToolUseStarted { payload } => {
+                write!(
+                    f,
+                    "tool use started '{}' ({})",
+                    payload.name, payload.id
+                )
+            }
+            Command::ToolCallReceived { payload } => {
+                write!(
+                    f,
+                    "tool call received '{}' ({})",
+                    payload.tool_call.name, payload.tool_call.id
+                )
+            }
+            Command::ToolCallStreaming { payload } => {
+                write!(f, "tool call streaming idx {}", payload.index)
+            }
+            Command::PushToolResult { payload } => {
+                write!(
+                    f,
+                    "push tool result '{}' ({})",
+                    payload.result.name, payload.result.tool_call_id
+                )
+            }
         }
     }
 }
@@ -401,6 +507,13 @@ mod tests {
     #[case::picker_move_cursor_left(Command::PickerMoveCursorLeft)]
     #[case::picker_move_cursor_right(Command::PickerMoveCursorRight)]
     #[case::refresh_models(Command::RefreshModels)]
+    #[case::register_tools(Command::RegisterTools { payload: RegisterTools { provider: "echo-actor".into(), definitions: vec![crate::ToolDefinition { name: "echo".into(), description: "echo".into(), parameters: serde_json::json!({}) }] } })]
+    #[case::execute_tool_batch(Command::ExecuteToolBatch { payload: ExecuteToolBatch { session_id: SessionId::new(), tool_calls: vec![crate::ToolCall { id: "call_1".into(), name: "echo".into(), arguments: "{}".into() }] } })]
+    #[case::execute_tool(Command::ExecuteTool { payload: ExecuteTool { session_id: SessionId::new(), tool_call: crate::ToolCall { id: "call_1".into(), name: "echo".into(), arguments: "{}".into() } } })]
+    #[case::tool_use_started(Command::ToolUseStarted { payload: ToolUseStarted { session_id: SessionId::new(), index: 0, id: "call_1".into(), name: "echo".into() } })]
+    #[case::tool_call_received(Command::ToolCallReceived { payload: ToolCallReceived { session_id: SessionId::new(), tool_call: crate::ToolCall { id: "call_1".into(), name: "echo".into(), arguments: "{}".into() } } })]
+    #[case::tool_call_streaming(Command::ToolCallStreaming { payload: ToolCallStreaming { session_id: SessionId::new(), index: 0, partial_json: "{\"a\":".into() } })]
+    #[case::push_tool_result(Command::PushToolResult { payload: PushToolResult { session_id: SessionId::new(), result: crate::ToolResult { tool_call_id: "call_1".into(), name: "echo".into(), content: "hi".into(), success: true } } })]
     fn command_roundtrip_all_variants(#[case] cmd: Command) {
         // Given a command variant.
         let json = serde_json::to_string(&cmd).expect("serialize");

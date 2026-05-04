@@ -5,7 +5,7 @@
 
 use error_stack::Report;
 use futures::stream;
-use llm::chat::ChatMessage;
+use nullslop_protocol::LlmMessage;
 
 use crate::service::{ChatStream, LlmService, LlmServiceError, LlmServiceFactory};
 
@@ -43,7 +43,7 @@ struct NoProvidersAvailableService;
 impl LlmService for NoProvidersAvailableService {
     async fn chat_stream(
         &self,
-        _messages: Vec<ChatMessage>,
+        _messages: Vec<LlmMessage>,
     ) -> Result<ChatStream, Report<LlmServiceError>> {
         let tokens = tokenize(HELP_MESSAGE);
         let stream: ChatStream = Box::pin(stream::iter(tokens.into_iter().map(Ok)));

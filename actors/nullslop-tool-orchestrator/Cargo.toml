@@ -1,5 +1,5 @@
 [package]
-name = "nullslop-llm"
+name = "nullslop-tool-orchestrator"
 version = "0.1.0"
 edition = "2024"
 
@@ -9,14 +9,13 @@ path = "src/lib.rs"
 [dependencies]
 nullslop-actor = { workspace = true }
 nullslop-protocol = { workspace = true }
-nullslop-providers = { workspace = true }
-nullslop-services = { workspace = true }
+serde_json = { workspace = true }
 tokio = { workspace = true }
-futures = { workspace = true }
 tracing = { workspace = true }
+jiff = { workspace = true }
 
 [dev-dependencies]
-serde_json = { workspace = true }
+tempfile = { workspace = true }
 
 [lints]
 workspace = true

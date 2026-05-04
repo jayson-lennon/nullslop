@@ -489,6 +489,27 @@ impl<S, Sv> Bus<S, Sv> {
                 let cmd = RefreshModels;
                 self.dispatch_command_to_handlers(&cmd, state, services, &mut out);
             }
+            Command::RegisterTools { payload } => {
+                self.dispatch_command_to_handlers(&payload, state, services, &mut out);
+            }
+            Command::ExecuteToolBatch { payload } => {
+                self.dispatch_command_to_handlers(&payload, state, services, &mut out);
+            }
+            Command::ExecuteTool { payload } => {
+                self.dispatch_command_to_handlers(&payload, state, services, &mut out);
+            }
+            Command::ToolUseStarted { payload } => {
+                self.dispatch_command_to_handlers(&payload, state, services, &mut out);
+            }
+            Command::ToolCallReceived { payload } => {
+                self.dispatch_command_to_handlers(&payload, state, services, &mut out);
+            }
+            Command::ToolCallStreaming { payload } => {
+                self.dispatch_command_to_handlers(&payload, state, services, &mut out);
+            }
+            Command::PushToolResult { payload } => {
+                self.dispatch_command_to_handlers(&payload, state, services, &mut out);
+            }
         }
         self.flush_out(out);
     }
@@ -552,6 +573,15 @@ impl<S, Sv> Bus<S, Sv> {
                 self.dispatch_event_to_handlers(&payload, state, services, &mut out);
             }
             Event::ModelsRefreshed { payload } => {
+                self.dispatch_event_to_handlers(&payload, state, services, &mut out);
+            }
+            Event::ToolBatchCompleted { payload } => {
+                self.dispatch_event_to_handlers(&payload, state, services, &mut out);
+            }
+            Event::ToolExecutionCompleted { payload } => {
+                self.dispatch_event_to_handlers(&payload, state, services, &mut out);
+            }
+            Event::ToolsRegistered { payload } => {
                 self.dispatch_event_to_handlers(&payload, state, services, &mut out);
             }
         }

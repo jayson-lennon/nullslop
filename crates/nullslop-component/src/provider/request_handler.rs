@@ -240,6 +240,8 @@ mod tests {
             payload: StreamCompleted {
                 session_id: sid.clone(),
                 reason: StreamCompletedReason::Finished,
+                assistant_content: None,
+                tool_calls: None,
             },
         });
         bus.process_events(&mut state, &services);
@@ -281,6 +283,8 @@ mod tests {
             payload: StreamCompleted {
                 session_id: sid.clone(),
                 reason: StreamCompletedReason::Canceled,
+                assistant_content: None,
+                tool_calls: None,
             },
         });
         bus.process_events(&mut state, &services);
@@ -352,6 +356,8 @@ mod tests {
             payload: StreamCompleted {
                 session_id: sid.clone(),
                 reason: StreamCompletedReason::Finished,
+                assistant_content: None,
+                tool_calls: None,
             },
         });
         bus.process_events(&mut state, &services);
@@ -406,6 +412,8 @@ mod tests {
             payload: StreamCompleted {
                 session_id: sid.clone(),
                 reason: StreamCompletedReason::Finished,
+                assistant_content: None,
+                tool_calls: None,
             },
         });
         bus.process_events(&mut state, &services);

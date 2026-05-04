@@ -8,9 +8,10 @@
 use error_stack::{Report, ResultExt as _};
 use futures::StreamExt;
 use llm::builder::{LLMBackend, LLMBuilder};
-use llm::chat::ChatMessage;
+use nullslop_protocol::tool::ToolDefinition;
+use nullslop_protocol::LlmMessage;
 
-use crate::service::{ChatStream, LlmService, LlmServiceError, LlmServiceFactory};
+use crate::service::{ChatStream, LlmService, LlmServiceError, LlmServiceFactory, ToolStream};
 
 /// Generic factory that builds an LLM service from a provider config.
 ///
@@ -89,11 +90,12 @@ struct GenericLlmService {
 impl LlmService for GenericLlmService {
     async fn chat_stream(
         &self,
-        messages: Vec<ChatMessage>,
+        messages: Vec<LlmMessage>,
     ) -> Result<ChatStream, Report<LlmServiceError>> {
+        let chat_messages = crate::convert::messages_to_llm(&messages);
         let stream = self
             .provider
-            .chat_stream(&messages)
+            .chat_stream(&chat_messages)
             .await
             .change_context(LlmServiceError::Provider)?;
         let mapped: ChatStream = Box::pin(StreamExt::map(
@@ -102,6 +104,32 @@ impl LlmService for GenericLlmService {
                 token_result.change_context(LlmServiceError::Provider)
             },
         ));
+        Ok(mapped)
+    }
+
+    async fn chat_stream_with_tools(
+        &self,
+        messages: Vec<LlmMessage>,
+        tools: Vec<ToolDefinition>,
+    ) -> Result<ToolStream, Report<LlmServiceError>> {
+        let chat_messages = crate::convert::messages_to_llm(&messages);
+        let llm_tools = crate::convert::tool_definitions_to_llm(&tools);
+        let tools_opt = if llm_tools.is_empty() {
+            None
+        } else {
+            Some(llm_tools.as_slice())
+        };
+
+        let stream = self
+            .provider
+            .chat_stream_with_tools(&chat_messages, tools_opt)
+            .await
+            .change_context(LlmServiceError::Provider)?;
+        let mapped: ToolStream = Box::pin(StreamExt::map(stream, |chunk_result| {
+            chunk_result
+                .change_context(LlmServiceError::Provider)
+                .map(crate::convert::stream_chunk_to_event)
+        }));
         Ok(mapped)
     }
 }

@@ -26,6 +26,7 @@ pub mod provider_picker;
 pub mod session;
 pub mod system;
 pub mod tab;
+pub mod tool;
 
 // Re-export primary types
 pub use action::CommandAction;
@@ -39,10 +40,15 @@ pub use key::{Key, KeyEvent, Modifiers};
 pub use mode::Mode;
 pub use nullslop_protocol_derive::{CommandMsg, EventMsg};
 pub use provider::entries_to_messages;
-pub use provider::{LlmMessage, LlmRole};
+pub use provider::LlmMessage;
 pub use provider_picker::{
     PickerBackspace, PickerConfirm, PickerInsertChar, PickerMoveDown, PickerMoveUp,
 };
 pub use session::SessionId;
 pub use tab::ActiveTab;
 pub use tab::TabDirection;
+pub use tool::{
+    ExecuteTool, ExecuteToolBatch, PushToolResult, RegisterTools, ToolBatchCompleted, ToolCall,
+    ToolCallReceived, ToolCallStreaming, ToolDefinition, ToolExecutionCompleted, ToolResult,
+    ToolsRegistered, ToolUseStarted,
+};

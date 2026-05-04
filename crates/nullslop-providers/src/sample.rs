@@ -14,7 +14,7 @@ use std::time::Duration;
 
 use error_stack::Report;
 use futures::stream;
-use llm::chat::{ChatMessage, ChatRole};
+use nullslop_protocol::LlmMessage;
 use rand::Rng;
 
 use crate::service::{ChatStream, LlmService, LlmServiceError, LlmServiceFactory};
@@ -69,13 +69,15 @@ struct SampleLlmService;
 impl LlmService for SampleLlmService {
     async fn chat_stream(
         &self,
-        messages: Vec<ChatMessage>,
+        messages: Vec<LlmMessage>,
     ) -> Result<ChatStream, Report<LlmServiceError>> {
         let last_user_msg = messages
             .iter()
             .rev()
-            .find(|m| m.role == ChatRole::User)
-            .map(|m| m.content.trim().to_lowercase())
+            .find_map(|m| match m {
+                LlmMessage::User { content } => Some(content.trim().to_lowercase()),
+                _ => None,
+            })
             .unwrap_or_default();
 
         let (tokens, with_delay) = match last_user_msg.as_str() {
@@ -181,7 +183,9 @@ mod tests {
     async fn response_command_streams_canned_text() {
         // Given a sample service.
         let service = SampleLlmServiceFactory.create().expect("create service");
-        let messages = vec![ChatMessage::user().content("!response").build()];
+        let messages = vec![LlmMessage::User {
+            content: "!response".to_string(),
+        }];
 
         // When streaming.
         let stream = service.chat_stream(messages).await.expect("chat_stream");
@@ -198,7 +202,9 @@ mod tests {
     async fn think_command_streams_thinking_then_response() {
         // Given a sample service.
         let service = SampleLlmServiceFactory.create().expect("create service");
-        let messages = vec![ChatMessage::user().content("!think").build()];
+        let messages = vec![LlmMessage::User {
+            content: "!think".to_string(),
+        }];
 
         // When streaming.
         let stream = service.chat_stream(messages).await.expect("chat_stream");
@@ -219,7 +225,9 @@ mod tests {
     async fn unknown_input_streams_help() {
         // Given a sample service.
         let service = SampleLlmServiceFactory.create().expect("create service");
-        let messages = vec![ChatMessage::user().content("hello").build()];
+        let messages = vec![LlmMessage::User {
+            content: "hello".to_string(),
+        }];
 
         // When streaming.
         let stream = service.chat_stream(messages).await.expect("chat_stream");
@@ -254,7 +262,9 @@ mod tests {
     async fn response_command_produces_more_than_one_token() {
         // Given a sample service.
         let service = SampleLlmServiceFactory.create().expect("create service");
-        let messages = vec![ChatMessage::user().content("!response").build()];
+        let messages = vec![LlmMessage::User {
+            content: "!response".to_string(),
+        }];
 
         // When streaming.
         let stream = service.chat_stream(messages).await.expect("chat_stream");
@@ -304,8 +314,17 @@ mod tests {
         let service = SampleLlmServiceFactory.create().expect("create service");
 
         // When sending "!Response" (mixed case) as a message.
-        // The service should still match it as !response.
-        // This is verified indirectly — we just check the factory creates OK.
-        assert!(service.chat_stream(vec![]).await.is_ok());
+        let messages = vec![LlmMessage::User {
+            content: "!Response".to_string(),
+        }];
+        let stream = service.chat_stream(messages).await.expect("chat_stream");
+        let output: String = stream
+            .map(|r| r.expect("token"))
+            .collect::<Vec<_>>()
+            .await
+            .join("");
+
+        // Then the output matches the canned response (case-insensitive match).
+        assert_eq!(output, RESPONSE_TEXT);
     }
 }

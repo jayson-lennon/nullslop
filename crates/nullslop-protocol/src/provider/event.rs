@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::tool::ToolCall;
 use crate::EventMsg;
 use crate::SessionId;
 
@@ -13,6 +14,8 @@ pub enum StreamCompletedReason {
     Finished,
     /// The stream was cancelled by the user.
     Canceled,
+    /// The stream stopped because the model requested tool use.
+    ToolUse,
 }
 
 /// Streaming response completed for a session.
@@ -23,6 +26,12 @@ pub struct StreamCompleted {
     pub session_id: SessionId,
     /// Why the stream completed.
     pub reason: StreamCompletedReason,
+    /// Accumulated text content from the assistant response (populated when reason is `ToolUse`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assistant_content: Option<String>,
+    /// Tool calls requested by the assistant (populated when reason is `ToolUse`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<ToolCall>>,
 }
 
 /// The active provider was switched.

@@ -24,6 +24,7 @@ nullslop-actor = { workspace = true }
 nullslop-echo = { workspace = true }
 nullslop-llm = { workspace = true }
 nullslop-llm-discover = { workspace = true }
+nullslop-tool-orchestrator = { workspace = true }
 tokio = { workspace = true }
 kanal = { workspace = true }
 wherror = { workspace = true }
@@ -50,6 +51,7 @@ nullslop-services = { path = "crates/nullslop-services" }
 nullslop-echo = { path = "actors/nullslop-echo" }
 nullslop-llm = { path = "actors/nullslop-llm" }
 nullslop-llm-discover = { path = "actors/nullslop-llm-discover" }
+nullslop-tool-orchestrator = { path = "actors/nullslop-tool-orchestrator" }
 nullslop-actor = { path = "crates/nullslop-actor" }
 nullslop-actor-host = { path = "crates/nullslop-actor-host" }
 nullslop-providers = { path = "crates/nullslop-providers" }

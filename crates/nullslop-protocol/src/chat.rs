@@ -30,6 +30,26 @@ pub enum ChatEntryKind {
         /// The message text.
         text: String,
     },
+    /// A tool call requested by the LLM.
+    ToolCall {
+        /// Unique ID assigned by the LLM provider.
+        id: String,
+        /// The function name.
+        name: String,
+        /// The JSON arguments string.
+        arguments: String,
+    },
+    /// The result of executing a tool call.
+    ToolResult {
+        /// The ID of the tool call this result is for.
+        id: String,
+        /// The function name.
+        name: String,
+        /// The output content.
+        content: String,
+        /// Whether execution succeeded.
+        success: bool,
+    },
 }
 
 impl ChatEntry {
@@ -81,6 +101,42 @@ impl ChatEntry {
             kind: ChatEntryKind::Actor {
                 source: source.into(),
                 text: text.into(),
+            },
+        }
+    }
+
+    /// Create a new tool call entry with the current timestamp.
+    #[must_use]
+    pub fn tool_call(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        arguments: impl Into<String>,
+    ) -> Self {
+        Self {
+            timestamp: jiff::Timestamp::now(),
+            kind: ChatEntryKind::ToolCall {
+                id: id.into(),
+                name: name.into(),
+                arguments: arguments.into(),
+            },
+        }
+    }
+
+    /// Create a new tool result entry with the current timestamp.
+    #[must_use]
+    pub fn tool_result(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        content: impl Into<String>,
+        success: bool,
+    ) -> Self {
+        Self {
+            timestamp: jiff::Timestamp::now(),
+            kind: ChatEntryKind::ToolResult {
+                id: id.into(),
+                name: name.into(),
+                content: content.into(),
+                success,
             },
         }
     }
@@ -181,6 +237,77 @@ mod tests {
     fn actor_entry_serialization_roundtrip() {
         // Given an actor ChatEntry.
         let entry = ChatEntry::actor("nullslop-echo", "hello");
+
+        // When serialized and deserialized.
+        let json = serde_json::to_string(&entry).expect("serialize");
+        let back: ChatEntry = serde_json::from_str(&json).expect("deserialize");
+
+        // Then it matches the original.
+        assert_eq!(back.kind, entry.kind);
+        assert_eq!(back.timestamp, entry.timestamp);
+    }
+
+    #[test]
+    fn tool_call_entry_has_tool_call_kind() {
+        // Given tool call details.
+        let id = "call_123";
+        let name = "echo";
+        let arguments = r#"{"input":"hi"}"#;
+
+        // When creating a tool call entry.
+        let entry = ChatEntry::tool_call(id, name, arguments);
+
+        // Then kind is ToolCall with correct fields.
+        assert_eq!(
+            entry.kind,
+            ChatEntryKind::ToolCall {
+                id: "call_123".to_owned(),
+                name: "echo".to_owned(),
+                arguments: r#"{"input":"hi"}"#.to_owned(),
+            }
+        );
+    }
+
+    #[test]
+    fn tool_result_entry_has_tool_result_kind() {
+        // Given tool result details.
+        let id = "call_123";
+        let name = "echo";
+        let content = "hi";
+
+        // When creating a tool result entry.
+        let entry = ChatEntry::tool_result(id, name, content, true);
+
+        // Then kind is ToolResult with correct fields.
+        assert_eq!(
+            entry.kind,
+            ChatEntryKind::ToolResult {
+                id: "call_123".to_owned(),
+                name: "echo".to_owned(),
+                content: "hi".to_owned(),
+                success: true,
+            }
+        );
+    }
+
+    #[test]
+    fn tool_call_entry_serialization_roundtrip() {
+        // Given a tool call ChatEntry.
+        let entry = ChatEntry::tool_call("call_1", "echo", r#"{"input":"hi"}"#);
+
+        // When serialized and deserialized.
+        let json = serde_json::to_string(&entry).expect("serialize");
+        let back: ChatEntry = serde_json::from_str(&json).expect("deserialize");
+
+        // Then it matches the original.
+        assert_eq!(back.kind, entry.kind);
+        assert_eq!(back.timestamp, entry.timestamp);
+    }
+
+    #[test]
+    fn tool_result_entry_serialization_roundtrip() {
+        // Given a tool result ChatEntry.
+        let entry = ChatEntry::tool_result("call_1", "echo", "hi", true);
 
         // When serialized and deserialized.
         let json = serde_json::to_string(&entry).expect("serialize");
