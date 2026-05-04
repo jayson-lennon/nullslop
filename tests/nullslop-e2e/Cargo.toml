@@ -11,6 +11,10 @@ harness = false
 name = "bus_cucumber"
 harness = false
 
+[[test]]
+name = "actor_cucumber"
+harness = false
+
 [dependencies]
 cucumber = "0.23"
 tokio = { workspace = true }
@@ -23,6 +27,11 @@ nullslop-component = { workspace = true }
 nullslop-component-core = { workspace = true }
 crossterm = { workspace = true }
 ratatui-which-key = { workspace = true }
+nullslop-core = { workspace = true }
+nullslop-actor = { workspace = true }
+nullslop-llm = { workspace = true }
+nullslop-tool-orchestrator = { workspace = true }
+kanal = { workspace = true }
 
 [lints.clippy]
 # Test-only crate: relax production lints.

@@ -11,6 +11,7 @@ use nullslop_providers::{
     ApiKeys, ApiKeysService, ConfigStorageService, InMemoryConfigStorage, LlmServiceFactoryService,
     ProviderRegistry, ProviderRegistryService, ProvidersConfig,
 };
+use tokio::runtime::Handle;
 
 use crate::Services;
 
@@ -27,10 +28,15 @@ use crate::Services;
 /// let services = TestServices::builder().build();
 /// let state = AppState::default();
 /// ```
-#[derive(Debug)]
 pub struct TestServices {
     /// Provider configuration for the registry.
     providers: ProvidersConfig,
+    /// Custom tokio runtime handle (if provided).
+    handle: Option<Handle>,
+    /// Custom actor host (if provided).
+    actor_host: Option<Arc<dyn nullslop_actor_host::ActorHost>>,
+    /// Custom LLM service factory (if provided).
+    llm_service: Option<LlmServiceFactoryService>,
 }
 
 impl Default for TestServices {
@@ -41,6 +47,9 @@ impl Default for TestServices {
                 aliases: vec![],
                 default_provider: None,
             },
+            handle: None,
+            actor_host: None,
+            llm_service: None,
         }
     }
 }
@@ -59,9 +68,30 @@ impl TestServices {
         self
     }
 
+    /// Set a custom tokio runtime handle.
+    #[must_use]
+    pub fn handle(mut self, handle: Handle) -> Self {
+        self.handle = Some(handle);
+        self
+    }
+
+    /// Set a custom actor host.
+    #[must_use]
+    pub fn actor_host(mut self, host: Arc<dyn nullslop_actor_host::ActorHost>) -> Self {
+        self.actor_host = Some(host);
+        self
+    }
+
+    /// Set a custom LLM service factory.
+    #[must_use]
+    pub fn llm_service(mut self, service: LlmServiceFactoryService) -> Self {
+        self.llm_service = Some(service);
+        self
+    }
+
     /// Build the [`Services`] instance.
     ///
-    /// Leaks a tokio runtime — acceptable for unit tests.
+    /// Leaks a tokio runtime if no custom handle is provided — acceptable for unit tests.
     ///
     /// # Panics
     ///
@@ -69,15 +99,21 @@ impl TestServices {
     #[must_use]
     #[expect(clippy::expect_used, reason = "test-only code, panics are acceptable")]
     pub fn build(self) -> Services {
-        let rt = Box::leak(Box::new(
-            tokio::runtime::Runtime::new().expect("test runtime"),
-        ));
-        let handle = rt.handle().clone();
+        let handle = self.handle.unwrap_or_else(|| {
+            let rt = Box::leak(Box::new(
+                tokio::runtime::Runtime::new().expect("test runtime"),
+            ));
+            rt.handle().clone()
+        });
 
-        let actor_host: Arc<dyn nullslop_actor_host::ActorHost> = Arc::new(FakeActorHost::new());
-        let llm = LlmServiceFactoryService::new(Arc::new(
-            nullslop_providers::FakeLlmServiceFactory::new(vec![]),
-        ));
+        let actor_host = self
+            .actor_host
+            .unwrap_or_else(|| Arc::new(FakeActorHost::new()));
+        let llm = self.llm_service.unwrap_or_else(|| {
+            LlmServiceFactoryService::new(Arc::new(
+                nullslop_providers::FakeLlmServiceFactory::new(vec![]),
+            ))
+        });
         let registry = ProviderRegistryService::new(
             ProviderRegistry::from_config(self.providers).expect("test registry"),
         );

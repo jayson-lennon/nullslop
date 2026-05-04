@@ -34,7 +34,7 @@ pub use config_storage::{
     ConfigStorage, ConfigStorageService, FilesystemConfigStorage, InMemoryConfigStorage,
 };
 pub use stream_event::StreamEvent;
-pub use fake::FakeLlmServiceFactory;
+pub use fake::{FakeLlmServiceFactory, TOOL_LOOP_TRIGGER};
 pub use generic_factory::GenericLlmServiceFactory;
 pub use model_cache::{ModelCache, ModelCacheError, cache_path};
 pub use no_providers::{NO_PROVIDER_ID, NoProvidersAvailableFactory};
