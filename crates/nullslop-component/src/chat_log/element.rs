@@ -102,24 +102,26 @@ fn entry_to_lines(entry: &nullslop_protocol::ChatEntry) -> Vec<Line<'static>> {
                 Style::default().fg(Color::Magenta),
             )
         }
+        ChatEntryKind::Error(text) => error_block_lines(text),
         ChatEntryKind::ToolResult {
             id: _,
             name,
             content,
-            success,
+            success: true,
         } => {
-            let icon = if *success { "✅" } else { "❌" };
             multiline_styled(
-                format!("{icon} {name}: {content}"),
+                format!("✅ {name}: {content}"),
                 "  ",
                 "  ",
-                if *success {
-                    Style::default().fg(Color::Green)
-                } else {
-                    Style::default().fg(Color::Red)
-                },
+                Style::default().fg(Color::Green),
             )
         }
+        ChatEntryKind::ToolResult {
+            id: _,
+            name,
+            content,
+            success: false,
+        } => error_block_lines(&format!("{name}: {content}")),
     }
 }
 
@@ -143,6 +145,48 @@ where
         };
         lines.push(Line::from(Span::styled(content, style)));
     }
+    lines
+}
+
+/// The horizontal bar character used for error block borders.
+const BAR_CHAR: &str = "─";
+
+/// Number of `─` characters for the error block bars.
+/// Kept short enough to fit in most terminal widths without wrapping.
+const BAR_WIDTH: usize = 60;
+
+/// Build a bordered error block with the given message.
+///
+/// Produces:
+/// ```text
+/// ── ERROR ──────────────  (dashes dark red, "ERROR" bright red)
+/// <message>               (default text color)
+/// ──────────────────────── (dark red)
+/// ```
+fn error_block_lines(text: &str) -> Vec<Line<'static>> {
+    let dark_red = Style::default().fg(Color::Red);
+    let bright_red = Style::default().fg(Color::LightRed);
+
+    let bar: String = BAR_CHAR.repeat(BAR_WIDTH);
+
+    // Top bar: "── ERROR " + dashes to fill
+    let label = " ERROR ";
+    let remaining = BAR_WIDTH.saturating_sub("──".len() + label.len());
+    let top_bar = Line::from(vec![
+        Span::styled("──".to_owned(), dark_red),
+        Span::styled(label.to_owned(), bright_red),
+        Span::styled(BAR_CHAR.repeat(remaining), dark_red),
+    ]);
+
+    // Bottom bar: all dashes
+    let bottom_bar = Line::from(Span::styled(bar, dark_red));
+
+    // Message lines in default text color
+    let mut lines = vec![top_bar];
+    for segment in text.split('\n') {
+        lines.push(Line::from(Span::styled(segment.to_owned(), Style::default())));
+    }
+    lines.push(bottom_bar);
     lines
 }
 
@@ -489,5 +533,127 @@ mod tests {
         let bottom_cell = buffer.cell((0, 9)).expect("cell should exist");
         assert_eq!(bottom_cell.symbol(), ">");
         assert!(bottom_cell.style().add_modifier.contains(Modifier::BOLD));
+    }
+
+    #[test]
+    fn render_error_entry() {
+        // Given a ChatLogElement with an error entry "something broke".
+        let mut element = ChatLogElement;
+        let state = {
+            let mut s = AppState::default();
+            s.active_session_mut()
+                .push_entry(ChatEntry::error("something broke"));
+            s
+        };
+
+        let backend = TestBackend::new(80, 10);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 80, 10);
+
+        // When rendering.
+        terminal
+            .draw(|frame| {
+                element.render(frame, area, &state);
+            })
+            .unwrap();
+
+        // Then the top bar has dashes in dark red.
+        let buffer = terminal.backend().buffer().clone();
+        let top_bar_cell = buffer.cell((0, 7)).expect("cell should exist");
+        assert_eq!(top_bar_cell.symbol(), "─");
+        assert_eq!(top_bar_cell.style().fg, Some(Color::Red));
+
+        // And "ERROR" appears in bright red.
+        let e_cell = buffer.cell((3, 7)).expect("cell should exist");
+        assert_eq!(e_cell.symbol(), "E");
+        assert_eq!(e_cell.style().fg, Some(Color::LightRed));
+
+        // And the message line has default color.
+        let msg_cell = buffer.cell((0, 8)).expect("cell should exist");
+        assert_eq!(msg_cell.symbol(), "s");
+        assert!(msg_cell.style().fg != Some(Color::Red) && msg_cell.style().fg != Some(Color::LightRed));
+
+        // And the bottom bar has dashes in dark red.
+        let bottom_bar_cell = buffer.cell((0, 9)).expect("cell should exist");
+        assert_eq!(bottom_bar_cell.symbol(), "─");
+        assert_eq!(bottom_bar_cell.style().fg, Some(Color::Red));
+    }
+
+    #[test]
+    fn render_failed_tool_result() {
+        // Given a ChatLogElement with a failed tool result.
+        let mut element = ChatLogElement;
+        let state = {
+            let mut s = AppState::default();
+            s.active_session_mut()
+                .push_entry(ChatEntry::tool_result("call_1", "echo", "timeout", false));
+            s
+        };
+
+        let backend = TestBackend::new(80, 10);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 80, 10);
+
+        // When rendering.
+        terminal
+            .draw(|frame| {
+                element.render(frame, area, &state);
+            })
+            .unwrap();
+
+        // Then the top bar has dashes in dark red (error block treatment).
+        let buffer = terminal.backend().buffer().clone();
+        let top_bar_cell = buffer.cell((0, 7)).expect("cell should exist");
+        assert_eq!(top_bar_cell.symbol(), "─");
+        assert_eq!(top_bar_cell.style().fg, Some(Color::Red));
+
+        // And "ERROR" appears in bright red.
+        let e_cell = buffer.cell((3, 7)).expect("cell should exist");
+        assert_eq!(e_cell.symbol(), "E");
+        assert_eq!(e_cell.style().fg, Some(Color::LightRed));
+
+        // And the message contains tool name and content in default color.
+        let msg_cell = buffer.cell((0, 8)).expect("cell should exist");
+        assert_eq!(msg_cell.symbol(), "e");
+        assert!(msg_cell.style().fg != Some(Color::Red) && msg_cell.style().fg != Some(Color::LightRed));
+
+        // And the bottom bar has dashes in dark red.
+        let bottom_bar_cell = buffer.cell((0, 9)).expect("cell should exist");
+        assert_eq!(bottom_bar_cell.symbol(), "─");
+        assert_eq!(bottom_bar_cell.style().fg, Some(Color::Red));
+    }
+
+    #[test]
+    fn render_successful_tool_result_stays_green() {
+        // Given a ChatLogElement with a successful tool result.
+        let mut element = ChatLogElement;
+        let state = {
+            let mut s = AppState::default();
+            s.active_session_mut()
+                .push_entry(ChatEntry::tool_result("call_1", "echo", "hi", true));
+            s
+        };
+
+        let backend = TestBackend::new(80, 10);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 80, 10);
+
+        // When rendering.
+        terminal
+            .draw(|frame| {
+                element.render(frame, area, &state);
+            })
+            .unwrap();
+
+        // Then it renders with green style (not error block).
+        // The "echo" text appears somewhere in the bottom row with green foreground.
+        let buffer = terminal.backend().buffer().clone();
+        // Find a cell with green color to confirm non-error rendering.
+        let found_green = (0..80).any(|x| {
+            buffer
+                .cell((x, 9))
+                .map_or(false, |c| c.style().fg == Some(Color::Green))
+        });
+        assert!(found_green, "expected green text for successful tool result");
     }
 }

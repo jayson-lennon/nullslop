@@ -196,7 +196,7 @@ impl LlmActor {
                     let _ = sink.send_command(Command::PushChatEntry {
                         payload: PushChatEntry {
                             session_id: sid.clone(),
-                            entry: ChatEntry::system("LLM service creation failed"),
+                            entry: ChatEntry::error("LLM service creation failed"),
                         },
                     });
                     let _ = sink.send_event(Event::StreamCompleted {
@@ -218,7 +218,7 @@ impl LlmActor {
                     let _ = sink.send_command(Command::PushChatEntry {
                         payload: PushChatEntry {
                             session_id: sid.clone(),
-                            entry: ChatEntry::system(format!("LLM stream error: {e:?}")),
+                            entry: ChatEntry::error(format!("LLM stream error: {e:?}")),
                         },
                     });
                     let _ = sink.send_event(Event::StreamCompleted {

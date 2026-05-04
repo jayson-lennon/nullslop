@@ -39,6 +39,8 @@ pub enum ChatEntryKind {
         /// The JSON arguments string.
         arguments: String,
     },
+    /// An error that should be prominently displayed to the user.
+    Error(String),
     /// The result of executing a tool call.
     ToolResult {
         /// The ID of the tool call this result is for.
@@ -102,6 +104,18 @@ impl ChatEntry {
                 source: source.into(),
                 text: text.into(),
             },
+        }
+    }
+
+    /// Create a new error chat entry with the current timestamp.
+    #[must_use]
+    pub fn error<T>(text: T) -> Self
+    where
+        T: Into<String>,
+    {
+        Self {
+            timestamp: jiff::Timestamp::now(),
+            kind: ChatEntryKind::Error(text.into()),
         }
     }
 
@@ -308,6 +322,35 @@ mod tests {
     fn tool_result_entry_serialization_roundtrip() {
         // Given a tool result ChatEntry.
         let entry = ChatEntry::tool_result("call_1", "echo", "hi", true);
+
+        // When serialized and deserialized.
+        let json = serde_json::to_string(&entry).expect("serialize");
+        let back: ChatEntry = serde_json::from_str(&json).expect("deserialize");
+
+        // Then it matches the original.
+        assert_eq!(back.kind, entry.kind);
+        assert_eq!(back.timestamp, entry.timestamp);
+    }
+
+    #[test]
+    fn error_entry_has_error_kind() {
+        // Given text "something went wrong".
+        let text = "something went wrong";
+
+        // When creating an error entry.
+        let entry = ChatEntry::error(text);
+
+        // Then kind is Error("something went wrong").
+        assert_eq!(
+            entry.kind,
+            ChatEntryKind::Error("something went wrong".to_owned())
+        );
+    }
+
+    #[test]
+    fn error_entry_serialization_roundtrip() {
+        // Given an error ChatEntry.
+        let entry = ChatEntry::error("something broke");
 
         // When serialized and deserialized.
         let json = serde_json::to_string(&entry).expect("serialize");
