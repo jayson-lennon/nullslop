@@ -355,6 +355,8 @@ fn when_stream_completed_finished(world: &mut BusWorld) {
         payload: npr::provider::StreamCompleted {
             session_id: world.state.active_session.clone(),
             reason: npr::provider::StreamCompletedReason::Finished,
+            assistant_content: None,
+            tool_calls: None,
         },
     });
 }
@@ -365,6 +367,8 @@ fn when_stream_completed_canceled(world: &mut BusWorld) {
         payload: npr::provider::StreamCompleted {
             session_id: world.state.active_session.clone(),
             reason: npr::provider::StreamCompletedReason::Canceled,
+            assistant_content: None,
+            tool_calls: None,
         },
     });
 }
