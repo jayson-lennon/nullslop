@@ -29,10 +29,6 @@
 # cmd runner
 !justfile
 
-# plans
-!.plans/
-!.plans/**/
-
 # legal
 !LICENSE
 
