@@ -19,6 +19,13 @@
 !Cargo.{toml,lock}#
 !clippy.toml
 
+!tests/
+!tests/**/
+!tests/**/*.rs
+!tests/**/Cargo.toml
+!tests/**/Cargo.lock
+!tests/**/*.feature
+
 # cmd runner
 !justfile
 
