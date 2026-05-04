@@ -93,7 +93,11 @@ impl Actor for ToolOrchestratorActor {
             pending: HashMap::new(),
         };
 
-        for (def, execute_fn) in builtin_tools() {
+        let builtins = builtin_tools();
+        let definitions: Vec<ToolDefinition> =
+            builtins.iter().map(|(d, _)| d.clone()).collect();
+
+        for (def, execute_fn) in builtins {
             let name = def.name.clone();
             actor.tools.insert(
                 name,
@@ -102,6 +106,16 @@ impl Actor for ToolOrchestratorActor {
                     execute: execute_fn,
                 },
             );
+        }
+
+        // Announce built-in tools so the LLM actor can cache them.
+        if let Err(e) = ctx.send_event(Event::ToolsRegistered {
+            payload: ToolsRegistered {
+                provider: "builtin".to_owned(),
+                definitions,
+            },
+        }) {
+            tracing::warn!(err = ?e, "failed to emit ToolsRegistered for built-in tools");
         }
 
         actor
@@ -564,6 +578,40 @@ mod tests {
         assert!(actor.tools.contains_key("echo"));
         assert!(actor.tools.contains_key("get_time"));
         assert!(actor.tools.contains_key("file_read"));
+    }
+
+    #[test]
+    fn activate_emits_tools_registered_for_builtins() {
+        // Given a fresh actor context with a recording sink.
+        let sink = std::sync::Arc::new(RecordingSink::new());
+        let mut ctx = test_context(&sink);
+
+        // When activating the actor.
+        let _actor = ToolOrchestratorActor::activate(&mut ctx);
+
+        // Then a ToolsRegistered event was emitted for built-in tools.
+        let events = sink.events();
+        let tools_registered: Vec<_> = events
+            .iter()
+            .filter_map(|e| match e {
+                Event::ToolsRegistered { payload } => Some(payload.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(tools_registered.len(), 1, "expected one ToolsRegistered event");
+
+        let payload = &tools_registered[0];
+        assert_eq!(payload.provider, "builtin");
+        assert_eq!(payload.definitions.len(), 3);
+
+        let names: Vec<&str> = payload
+            .definitions
+            .iter()
+            .map(|d| d.name.as_str())
+            .collect();
+        assert!(names.contains(&"echo"), "expected echo tool");
+        assert!(names.contains(&"get_time"), "expected get_time tool");
+        assert!(names.contains(&"file_read"), "expected file_read tool");
     }
 
     // --- RegisterTools command tests ---

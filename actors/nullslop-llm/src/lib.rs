@@ -175,6 +175,9 @@ impl LlmActor {
         }
 
         // Create or reset session data.
+        // Clone messages before inserting into the session so the stream task
+        // can take ownership of its copy.
+        let messages_for_stream = messages.clone();
         let session = SessionData::new(messages);
         self.sessions.insert(session_id.clone(), session);
 
@@ -208,7 +211,7 @@ impl LlmActor {
                 }
             };
 
-            let stream = match service.chat_stream_with_tools(vec![], tools).await {
+            let stream = match service.chat_stream_with_tools(messages_for_stream, tools).await {
                 Ok(s) => s,
                 Err(e) => {
                     tracing::error!(err = ?e, "failed to start LLM stream");

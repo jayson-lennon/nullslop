@@ -16,6 +16,7 @@ use nullslop_core::{ActorMessageSink, AppCore, AppMsg, State};
 use nullslop_echo::EchoActor;
 use nullslop_llm::LlmActor;
 use nullslop_llm_discover::DiscoverActor;
+use nullslop_tool_orchestrator::ToolOrchestratorActor;
 use nullslop_protocol::Event;
 use nullslop_protocol::actor::{ActorStarted, ActorStarting};
 use nullslop_providers::ApiKeys;
@@ -262,6 +263,21 @@ fn create_core_with_actor_host(
         handle,
     );
 
+    // Create tool orchestrator actor.
+    let (orch_tx, orch_rx) =
+        kanal::unbounded::<ActorEnvelope<nullslop_tool_orchestrator::ToolOrchestratorDirectMsg>>();
+    let orch_ref = ActorRef::new(orch_tx);
+    let mut orch_ctx = ActorContext::new("nullslop-tool-orchestrator", sink.clone());
+    let orch_actor = ToolOrchestratorActor::activate(&mut orch_ctx);
+    let orch_result = spawn_actor(
+        "nullslop-tool-orchestrator",
+        orch_actor,
+        &orch_ref,
+        orch_rx,
+        orch_ctx,
+        handle,
+    );
+
     // Emit lifecycle events.
     let _ = sink.send_event(Event::ActorStarting {
         payload: ActorStarting {
@@ -293,9 +309,19 @@ fn create_core_with_actor_host(
             name: "nullslop-llm-discover".to_string(),
         },
     });
+    let _ = sink.send_event(Event::ActorStarting {
+        payload: ActorStarting {
+            name: "nullslop-tool-orchestrator".to_string(),
+        },
+    });
+    let _ = sink.send_event(Event::ActorStarted {
+        payload: ActorStarted {
+            name: "nullslop-tool-orchestrator".to_string(),
+        },
+    });
 
     let host = InMemoryActorHost::from_actors_with_handle(
-        vec![echo_result, llm_result, discover_result],
+        vec![echo_result, llm_result, discover_result, orch_result],
         handle.clone(),
     );
     let host_arc: Arc<dyn nullslop_actor_host::ActorHost> = Arc::new(host);
