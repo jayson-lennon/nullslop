@@ -4,7 +4,7 @@
 //! actor-provided), dispatches [`ExecuteToolBatch`] requests, and emits
 //! [`ToolBatchCompleted`] when all calls in a batch finish.
 //!
-//! Built-in tools (`echo`, `get_time`, `file_read`) are registered at
+//! Built-in tools (`echo`, `get_time`, `file_read`, `file_write`) are registered at
 //! activation and executed via spawned tokio tasks. Actor-provided tools
 //! are routed via [`ExecuteTool`] commands on the bus.
 
@@ -367,6 +367,10 @@ fn builtin_tools() -> Vec<(ToolDefinition, fn(ToolCall) -> BoxedToolFuture)> {
             file_read_definition(),
             execute_file_read as fn(ToolCall) -> BoxedToolFuture,
         ),
+        (
+            file_write_definition(),
+            execute_file_write as fn(ToolCall) -> BoxedToolFuture,
+        ),
     ]
 }
 
@@ -451,6 +455,27 @@ fn execute_get_time(call: ToolCall) -> BoxedToolFuture {
     })
 }
 
+fn file_write_definition() -> ToolDefinition {
+    ToolDefinition {
+        name: "file_write".to_owned(),
+        description: "Writes content to a file on disk, creating parent directories as needed.".to_owned(),
+        parameters: serde_json::json!({
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Path to the file to write"
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Content to write to the file"
+                }
+            },
+            "required": ["path", "content"]
+        }),
+    }
+}
+
 /// Executes the `file_read` built-in tool using async I/O.
 fn execute_file_read(call: ToolCall) -> BoxedToolFuture {
     Box::pin(async move {
@@ -481,6 +506,66 @@ fn execute_file_read(call: ToolCall) -> BoxedToolFuture {
                 tool_call_id: call.id,
                 name: call.name,
                 content: format!("failed to read file '{path}': {e}"),
+                success: false,
+            },
+        }
+    })
+}
+
+/// Executes the `file_write` built-in tool using async I/O.
+///
+/// Creates parent directories if they don't exist. Overwrites the file if it
+/// already exists.
+fn execute_file_write(call: ToolCall) -> BoxedToolFuture {
+    Box::pin(async move {
+        let (path, content) = match serde_json::from_str::<serde_json::Value>(&call.arguments) {
+            Ok(args) => {
+                let path = args
+                    .get("path")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_owned();
+                let content = args
+                    .get("content")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_owned();
+                (path, content)
+            }
+            Err(e) => {
+                return ToolResult {
+                    tool_call_id: call.id,
+                    name: call.name,
+                    content: format!("failed to parse arguments: {e}"),
+                    success: false,
+                };
+            }
+        };
+
+        if let Some(parent) = std::path::Path::new(&path).parent() {
+            if !parent.as_os_str().is_empty() {
+                if let Err(e) = tokio::fs::create_dir_all(parent).await {
+                    return ToolResult {
+                        tool_call_id: call.id,
+                        name: call.name,
+                        content: format!("failed to create parent directories for '{path}': {e}"),
+                        success: false,
+                    };
+                }
+            }
+        }
+
+        match tokio::fs::write(&path, &content).await {
+            Ok(()) => ToolResult {
+                tool_call_id: call.id,
+                name: call.name,
+                content: format!("wrote {} bytes to {path}", content.len()),
+                success: true,
+            },
+            Err(e) => ToolResult {
+                tool_call_id: call.id,
+                name: call.name,
+                content: format!("failed to write file '{path}': {e}"),
                 success: false,
             },
         }
@@ -578,6 +663,7 @@ mod tests {
         assert!(actor.tools.contains_key("echo"));
         assert!(actor.tools.contains_key("get_time"));
         assert!(actor.tools.contains_key("file_read"));
+        assert!(actor.tools.contains_key("file_write"));
     }
 
     #[test]
@@ -602,7 +688,7 @@ mod tests {
 
         let payload = &tools_registered[0];
         assert_eq!(payload.provider, "builtin");
-        assert_eq!(payload.definitions.len(), 3);
+        assert_eq!(payload.definitions.len(), 4);
 
         let names: Vec<&str> = payload
             .definitions
@@ -612,6 +698,7 @@ mod tests {
         assert!(names.contains(&"echo"), "expected echo tool");
         assert!(names.contains(&"get_time"), "expected get_time tool");
         assert!(names.contains(&"file_read"), "expected file_read tool");
+        assert!(names.contains(&"file_write"), "expected file_write tool");
     }
 
     // --- RegisterTools command tests ---
@@ -980,6 +1067,109 @@ mod tests {
         let batch_completed = find_batch_completed(&events);
         assert_eq!(batch_completed.len(), 1);
         assert!(batch_completed[0].results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn execute_builtin_file_write_tool() {
+        // Given a temp directory.
+        let dir = tempfile::tempdir().expect("create temp dir");
+        let file_path = dir.path().join("output.txt");
+
+        let call = ToolCall {
+            id: "call_fw1".to_owned(),
+            name: "file_write".to_owned(),
+            arguments: serde_json::json!({
+                "path": file_path.to_string_lossy(),
+                "content": "hello from file_write"
+            })
+            .to_string(),
+        };
+
+        // When executing the file_write tool.
+        let result = execute_file_write(call).await;
+
+        // Then the result indicates success.
+        assert_eq!(result.tool_call_id, "call_fw1");
+        assert!(result.success, "expected success, got: {}", result.content);
+        assert!(result.content.contains("wrote 21 bytes"));
+
+        // And the file contains the written content.
+        let content = std::fs::read_to_string(&file_path).expect("read written file");
+        assert_eq!(content, "hello from file_write");
+    }
+
+    #[tokio::test]
+    async fn execute_builtin_file_write_tool_creates_parent_dirs() {
+        // Given a temp directory.
+        let dir = tempfile::tempdir().expect("create temp dir");
+        let file_path = dir.path().join("nested").join("deep").join("file.txt");
+
+        let call = ToolCall {
+            id: "call_fw2".to_owned(),
+            name: "file_write".to_owned(),
+            arguments: serde_json::json!({
+                "path": file_path.to_string_lossy(),
+                "content": "nested content"
+            })
+            .to_string(),
+        };
+
+        // When executing the file_write tool.
+        let result = execute_file_write(call).await;
+
+        // Then the result indicates success.
+        assert_eq!(result.tool_call_id, "call_fw2");
+        assert!(result.success, "expected success, got: {}", result.content);
+
+        // And the file was created with parent directories.
+        let content = std::fs::read_to_string(&file_path).expect("read written file");
+        assert_eq!(content, "nested content");
+    }
+
+    #[tokio::test]
+    async fn execute_builtin_file_write_tool_overwrites_existing_file() {
+        // Given a temp file with existing content.
+        let dir = tempfile::tempdir().expect("create temp dir");
+        let file_path = dir.path().join("existing.txt");
+        std::fs::write(&file_path, "old content").expect("write existing file");
+
+        let call = ToolCall {
+            id: "call_fw3".to_owned(),
+            name: "file_write".to_owned(),
+            arguments: serde_json::json!({
+                "path": file_path.to_string_lossy(),
+                "content": "new content"
+            })
+            .to_string(),
+        };
+
+        // When executing the file_write tool.
+        let result = execute_file_write(call).await;
+
+        // Then the result indicates success.
+        assert!(result.success);
+
+        // And the file was overwritten.
+        let content = std::fs::read_to_string(&file_path).expect("read overwritten file");
+        assert_eq!(content, "new content");
+    }
+
+    #[tokio::test]
+    async fn execute_builtin_file_write_tool_returns_error_on_bad_json() {
+        // Given a file_write call with invalid JSON.
+        let call = ToolCall {
+            id: "call_fw4".to_owned(),
+            name: "file_write".to_owned(),
+            arguments: "not json".to_owned(),
+        };
+
+        // When executing the file_write tool.
+        let result = execute_file_write(call).await;
+
+        // Then the result indicates failure.
+        assert_eq!(result.tool_call_id, "call_fw4");
+        assert!(!result.success);
+        assert!(result.content.contains("failed to parse arguments"));
     }
 
     #[test]
