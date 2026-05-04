@@ -490,7 +490,7 @@ fn execute_file_read(call: ToolCall) -> BoxedToolFuture {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Mutex;
+    use parking_lot::Mutex;
 
     use nullslop_actor::MessageSink;
     use nullslop_protocol::tool::{ExecuteToolBatch, RegisterTools};
@@ -510,28 +510,28 @@ mod tests {
         }
 
         fn events(&self) -> Vec<Event> {
-            self.events.lock().unwrap().clone()
+            self.events.lock().clone()
         }
 
         fn take_events(&self) -> Vec<Event> {
-            let mut guard = self.events.lock().unwrap();
+            let mut guard = self.events.lock();
             std::mem::take(&mut guard)
         }
 
         fn clear(&self) {
-            self.commands.lock().unwrap().clear();
-            self.events.lock().unwrap().clear();
+            self.commands.lock().clear();
+            self.events.lock().clear();
         }
     }
 
     impl MessageSink for RecordingSink {
         fn send_command(&self, command: Command) -> nullslop_actor::SendResult {
-            self.commands.lock().unwrap().push(command);
+            self.commands.lock().push(command);
             Ok(())
         }
 
         fn send_event(&self, event: Event) -> nullslop_actor::SendResult {
-            self.events.lock().unwrap().push(event);
+            self.events.lock().push(event);
             Ok(())
         }
     }

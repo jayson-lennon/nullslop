@@ -1883,6 +1883,7 @@ dependencies = [
  "jiff",
  "nullslop-actor",
  "nullslop-protocol",
+ "parking_lot",
  "serde_json",
  "tempfile",
  "tokio",
