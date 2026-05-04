@@ -6,7 +6,7 @@ resolver = "3"
 default-run = "nullslop"
 
 [workspace]
-members = ["crates/*", "actors/*"]
+members = ["crates/*", "actors/*", "tests/*"]
 
 [lib]
 path = "src/lib.rs"

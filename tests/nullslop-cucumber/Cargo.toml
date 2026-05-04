@@ -1,0 +1,33 @@
+[package]
+name = "nullslop-cucumber"
+version = "0.1.0"
+edition = "2024"
+
+[[test]]
+name = "cucumber"
+harness = false
+
+[[test]]
+name = "bus_cucumber"
+harness = false
+
+[dependencies]
+cucumber = "0.23"
+tokio = { workspace = true }
+nullslop-tui = { workspace = true }
+nullslop-protocol = { workspace = true, features = ["which-key"] }
+nullslop-services = { workspace = true }
+nullslop-providers = { workspace = true }
+nullslop-actor-host = { workspace = true }
+nullslop-component = { workspace = true }
+nullslop-component-core = { workspace = true }
+crossterm = { workspace = true }
+ratatui-which-key = { workspace = true }
+
+[lints.clippy]
+# Test-only crate: relax production lints.
+pedantic = { level = "allow", priority = -1 }
+result_large_err = "allow"
+
+[lints.rust]
+missing_docs = "allow"

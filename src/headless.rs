@@ -191,12 +191,7 @@ pub fn parse_script(
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
-    use std::sync::Arc;
-
-    use nullslop_actor_host::FakeActorHost;
     use nullslop_protocol::{Key, KeyEvent, Modifiers};
-    use nullslop_services::providers::FakeLlmServiceFactory;
 
     use super::*;
 
@@ -297,72 +292,5 @@ mod tests {
         assert_eq!(lines[0].len(), 1); // i
         assert_eq!(lines[1].len(), 6); // h, e, l, l, o, enter
         assert_eq!(lines[2].len(), 1); // q
-    }
-
-    // --- Integration tests for run_script ---
-
-    fn create_test_headless() -> HeadlessApp {
-        let rt = Box::leak(Box::new(
-            tokio::runtime::Runtime::new().expect("test runtime"),
-        ));
-        let handle = rt.handle().clone();
-
-        let actor_host: Arc<dyn nullslop_actor_host::ActorHost> = Arc::new(FakeActorHost::new());
-
-        let llm = nullslop_services::providers::LlmServiceFactoryService::new(Arc::new(
-            FakeLlmServiceFactory::new(vec![]),
-        ));
-        let config = nullslop_providers::ProvidersConfig {
-            providers: vec![],
-            aliases: vec![],
-            default_provider: None,
-        };
-        let provider_registry = nullslop_providers::ProviderRegistryService::new(
-            nullslop_providers::ProviderRegistry::from_config(config).expect("test registry"),
-        );
-        let api_keys = nullslop_providers::ApiKeysService::new(nullslop_providers::ApiKeys::new());
-        let config_storage = nullslop_providers::ConfigStorageService::new(Arc::new(
-            nullslop_providers::InMemoryConfigStorage::new(),
-        ));
-        let services = nullslop_services::Services::new(
-            handle,
-            actor_host,
-            llm,
-            provider_registry,
-            api_keys,
-            config_storage,
-        );
-
-        let mut core = AppCore::new(services.clone());
-        let mut registry = nullslop_component::AppUiRegistry::new();
-        nullslop_component::register_all(&mut core.bus, &mut registry);
-
-        HeadlessApp::new(core, services)
-    }
-
-    #[test]
-    fn run_script_sets_should_quit() {
-        // Given a headless app and a script containing "q".
-        let mut headless = create_test_headless();
-
-        // When running the script.
-        headless.run_script(Cursor::new("q")).expect("run_script");
-
-        // Then should_quit is true.
-        assert!(headless.core.state.read().should_quit);
-    }
-
-    #[test]
-    fn run_script_is_noop_for_empty_content() {
-        // Given a headless app and an empty script.
-        let mut headless = create_test_headless();
-
-        // When running the script.
-        headless.run_script(Cursor::new("")).expect("run_script");
-
-        // Then no state changes occurred.
-        let state = headless.core.state.read();
-        assert!(!state.should_quit);
-        assert!(state.active_session().history().is_empty());
     }
 }
