@@ -2,10 +2,10 @@ COPYRIGHT_NAME := "Jayson Lennon"
 COPYRIGHT_YEAR := "2026"
 
 test:
-    cargo nextest run --workspace --all-features --exclude nullslop-cucumber
+    cargo nextest run --workspace --all-features --exclude nullslop-e2e
     cargo test --workspace --doc
-    cargo test --test cucumber -p nullslop-cucumber
-    cargo test --test bus_cucumber -p nullslop-cucumber
+    cargo test --test cucumber -p nullslop-e2e
+    cargo test --test bus_cucumber -p nullslop-e2e
 
 check:
     cargo check --workspace
@@ -27,16 +27,16 @@ lint:
 
 # Full CI pipeline (lint + test + docs)
 ci: lint
-    cargo nextest run --workspace --all-features --exclude nullslop-cucumber
+    cargo nextest run --workspace --all-features --exclude nullslop-e2e
     cargo test --workspace --doc
-    cargo test --test cucumber -p nullslop-cucumber
-    cargo test --test bus_cucumber -p nullslop-cucumber
+    cargo test --test cucumber -p nullslop-e2e
+    cargo test --test bus_cucumber -p nullslop-e2e
     cargo doc --workspace --no-deps
 
 # Run all cucumber tests
 cucumber:
-    cargo test --test cucumber -p nullslop-cucumber
-    cargo test --test bus_cucumber -p nullslop-cucumber
+    cargo test --test cucumber -p nullslop-e2e
+    cargo test --test bus_cucumber -p nullslop-e2e
 
 # Build and open documentation
 docs:
