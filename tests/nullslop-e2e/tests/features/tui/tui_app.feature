@@ -39,9 +39,9 @@ Feature: TUI Application
 
   Scenario: Pushing a chat entry from an actor
     Given a new app
-    When the app routes the PushChatEntry command with an actor message from "nullslop-echo" with text "HELLO"
+    When the app routes the PushChatEntry command with an actor message from "echo" with text "HELLO"
     Then the chat history should contain 1 entry
-    And the chat history entry 1 should be an actor message from "nullslop-echo" with text "HELLO"
+    And the chat history entry 1 should be an actor message from "echo" with text "HELLO"
 
   Scenario: Shift+Enter inserts a newline in Input mode
     Given a new app

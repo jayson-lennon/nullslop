@@ -1,7 +1,8 @@
 //! Renders the dashboard view — a list of actors with their startup status.
 //!
-//! Each actor is displayed as a row with its name and status badge.
-//! "Starting" appears yellow, "Running" appears green.
+//! Each actor is displayed as a card with its name and status on one line,
+//! and a light gray description indented below. "Starting" appears yellow,
+//! "Running" appears green.
 
 use crate::AppState;
 use crate::dashboard::state::ActorStatus;
@@ -30,38 +31,35 @@ impl UiElement<AppState> for DashboardElement {
         } else {
             let mut lines = Vec::new();
 
-            // Compute the widest name for column alignment (header or data).
-            let header_name = "Actor";
-            let max_name_len = state
-                .dashboard
-                .actors()
-                .into_iter()
-                .map(|(name, _)| name.len())
-                .chain(std::iter::once(header_name.len()))
-                .max()
-                .unwrap_or(header_name.len());
-
-            // Header row.
-            lines.push(Line::from(vec![
-                Span::styled(
-                    format!(" {header_name:<max_name_len$} "),
-                    Style::default().fg(Color::Gray).bold(),
-                ),
-                Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
-                Span::styled("Status", Style::default().fg(Color::Gray).bold()),
-            ]));
-
-            for (name, status) in state.dashboard.actors() {
-                let (label, color) = match status {
+            for (i, entry) in state.dashboard.actors().iter().enumerate() {
+                let (label, color) = match entry.status {
                     ActorStatus::Starting => ("Starting", Color::Yellow),
                     ActorStatus::Running => ("Running", Color::Green),
                 };
-                let padded_name = format!(" {name:<max_name_len$} ");
+
+                // Name line: padded name ... status
                 lines.push(Line::from(vec![
-                    Span::styled(padded_name, Style::default()),
-                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!(" {}", entry.name),
+                        Style::default().bold(),
+                    ),
+                    // Fill with spaces to push status right — use raw spaces
+                    Span::raw(fill_to_status(&entry.name, area.width)),
                     Span::styled(label, Style::default().fg(color)),
                 ]));
+
+                // Description line (if present).
+                if let Some(desc) = &entry.description {
+                    lines.push(Line::from(Span::styled(
+                        format!("   {}", desc),
+                        Style::default().fg(Color::DarkGray),
+                    )));
+                }
+
+                // Blank line between actors (not after the last one).
+                if i < state.dashboard.actors().len() - 1 {
+                    lines.push(Line::from(""));
+                }
             }
 
             lines
@@ -74,6 +72,16 @@ impl UiElement<AppState> for DashboardElement {
     }
 }
 
+/// Returns spaces to pad between the name and the right-aligned status.
+/// The status label takes up to ~8 chars ("Starting"), so we leave room.
+fn fill_to_status(name: &str, area_width: u16) -> String {
+    let status_width: usize = 8; // "Starting" is the longest status
+    let name_len = name.len() + 1; // +1 for leading space
+    let available = area_width as usize;
+    let padding = available.saturating_sub(name_len).saturating_sub(status_width);
+    " ".repeat(padding.max(1))
+}
+
 #[cfg(test)]
 mod tests {
     use ratatui::Terminal;
@@ -83,19 +91,19 @@ mod tests {
     use super::*;
     use crate::AppState;
 
-    fn render_rows(element: &mut DashboardElement, state: &AppState) -> Vec<String> {
-        let backend = TestBackend::new(40, 10);
+    fn render_rows(element: &mut DashboardElement, state: &AppState, width: u16, height: u16) -> Vec<String> {
+        let backend = TestBackend::new(width, height);
         let mut terminal = Terminal::new(backend).unwrap();
-        let area = Rect::new(0, 0, 40, 10);
+        let area = Rect::new(0, 0, width, height);
         terminal
             .draw(|frame| {
                 element.render(frame, area, state);
             })
             .unwrap();
         let buffer = terminal.backend().buffer();
-        (0..10)
+        (0..height)
             .map(|y| {
-                (0..40)
+                (0..width)
                     .map(|x| {
                         buffer
                             .cell((x, y))
@@ -125,7 +133,7 @@ mod tests {
         let state = AppState::default();
 
         // When rendering.
-        let rows = render_rows(&mut element, &state);
+        let rows = render_rows(&mut element, &state, 40, 10);
 
         // Then "No actors registered." appears.
         assert!(rows[0].contains("No actors registered."));
@@ -137,16 +145,19 @@ mod tests {
         let mut element = DashboardElement;
         let state = {
             let mut s = AppState::default();
-            s.dashboard.mark_starting("actor-a");
+            s.dashboard.mark_starting("echo", Some("Echoes messages back".to_string()));
             s
         };
 
         // When rendering.
-        let rows = render_rows(&mut element, &state);
+        let rows = render_rows(&mut element, &state, 40, 10);
 
-        // Then the actor name and status appear.
-        assert!(rows[1].contains("actor-a"));
-        assert!(rows[1].contains("Starting"));
+        // Then the actor name and status appear on the first line.
+        assert!(rows[0].contains("echo"));
+        assert!(rows[0].contains("Starting"));
+
+        // And the description appears on the next line in light gray.
+        assert!(rows[1].contains("Echoes messages back"));
     }
 
     #[test]
@@ -155,16 +166,56 @@ mod tests {
         let mut element = DashboardElement;
         let state = {
             let mut s = AppState::default();
-            s.dashboard.mark_starting("actor-a");
-            s.dashboard.mark_running("actor-a");
+            s.dashboard.mark_starting("echo", Some("Echoes messages back".to_string()));
+            s.dashboard.mark_running("echo", None);
             s
         };
 
         // When rendering.
-        let rows = render_rows(&mut element, &state);
+        let rows = render_rows(&mut element, &state, 40, 10);
 
-        // Then the actor name and status appear.
-        assert!(rows[1].contains("actor-a"));
-        assert!(rows[1].contains("Running"));
+        // Then the actor name and Running status appear.
+        assert!(rows[0].contains("echo"));
+        assert!(rows[0].contains("Running"));
+    }
+
+    #[test]
+    fn render_actor_without_description() {
+        // Given a DashboardElement with an actor that has no description.
+        let mut element = DashboardElement;
+        let state = {
+            let mut s = AppState::default();
+            s.dashboard.mark_starting("actor-a", None);
+            s
+        };
+
+        // When rendering.
+        let rows = render_rows(&mut element, &state, 40, 10);
+
+        // Then the actor name and status appear with no description line.
+        assert!(rows[0].contains("actor-a"));
+        assert!(rows[0].contains("Starting"));
+    }
+
+    #[test]
+    fn render_multiple_actors_with_blank_line_between() {
+        // Given two actors.
+        let mut element = DashboardElement;
+        let state = {
+            let mut s = AppState::default();
+            s.dashboard.mark_starting("echo", Some("Echoes messages back".to_string()));
+            s.dashboard.mark_starting("llm", Some("LLM streaming".to_string()));
+            s
+        };
+
+        // When rendering with enough height.
+        let rows = render_rows(&mut element, &state, 40, 10);
+
+        // Then there is a blank line between the two actors.
+        // echo on row 0, description on row 1, blank on row 2, llm on row 3.
+        assert!(rows[0].contains("echo"));
+        assert!(rows[1].contains("Echoes messages back"));
+        assert!(rows[3].contains("llm"));
+        assert!(rows[4].contains("LLM streaming"));
     }
 }

@@ -108,7 +108,7 @@ mod tests {
     fn tools_registered_roundtrip() {
         // Given a ToolsRegistered event.
         let event = ToolsRegistered {
-            provider: "nullslop-echo".into(),
+            provider: "echo".into(),
             definitions: vec![ToolDefinition {
                 name: "echo".into(),
                 description: "Echoes input".into(),
@@ -121,7 +121,7 @@ mod tests {
         let back: ToolsRegistered = serde_json::from_str(&json).expect("deserialize");
 
         // Then it matches.
-        assert_eq!(back.provider, "nullslop-echo");
+        assert_eq!(back.provider, "echo");
         assert_eq!(back.definitions.len(), 1);
     }
 

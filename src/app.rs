@@ -229,10 +229,11 @@ fn create_core_with_actor_host(
     // Create echo actor using two-phase startup.
     let (echo_tx, echo_rx) = kanal::unbounded::<ActorEnvelope<nullslop_echo::EchoDirectMsg>>();
     let echo_ref = ActorRef::new(echo_tx);
-    let mut echo_ctx = ActorContext::new("nullslop-echo", sink.clone());
+    let mut echo_ctx = ActorContext::new("echo", sink.clone());
+    echo_ctx.set_description("Echoes messages back");
     let echo_actor = EchoActor::activate(&mut echo_ctx);
     let echo_result = spawn_actor(
-        "nullslop-echo",
+        "echo",
         echo_actor,
         &echo_ref,
         echo_rx,
@@ -243,21 +244,23 @@ fn create_core_with_actor_host(
     // Create LLM actor with data injection.
     let (llm_tx, llm_rx) = kanal::unbounded::<ActorEnvelope<nullslop_llm::LlmDirectMsg>>();
     let llm_ref = ActorRef::new(llm_tx);
-    let mut llm_ctx = ActorContext::new("nullslop-llm", sink.clone());
+    let mut llm_ctx = ActorContext::new("llm-streaming", sink.clone());
+    llm_ctx.set_description("LLM streaming with tool support");
     llm_ctx.set_data(llm_service.clone());
     let llm_actor = LlmActor::activate(&mut llm_ctx);
-    let llm_result = spawn_actor("nullslop-llm", llm_actor, &llm_ref, llm_rx, llm_ctx, handle);
+    let llm_result = spawn_actor("llm-streaming", llm_actor, &llm_ref, llm_rx, llm_ctx, handle);
 
     // Create discover actor with data injection.
     let (discover_tx, discover_rx) =
         kanal::unbounded::<ActorEnvelope<nullslop_llm_discover::DiscoverDirectMsg>>();
     let discover_ref = ActorRef::new(discover_tx);
-    let mut discover_ctx = ActorContext::new("nullslop-llm-discover", sink.clone());
+    let mut discover_ctx = ActorContext::new("llm-provider-listing", sink.clone());
+    discover_ctx.set_description("Discovers available models");
     discover_ctx.set_data(provider_registry.clone());
     discover_ctx.set_data(api_keys.clone());
     let discover_actor = DiscoverActor::activate(&mut discover_ctx);
     let discover_result = spawn_actor(
-        "nullslop-llm-discover",
+        "llm-provider-listing",
         discover_actor,
         &discover_ref,
         discover_rx,
@@ -269,10 +272,11 @@ fn create_core_with_actor_host(
     let (orch_tx, orch_rx) =
         kanal::unbounded::<ActorEnvelope<nullslop_tool_orchestrator::ToolOrchestratorDirectMsg>>();
     let orch_ref = ActorRef::new(orch_tx);
-    let mut orch_ctx = ActorContext::new("nullslop-tool-orchestrator", sink.clone());
+    let mut orch_ctx = ActorContext::new("tool-orchestrator", sink.clone());
+    orch_ctx.set_description("Dispatches and manages tool execution");
     let orch_actor = ToolOrchestratorActor::activate(&mut orch_ctx);
     let orch_result = spawn_actor(
-        "nullslop-tool-orchestrator",
+        "tool-orchestrator",
         orch_actor,
         &orch_ref,
         orch_rx,
@@ -284,13 +288,14 @@ fn create_core_with_actor_host(
     let (ctx_tx, ctx_rx) =
         kanal::unbounded::<ActorEnvelope<nullslop_context_actor::ContextDirectMsg>>();
     let ctx_ref = ActorRef::new(ctx_tx);
-    let mut prompt_ctx = ActorContext::new("nullslop-context-actor", sink.clone());
+    let mut prompt_ctx = ActorContext::new("context", sink.clone());
+    prompt_ctx.set_description("Assembles LLM prompts from chat history");
     prompt_ctx.set_data::<Box<dyn StrategyFactory>>(
         Box::new(DefaultStrategyFactory),
     );
     let prompt_actor = PromptAssemblyActor::activate(&mut prompt_ctx);
     let prompt_result = spawn_actor(
-        "nullslop-context-actor",
+        "context",
         prompt_actor,
         &ctx_ref,
         ctx_rx,
@@ -301,52 +306,62 @@ fn create_core_with_actor_host(
     // Emit lifecycle events.
     let _ = sink.send_event(Event::ActorStarting {
         payload: ActorStarting {
-            name: "nullslop-echo".to_string(),
+            name: "echo".to_string(),
+            description: Some("Echoes messages back".to_string()),
         },
     });
     let _ = sink.send_event(Event::ActorStarted {
         payload: ActorStarted {
-            name: "nullslop-echo".to_string(),
+            name: "echo".to_string(),
+            description: Some("Echoes messages back".to_string()),
         },
     });
     let _ = sink.send_event(Event::ActorStarting {
         payload: ActorStarting {
-            name: "nullslop-llm".to_string(),
+            name: "llm-streaming".to_string(),
+            description: Some("LLM streaming with tool support".to_string()),
         },
     });
     let _ = sink.send_event(Event::ActorStarted {
         payload: ActorStarted {
-            name: "nullslop-llm".to_string(),
+            name: "llm-streaming".to_string(),
+            description: Some("LLM streaming with tool support".to_string()),
         },
     });
     let _ = sink.send_event(Event::ActorStarting {
         payload: ActorStarting {
-            name: "nullslop-llm-discover".to_string(),
+            name: "llm-provider-listing".to_string(),
+            description: Some("Discovers available models".to_string()),
         },
     });
     let _ = sink.send_event(Event::ActorStarted {
         payload: ActorStarted {
-            name: "nullslop-llm-discover".to_string(),
+            name: "llm-provider-listing".to_string(),
+            description: Some("Discovers available models".to_string()),
         },
     });
     let _ = sink.send_event(Event::ActorStarting {
         payload: ActorStarting {
-            name: "nullslop-tool-orchestrator".to_string(),
+            name: "tool-orchestrator".to_string(),
+            description: Some("Dispatches and manages tool execution".to_string()),
         },
     });
     let _ = sink.send_event(Event::ActorStarted {
         payload: ActorStarted {
-            name: "nullslop-tool-orchestrator".to_string(),
+            name: "tool-orchestrator".to_string(),
+            description: Some("Dispatches and manages tool execution".to_string()),
         },
     });
     let _ = sink.send_event(Event::ActorStarting {
         payload: ActorStarting {
-            name: "nullslop-context-actor".to_string(),
+            name: "context".to_string(),
+            description: Some("Assembles LLM prompts from chat history".to_string()),
         },
     });
     let _ = sink.send_event(Event::ActorStarted {
         payload: ActorStarted {
-            name: "nullslop-context-actor".to_string(),
+            name: "context".to_string(),
+            description: Some("Assembles LLM prompts from chat history".to_string()),
         },
     });
 

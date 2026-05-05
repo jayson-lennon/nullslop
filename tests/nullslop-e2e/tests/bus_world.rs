@@ -811,7 +811,7 @@ fn given_actor_tracked(world: &mut BusWorld, name: String) {
 #[cucumber::when(expr = "I submit ActorStarting with name {string}")]
 fn when_actor_starting(world: &mut BusWorld, name: String) {
     world.submit_event_and_process(npr::Event::ActorStarting {
-        payload: npr::actor::ActorStarting { name },
+        payload: npr::actor::ActorStarting { name, description: None },
     });
 }
 

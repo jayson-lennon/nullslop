@@ -131,10 +131,10 @@ fn create_actor_core(
     let (orch_tx, orch_rx) =
         kanal::unbounded::<ActorEnvelope<nullslop_tool_orchestrator::ToolOrchestratorDirectMsg>>();
     let orch_ref = ActorRef::new(orch_tx);
-    let mut orch_ctx = ActorContext::new("nullslop-tool-orchestrator", sink.clone());
+    let mut orch_ctx = ActorContext::new("tool-orchestrator", sink.clone());
     let orch_actor = ToolOrchestratorActor::activate(&mut orch_ctx);
     let orch_result = spawn_actor(
-        "nullslop-tool-orchestrator",
+        "tool-orchestrator",
         orch_actor,
         &orch_ref,
         orch_rx,
@@ -145,11 +145,11 @@ fn create_actor_core(
     // Create LLM actor with fake factory.
     let (llm_tx, llm_rx) = kanal::unbounded::<ActorEnvelope<nullslop_llm::LlmDirectMsg>>();
     let llm_ref = ActorRef::new(llm_tx);
-    let mut llm_ctx = ActorContext::new("nullslop-llm", sink.clone());
+    let mut llm_ctx = ActorContext::new("llm-streaming", sink.clone());
     llm_ctx.set_data(llm_service.clone());
     let llm_actor = LlmActor::activate(&mut llm_ctx);
     let llm_result = spawn_actor(
-        "nullslop-llm",
+        "llm-streaming",
         llm_actor,
         &llm_ref,
         llm_rx,

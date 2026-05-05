@@ -216,8 +216,8 @@ mod tests {
     #[case::key_up(Event::KeyUp { payload: KeyUp { key: KeyEvent { key: Key::Enter, modifiers: Modifiers::none() } } })]
     #[case::chat_submitted(Event::ChatEntrySubmitted { payload: ChatEntrySubmitted { session_id: SessionId::new(), entry: ChatEntry::user("test") } })]
     #[case::mode_changed(Event::ModeChanged { payload: ModeChanged { from: Mode::Normal, to: Mode::Input } })]
-    #[case::actor_starting(Event::ActorStarting { payload: ActorStarting { name: "actor-a".into() } })]
-    #[case::actor_started(Event::ActorStarted { payload: ActorStarted { name: "actor-a".into() } })]
+    #[case::actor_starting(Event::ActorStarting { payload: ActorStarting { name: "actor-a".into(), description: None } })]
+    #[case::actor_started(Event::ActorStarted { payload: ActorStarted { name: "actor-a".into(), description: None } })]
     #[case::actor_shutdown_completed(Event::ActorShutdownCompleted { payload: ActorShutdownCompleted { name: "actor-a".into() } })]
     #[case::stream_completed(Event::StreamCompleted { payload: StreamCompleted { session_id: SessionId::new(), reason: StreamCompletedReason::Finished, assistant_content: None, tool_calls: None } })]
     #[case::provider_switched(Event::ProviderSwitched { payload: ProviderSwitched { provider_name: "Ollama".into() } })]
@@ -259,6 +259,7 @@ mod tests {
             Event::ActorStarting {
                 payload: ActorStarting {
                     name: "actor-a".into(),
+                    description: None,
                 }
             }
             .type_name(),
@@ -268,6 +269,7 @@ mod tests {
             Event::ActorStarted {
                 payload: ActorStarted {
                     name: "actor-a".into(),
+                    description: None,
                 }
             }
             .type_name(),

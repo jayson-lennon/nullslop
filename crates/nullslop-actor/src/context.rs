@@ -27,6 +27,8 @@ use crate::message_sink::MessageSink;
 pub struct ActorContext {
     /// The actor's host-assigned name.
     name: String,
+    /// A short human-readable description of what the actor does.
+    description: Option<String>,
     /// Accumulated event subscriptions (by type name).
     subscriptions: Vec<EventTypeName>,
     /// Accumulated command registrations (by name).
@@ -53,6 +55,7 @@ impl ActorContext {
     {
         Self {
             name: name.as_ref().to_owned(),
+            description: None,
             subscriptions: Vec::new(),
             commands: Vec::new(),
             actor_refs: HashMap::new(),
@@ -65,6 +68,23 @@ impl ActorContext {
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// Sets a short human-readable description for this actor.
+    ///
+    /// Called during [`activate`](crate::Actor::activate). The description
+    /// is included in lifecycle events for display on the dashboard.
+    pub fn set_description<S>(&mut self, description: S)
+    where
+        S: AsRef<str>,
+    {
+        self.description = Some(description.as_ref().to_owned());
+    }
+
+    /// Returns the actor's description, if set.
+    #[must_use]
+    pub fn description(&self) -> Option<&str> {
+        self.description.as_deref()
     }
 
     /// Subscribes to a bus event by name.
@@ -209,6 +229,7 @@ impl ActorContext {
         if let Err(e) = self.send_event(Event::ActorStarted {
             payload: ActorStarted {
                 name: self.name.clone(),
+                description: self.description.clone(),
             },
         }) {
             tracing::warn!(name = %self.name, err = ?e, "failed to announce ActorStarted");
@@ -442,6 +463,51 @@ mod tests {
     }
 
     #[test]
+    fn set_description_stores_description() {
+        // Given a new context.
+        let mut ctx = ActorContext::new("test", test_sink());
+
+        // When setting a description.
+        ctx.set_description("does something useful");
+
+        // Then description() returns the value.
+        assert_eq!(ctx.description(), Some("does something useful"));
+    }
+
+    #[test]
+    fn description_is_none_by_default() {
+        // Given a new context.
+        let ctx = ActorContext::new("test", test_sink());
+
+        // When querying description without setting it.
+        assert!(ctx.description().is_none());
+
+        // Then it is None.
+    }
+
+    #[test]
+    fn announce_started_includes_description() {
+        // Given a context with a description.
+        let sink = test_sink_as_concrete();
+        let mut ctx = ActorContext::new("my-actor", sink.clone());
+        ctx.set_description("does cool stuff");
+
+        // When announcing started.
+        ctx.announce_started();
+
+        // Then the event carries the description.
+        let events = sink.events();
+        assert_eq!(events.len(), 1);
+        match &events[0] {
+            Event::ActorStarted { payload } => {
+                assert_eq!(payload.name, "my-actor");
+                assert_eq!(payload.description.as_deref(), Some("does cool stuff"));
+            }
+            other => panic!("expected ActorStarted, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn announce_started_sends_actor_started_event() {
         // Given a context with a test sink.
         let sink = test_sink_as_concrete();
@@ -456,6 +522,7 @@ mod tests {
         match &events[0] {
             Event::ActorStarted { payload } => {
                 assert_eq!(payload.name, "my-actor");
+                assert!(payload.description.is_none());
             }
             other => panic!("expected ActorStarted, got {other:?}"),
         }

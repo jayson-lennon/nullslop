@@ -14,9 +14,9 @@ Feature: Chat Log
 
   Scenario: Push actor entry adds to history
     Given a fresh bus with all handlers
-    When I submit PushChatEntry with an Actor message from "nullslop-echo" with text "HELLO"
+    When I submit PushChatEntry with an Actor message from "echo" with text "HELLO"
     Then the chat history should contain 1 entry
-    And chat history entry 1 should be an Actor message from "nullslop-echo" with text "HELLO"
+    And chat history entry 1 should be an Actor message from "echo" with text "HELLO"
 
   Scenario: Scroll up from bottom resolves to concrete offset
     Given a fresh bus with all handlers

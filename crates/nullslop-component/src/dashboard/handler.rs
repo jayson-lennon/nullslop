@@ -22,12 +22,12 @@ define_handler! {
 impl DashboardHandler {
     /// Records an actor as starting in the dashboard state.
     fn on_actor_starting(evt: &ActorStarting, ctx: &mut HandlerContext<'_, AppState, Services>) {
-        ctx.state.dashboard.mark_starting(&evt.name);
+        ctx.state.dashboard.mark_starting(&evt.name, evt.description.clone());
     }
 
     /// Records an actor as running in the dashboard state.
     fn on_actor_started(evt: &ActorStarted, ctx: &mut HandlerContext<'_, AppState, Services>) {
-        ctx.state.dashboard.mark_running(&evt.name);
+        ctx.state.dashboard.mark_running(&evt.name, evt.description.clone());
     }
 }
 
@@ -53,6 +53,7 @@ mod tests {
         bus.submit_event(Event::ActorStarting {
             payload: ActorStarting {
                 name: "actor-a".into(),
+                description: None,
             },
         });
         let services = test_utils::test_services();
@@ -62,7 +63,8 @@ mod tests {
         // Then the actor is tracked with Starting status.
         let actors = state.dashboard.actors();
         assert_eq!(actors.len(), 1);
-        assert_eq!(actors[0], ("actor-a", ActorStatus::Starting));
+        assert_eq!(actors[0].name, "actor-a");
+        assert_eq!(actors[0].status, ActorStatus::Starting);
     }
 
     #[test]
@@ -72,19 +74,21 @@ mod tests {
         DashboardHandler.register(&mut bus);
         let services = test_utils::test_services();
         let mut state = AppState::default();
-        state.dashboard.mark_starting("actor-a");
+        state.dashboard.mark_starting("actor-a", None);
 
         // When an ActorStarted event is processed.
         bus.submit_event(Event::ActorStarted {
             payload: ActorStarted {
                 name: "actor-a".into(),
+                description: None,
             },
         });
         bus.process_events(&mut state, &services);
 
         // Then the actor is updated to Running status.
         let actors = state.dashboard.actors();
-        assert_eq!(actors[0], ("actor-a", ActorStatus::Running));
+        assert_eq!(actors[0].name, "actor-a");
+        assert_eq!(actors[0].status, ActorStatus::Running);
     }
 
     #[test]
@@ -97,16 +101,19 @@ mod tests {
         bus.submit_event(Event::ActorStarting {
             payload: ActorStarting {
                 name: "alpha".into(),
+                description: None,
             },
         });
         bus.submit_event(Event::ActorStarted {
             payload: ActorStarted {
                 name: "alpha".into(),
+                description: None,
             },
         });
         bus.submit_event(Event::ActorStarting {
             payload: ActorStarting {
                 name: "beta".into(),
+                description: None,
             },
         });
         let services = test_utils::test_services();
@@ -116,7 +123,9 @@ mod tests {
         // Then both are tracked in order with correct statuses.
         let actors = state.dashboard.actors();
         assert_eq!(actors.len(), 2);
-        assert_eq!(actors[0], ("alpha", ActorStatus::Running));
-        assert_eq!(actors[1], ("beta", ActorStatus::Starting));
+        assert_eq!(actors[0].name, "alpha");
+        assert_eq!(actors[0].status, ActorStatus::Running);
+        assert_eq!(actors[1].name, "beta");
+        assert_eq!(actors[1].status, ActorStatus::Starting);
     }
 }

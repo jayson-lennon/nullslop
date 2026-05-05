@@ -292,8 +292,8 @@ mod tests {
 
     #[test]
     fn actor_entry_has_actor_kind() {
-        // Given source "nullslop-echo" and text "HELLO".
-        let source = "nullslop-echo";
+        // Given source "echo" and text "HELLO".
+        let source = "echo";
         let text = "HELLO";
 
         // When creating an actor entry.
@@ -303,7 +303,7 @@ mod tests {
         assert_eq!(
             entry.kind,
             ChatEntryKind::Actor {
-                source: "nullslop-echo".to_owned(),
+                source: "echo".to_owned(),
                 text: "HELLO".to_owned(),
             }
         );
@@ -312,7 +312,7 @@ mod tests {
     #[test]
     fn actor_entry_serialization_roundtrip() {
         // Given an actor ChatEntry.
-        let entry = ChatEntry::actor("nullslop-echo", "hello");
+        let entry = ChatEntry::actor("echo", "hello");
 
         // When serialized and deserialized.
         let json = serde_json::to_string(&entry).expect("serialize");

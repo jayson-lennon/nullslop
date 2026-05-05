@@ -282,7 +282,7 @@ mod tests {
         let state = {
             let mut s = AppState::default();
             s.active_session_mut()
-                .push_entry(ChatEntry::actor("nullslop-echo", "HELLO"));
+                .push_entry(ChatEntry::actor("echo", "HELLO"));
             s
         };
 
@@ -343,7 +343,7 @@ mod tests {
                 .push_entry(ChatEntry::system("welcome"));
             s.active_session_mut().push_entry(ChatEntry::user("hello"));
             s.active_session_mut()
-                .push_entry(ChatEntry::actor("nullslop-echo", "HELLO"));
+                .push_entry(ChatEntry::actor("echo", "HELLO"));
             s.active_session_mut()
                 .push_entry(ChatEntry::assistant("world"));
             s

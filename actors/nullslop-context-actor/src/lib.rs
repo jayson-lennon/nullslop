@@ -222,7 +222,7 @@ mod tests {
     }
 
     fn test_context(sink: Arc<RecordingSink>) -> ActorContext {
-        ActorContext::new("nullslop-context-actor", sink as Arc<dyn MessageSink>)
+        ActorContext::new("context", sink as Arc<dyn MessageSink>)
     }
 
     fn find_prompt_assembled(events: &[Event]) -> Option<PromptAssembled> {

@@ -63,7 +63,7 @@ impl EchoActor {
                 if let Err(e) = ctx.send_command(Command::PushChatEntry {
                     payload: chat_input::PushChatEntry {
                         session_id: session_id.clone(),
-                        entry: ChatEntry::actor("nullslop-echo", text.to_uppercase()),
+                        entry: ChatEntry::actor("echo", text.to_uppercase()),
                     },
                 }) {
                     tracing::error!(err = ?e, "echo actor failed to send command");

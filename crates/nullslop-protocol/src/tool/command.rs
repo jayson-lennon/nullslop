@@ -111,7 +111,7 @@ mod tests {
     fn register_tools_roundtrip() {
         // Given a RegisterTools command.
         let cmd = RegisterTools {
-            provider: "nullslop-echo".into(),
+            provider: "echo".into(),
             definitions: vec![ToolDefinition {
                 name: "echo".into(),
                 description: "Echoes input".into(),
@@ -124,7 +124,7 @@ mod tests {
         let back: RegisterTools = serde_json::from_str(&json).expect("deserialize");
 
         // Then it matches.
-        assert_eq!(back.provider, "nullslop-echo");
+        assert_eq!(back.provider, "echo");
         assert_eq!(back.definitions.len(), 1);
     }
 

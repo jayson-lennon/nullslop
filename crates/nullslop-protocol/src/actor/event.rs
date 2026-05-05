@@ -10,6 +10,8 @@ use crate::EventMsg;
 pub struct ActorStarting {
     /// The actor's name.
     pub name: String,
+    /// A short human-readable description of what the actor does.
+    pub description: Option<String>,
 }
 
 /// An actor has finished starting up.
@@ -18,6 +20,8 @@ pub struct ActorStarting {
 pub struct ActorStarted {
     /// The actor's name.
     pub name: String,
+    /// A short human-readable description of what the actor does.
+    pub description: Option<String>,
 }
 
 /// An actor has completed shutdown.
