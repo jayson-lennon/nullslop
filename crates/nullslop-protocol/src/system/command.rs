@@ -47,3 +47,23 @@ pub struct MouseScrollUp;
 #[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
 #[cmd("system")]
 pub struct MouseScrollDown;
+
+/// Scroll the chat log up by one line.
+#[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
+#[cmd("system")]
+pub struct ScrollLineUp;
+
+/// Scroll the chat log down by one line.
+#[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
+#[cmd("system")]
+pub struct ScrollLineDown;
+
+/// Scroll the chat log to the very top.
+#[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
+#[cmd("system")]
+pub struct ScrollToTop;
+
+/// Scroll the chat log to the very bottom.
+#[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
+#[cmd("system")]
+pub struct ScrollToBottom;

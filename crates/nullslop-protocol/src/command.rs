@@ -223,6 +223,18 @@ pub enum Command {
     /// Scroll the chat log down by a small amount (mouse wheel).
     #[serde(rename = "mouse_scroll_down")]
     MouseScrollDown,
+    /// Scroll the chat log up by one line.
+    #[serde(rename = "scroll_line_up")]
+    ScrollLineUp,
+    /// Scroll the chat log down by one line.
+    #[serde(rename = "scroll_line_down")]
+    ScrollLineDown,
+    /// Scroll the chat log to the very top.
+    #[serde(rename = "scroll_to_top")]
+    ScrollToTop,
+    /// Scroll the chat log to the very bottom.
+    #[serde(rename = "scroll_to_bottom")]
+    ScrollToBottom,
     /// Refresh the model list from all providers.
     #[serde(rename = "refresh_models")]
     RefreshModels,
@@ -331,7 +343,11 @@ impl Command {
             | Self::ScrollUp
             | Self::ScrollDown
             | Self::MouseScrollUp
-            | Self::MouseScrollDown => None,
+            | Self::MouseScrollDown
+            | Self::ScrollLineUp
+            | Self::ScrollLineDown
+            | Self::ScrollToTop
+            | Self::ScrollToBottom => None,
             Self::SwitchTab { .. } => Some(SwitchTab::NAME),
             Self::SendMessage { .. } => Some(SendMessage::NAME),
             Self::CancelStream { .. } => Some(CancelStream::NAME),
@@ -417,6 +433,10 @@ impl std::fmt::Display for Command {
             Command::ScrollDown => write!(f, "scroll down"),
             Command::MouseScrollUp => write!(f, "mouse scroll up"),
             Command::MouseScrollDown => write!(f, "mouse scroll down"),
+            Command::ScrollLineUp => write!(f, "scroll line up"),
+            Command::ScrollLineDown => write!(f, "scroll line down"),
+            Command::ScrollToTop => write!(f, "scroll to top"),
+            Command::ScrollToBottom => write!(f, "scroll to bottom"),
             Command::RefreshModels => write!(f, "refresh models"),
             Command::PickerInsertChar { payload } => write!(f, "picker insert '{}'", payload.ch),
             Command::PickerBackspace => write!(f, "picker backspace"),
@@ -542,6 +562,10 @@ mod tests {
     #[case::scroll_down(Command::ScrollDown)]
     #[case::mouse_scroll_up(Command::MouseScrollUp)]
     #[case::mouse_scroll_down(Command::MouseScrollDown)]
+    #[case::scroll_line_up(Command::ScrollLineUp)]
+    #[case::scroll_line_down(Command::ScrollLineDown)]
+    #[case::scroll_to_top(Command::ScrollToTop)]
+    #[case::scroll_to_bottom(Command::ScrollToBottom)]
     #[case::move_cursor_up(Command::MoveCursorUp)]
     #[case::move_cursor_down(Command::MoveCursorDown)]
     #[case::picker_insert_char(Command::PickerInsertChar { payload: PickerInsertChar { ch: 'x' } })]

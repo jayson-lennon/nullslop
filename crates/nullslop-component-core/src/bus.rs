@@ -48,7 +48,7 @@ use nullslop_protocol::provider_picker::{
     PickerBackspace, PickerConfirm, PickerMoveCursorLeft, PickerMoveCursorRight, PickerMoveDown,
     PickerMoveUp,
 };
-use nullslop_protocol::system::{EditInput, MouseScrollDown, MouseScrollUp, Quit, ScrollDown, ScrollUp, ToggleWhichKey};
+use nullslop_protocol::system::{EditInput, MouseScrollDown, MouseScrollUp, Quit, ScrollDown, ScrollLineDown, ScrollLineUp, ScrollToBottom, ScrollToTop, ScrollUp, ToggleWhichKey};
 use nullslop_protocol::{ActorName, Command, CommandAction, Event};
 
 use crate::handler::{CommandHandler, EventHandler, HandlerContext};
@@ -470,6 +470,22 @@ impl<S, Sv> Bus<S, Sv> {
             }
             Command::MouseScrollDown => {
                 let cmd = MouseScrollDown;
+                self.dispatch_command_to_handlers(&cmd, state, services, &mut out);
+            }
+            Command::ScrollLineUp => {
+                let cmd = ScrollLineUp;
+                self.dispatch_command_to_handlers(&cmd, state, services, &mut out);
+            }
+            Command::ScrollLineDown => {
+                let cmd = ScrollLineDown;
+                self.dispatch_command_to_handlers(&cmd, state, services, &mut out);
+            }
+            Command::ScrollToTop => {
+                let cmd = ScrollToTop;
+                self.dispatch_command_to_handlers(&cmd, state, services, &mut out);
+            }
+            Command::ScrollToBottom => {
+                let cmd = ScrollToBottom;
                 self.dispatch_command_to_handlers(&cmd, state, services, &mut out);
             }
             Command::ProviderSwitch { payload } => {

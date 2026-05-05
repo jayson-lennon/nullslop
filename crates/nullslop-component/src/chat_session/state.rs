@@ -378,6 +378,16 @@ impl ChatSessionState {
         self.scroll_offset = None;
     }
 
+    /// Scroll to the very top of the conversation.
+    pub fn scroll_to_top(&mut self) {
+        self.scroll_offset = Some(0);
+    }
+
+    /// Scroll to the very bottom of the conversation (auto-scroll).
+    pub fn scroll_to_bottom(&mut self) {
+        self.scroll_offset = None;
+    }
+
     /// Update the cached maximum scroll offset from the renderer.
     ///
     /// Called by the chat log element during each render so that
@@ -575,6 +585,34 @@ mod tests {
         session.scroll_down(10);
 
         // Then the offset resets to None (auto-scroll to bottom).
+        assert!(session.scroll_offset().is_none());
+    }
+
+    #[test]
+    fn scroll_to_top_sets_offset_to_zero() {
+        // Given a session scrolled to the middle.
+        let mut session = ChatSessionState::new();
+        session.set_last_max_offset(100);
+        session.scroll_offset = Some(50);
+
+        // When scrolling to top.
+        session.scroll_to_top();
+
+        // Then the offset is 0.
+        assert_eq!(session.scroll_offset(), Some(0));
+    }
+
+    #[test]
+    fn scroll_to_bottom_resets_to_auto_scroll() {
+        // Given a session scrolled to the top.
+        let mut session = ChatSessionState::new();
+        session.set_last_max_offset(100);
+        session.scroll_offset = Some(0);
+
+        // When scrolling to bottom.
+        session.scroll_to_bottom();
+
+        // Then the offset is None (auto-scroll).
         assert!(session.scroll_offset().is_none());
     }
 
