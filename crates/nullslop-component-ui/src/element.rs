@@ -36,4 +36,33 @@ pub trait UiElement<S>: 'static + std::fmt::Debug {
     /// * `area` - The allocated region where this element should draw.
     /// * `state` - Read-only application state for rendering decisions.
     fn render(&mut self, frame: &mut Frame<'_>, area: Rect, state: &S);
+
+    /// Returns `true` if this element's content supports text selection.
+    ///
+    /// When an element returns `true`, the render loop registers its
+    /// allocated `Rect` as a selectable region. Mouse clicks and drags
+    /// within that rect will trigger application-level selection.
+    ///
+    /// Default is `false` — most elements don't need selection.
+    fn is_selectable(&self) -> bool {
+        false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::fake::FakeUiElement;
+
+    #[test]
+    fn default_is_selectable_returns_false() {
+        // Given a FakeUiElement that does not override is_selectable.
+        let (element, _): (FakeUiElement<()>, _) = FakeUiElement::new("test");
+
+        // When calling is_selectable on the trait object.
+        let selectable: &dyn UiElement<()> = &element;
+
+        // Then it returns false (the default).
+        assert!(!selectable.is_selectable());
+    }
 }

@@ -28,6 +28,10 @@ impl UiElement<AppState> for DashboardElement {
         "dashboard".to_owned()
     }
 
+    fn is_selectable(&self) -> bool {
+        true
+    }
+
     fn render(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppState) {
         let actors = state.dashboard.actors();
         let selected_index = state.dashboard.selected_index();
@@ -347,5 +351,17 @@ mod tests {
         let second_cell = buffer.cell((0, 3)).expect("cell 0,3");
         assert_eq!(second_cell.symbol(), "\u{2588}");
         assert_eq!(second_cell.fg, Color::Yellow);
+    }
+
+    #[test]
+    fn dashboard_element_is_selectable() {
+        // Given a DashboardElement.
+        let element = DashboardElement;
+
+        // When calling is_selectable.
+        let selectable: &dyn UiElement<AppState> = &element;
+
+        // Then it returns true.
+        assert!(selectable.is_selectable());
     }
 }
