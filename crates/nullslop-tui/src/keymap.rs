@@ -23,13 +23,11 @@ use crate::scope::Scope;
 pub enum KeyCategory {
     /// App-level control: quit, interrupt, help.
     General,
-    /// Mode transitions: entering and leaving interaction modes.
-    Mode,
     /// Navigation: scrolling, tab switching, picker movement.
     Navigation,
     /// Model management: model picker, model refresh.
     Model,
-    /// Text editing: cursor movement, insertion, deletion.
+    /// Text editing: cursor movement, insertion, deletion, mode entry.
     Input,
 }
 
@@ -49,8 +47,8 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
             .bind("k", Command::DashboardSelectUp, KeyCategory::General)
             .bind("<c-c>", Command::Quit, KeyCategory::General)
             .bind("?", Command::ToggleWhichKey, KeyCategory::General)
-            // Mode — mode transitions
-            .bind("i", Command::SetMode { payload: SetMode { mode: Mode::Input } }, KeyCategory::Mode)
+            // Input — enter input mode
+            .bind("i", Command::SetMode { payload: SetMode { mode: Mode::Input } }, KeyCategory::Input)
             // Navigation — scrolling and tab switching
             .bind("k", Command::ScrollLineUp, KeyCategory::Navigation)
             .bind("j", Command::ScrollLineDown, KeyCategory::Navigation)
@@ -60,9 +58,9 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
             .bind("<s-tab>", Command::SwitchTab { payload: SwitchTab { direction: TabDirection::Prev } }, KeyCategory::Navigation)
             // Input — external editor
             .bind("<c-e>", Command::EditInput, KeyCategory::Input)
-            // g prefix — model management and scroll-to-top
-            .describe_group("g", "general")
-            .describe_group("gm", "model")
+            // g prefix — general commands and model management
+            .describe_group_with_category("g", "general", KeyCategory::General)
+            .describe_group_with_category("gm", "model", KeyCategory::Model)
             .bind("gg", Command::ScrollToTop, KeyCategory::Navigation)
             .bind("G", Command::ScrollToBottom, KeyCategory::Navigation)
             .bind("gmp", Command::SetMode { payload: SetMode { mode: Mode::Picker } }, KeyCategory::Model)
@@ -73,7 +71,7 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
             b.bind("<enter>", Command::SubmitMessage { payload: SubmitMessage { session_id: SessionId::new(), text: String::new() } }, KeyCategory::Input)
             .bind("<s-enter>", Command::InsertChar { payload: InsertChar { ch: '\n' } }, KeyCategory::Input)
             .bind("<c-enter>", Command::InsertChar { payload: InsertChar { ch: '\n' } }, KeyCategory::Input)
-            .bind("<esc>", Command::SetMode { payload: SetMode { mode: Mode::Normal } }, KeyCategory::Mode)
+            .bind("<esc>", Command::SetMode { payload: SetMode { mode: Mode::Normal } }, KeyCategory::General)
             .bind("<c-c>", Command::Interrupt, KeyCategory::General)
             .bind("<c-e>", Command::EditInput, KeyCategory::Input)
             .bind("<f1>", Command::ToggleWhichKey, KeyCategory::General)
@@ -102,7 +100,7 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
 
     keymap
         .scope(Scope::Picker, |b| {
-            b.bind("<esc>", Command::SetMode { payload: SetMode { mode: Mode::Normal } }, KeyCategory::Mode)
+            b.bind("<esc>", Command::SetMode { payload: SetMode { mode: Mode::Normal } }, KeyCategory::General)
             .bind("<enter>", Command::PickerConfirm, KeyCategory::Model)
             .bind("<up>", Command::PickerMoveUp, KeyCategory::Navigation)
             .bind("<down>", Command::PickerMoveDown, KeyCategory::Navigation)
@@ -406,12 +404,12 @@ mod tests {
 
         // When getting bindings grouped by category for Normal scope.
         let groups = keymap.bindings_for_scope(Scope::Normal);
-        let mode = groups.iter().find(|g| g.category == "Mode");
+        let input = groups.iter().find(|g| g.category == "Input");
 
-        // Then the Mode group exists and contains 'i' → set mode input.
-        assert!(mode.is_some(), "Mode category should exist");
-        let descs: Vec<&str> = mode.unwrap().bindings.iter().map(|b| b.description.as_str()).collect();
-        assert!(descs.iter().any(|d| d.contains("input")), "Mode should contain set mode input");
+        // Then the Input group exists and contains 'i' → set mode input.
+        assert!(input.is_some(), "Input category should exist");
+        let descs: Vec<&str> = input.unwrap().bindings.iter().map(|b| b.description.as_str()).collect();
+        assert!(descs.iter().any(|d| d.contains("input")), "Input should contain set mode input");
     }
 
     #[test]
@@ -432,15 +430,68 @@ mod tests {
     }
 
     #[test]
-    fn normal_scope_model_category_has_picker_and_refresh() {
+    fn gm_prefix_appears_under_model_category() {
+        // Given the keymap.
+        let keymap = init();
+
+        // When navigating into the 'g' prefix in Normal scope.
+        let g_key = KeyEvent {
+            key: Key::Char('g'),
+            modifiers: Modifiers::none(),
+        };
+        let children = keymap
+            .get_children_at_path(&[g_key], &Scope::Normal)
+            .expect("g prefix should have children");
+
+        // Then 'm' is one of the children with description "model".
+        let m_child = children.iter().find(|(k, _)| k.display() == "m");
+        assert!(m_child.is_some(), "'m' should be a child of 'g'");
+        assert_eq!(m_child.unwrap().1, "model");
+    }
+
+    #[test]
+    fn g_prefix_appears_under_general_category() {
         // Given the keymap.
         let keymap = init();
 
         // When getting bindings grouped by category for Normal scope.
         let groups = keymap.bindings_for_scope(Scope::Normal);
-        let model = groups.iter().find(|g| g.category == "Model");
+        let general = groups.iter().find(|g| g.category == "General");
 
-        // Then the Model group exists.
-        assert!(model.is_some(), "Model category should exist");
+        // Then the General group contains 'g' with description "general".
+        assert!(general.is_some(), "General category should exist");
+        let g_binding = general
+            .unwrap()
+            .bindings
+            .iter()
+            .find(|b| b.key.display() == "g");
+        assert!(
+            g_binding.is_some(),
+            "General category should contain 'g' prefix"
+        );
+        assert_eq!(g_binding.unwrap().description, "general");
+    }
+
+    #[test]
+    fn input_scope_escape_appears_under_general_category() {
+        // Given the keymap.
+        let keymap = init();
+
+        // When getting bindings grouped by category for Input scope.
+        let groups = keymap.bindings_for_scope(Scope::Input);
+        let general = groups.iter().find(|g| g.category == "General");
+
+        // Then the General group contains '<esc>' → set mode normal.
+        assert!(general.is_some(), "General category should exist");
+        let descs: Vec<&str> = general
+            .unwrap()
+            .bindings
+            .iter()
+            .map(|b| b.description.as_str())
+            .collect();
+        assert!(
+            descs.iter().any(|d| d.contains("normal")),
+            "General should contain set mode normal, found: {descs:?}"
+        );
     }
 }
