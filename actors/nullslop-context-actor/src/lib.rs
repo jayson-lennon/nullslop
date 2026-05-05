@@ -23,8 +23,11 @@ pub enum ContextDirectMsg {}
 
 /// The prompt assembly actor.
 pub struct PromptAssemblyActor {
+    /// Per-session prompt assembly strategies.
     strategies: HashMap<SessionId, Box<dyn PromptAssembly>>,
+    /// Cached tool definitions from [`ToolsRegistered`] events.
     tool_definitions: HashMap<String, ToolDefinition>,
+    /// Factory for creating new strategies on switch.
     factory: Option<Box<dyn StrategyFactory>>,
 }
 
@@ -68,6 +71,7 @@ impl Actor for PromptAssemblyActor {
 }
 
 impl PromptAssemblyActor {
+    /// Dispatches incoming commands to the appropriate handler.
     async fn handle_command(&mut self, cmd: &nullslop_protocol::Command, ctx: &ActorContext) {
         match cmd {
             nullslop_protocol::Command::AssemblePrompt { payload } => {
@@ -77,12 +81,13 @@ impl PromptAssemblyActor {
                 self.on_switch_prompt_strategy(payload, ctx);
             }
             nullslop_protocol::Command::RestoreStrategyState { payload } => {
-                self.on_restore_strategy_state(payload);
+                Self::on_restore_strategy_state(payload);
             }
             _ => {}
         }
     }
 
+    /// Dispatches incoming events to the appropriate handler.
     fn handle_event(&mut self, evt: &nullslop_protocol::Event) {
         match evt {
             Event::ToolsRegistered { payload } => {
@@ -92,6 +97,7 @@ impl PromptAssemblyActor {
         }
     }
 
+    /// Lazily initializes a passthrough strategy for unknown sessions.
     fn ensure_strategy(&mut self, session_id: &SessionId) {
         if !self.strategies.contains_key(session_id) {
             self.strategies.insert(
@@ -101,6 +107,7 @@ impl PromptAssemblyActor {
         }
     }
 
+    /// Handles [`AssemblePrompt`] by running the session's strategy.
     async fn on_assemble_prompt(&mut self, cmd: &AssemblePrompt, ctx: &ActorContext) {
         let session_id = cmd.session_id.clone();
         self.ensure_strategy(&session_id);
@@ -111,10 +118,11 @@ impl PromptAssemblyActor {
             .chain(
                 self.tool_definitions
                     .values()
-                    .cloned()
-                    .filter(|td| !cmd.tools.iter().any(|t| t.name == td.name)),
+                    .filter(|td| !cmd.tools.iter().any(|t| t.name == td.name))
+                    .cloned(),
             )
             .collect();
+        #[expect(clippy::expect_used, reason = "strategy was just ensured by ensure_strategy above")]
         let strategy = self
             .strategies
             .get(&session_id)
@@ -141,13 +149,11 @@ impl PromptAssemblyActor {
         });
     }
 
+    /// Handles [`SwitchPromptStrategy`] by creating a new strategy via the factory.
     fn on_switch_prompt_strategy(&mut self, cmd: &SwitchPromptStrategy, ctx: &ActorContext) {
-        let factory = match self.factory.as_ref() {
-            Some(f) => f,
-            None => {
-                tracing::error!("no strategy factory available");
-                return;
-            }
+        let Some(factory) = self.factory.as_ref() else {
+            tracing::error!("no strategy factory available");
+            return;
         };
         match factory.create(&cmd.strategy_id) {
             Ok(new_strategy) => {
@@ -165,16 +171,15 @@ impl PromptAssemblyActor {
         }
     }
 
+    /// Caches tool definitions from a [`ToolsRegistered`] event.
     fn on_tools_registered(&mut self, evt: &ToolsRegistered) {
         for def in &evt.definitions {
             self.tool_definitions.insert(def.name.clone(), def.clone());
         }
     }
 
-    fn on_restore_strategy_state(&mut self, cmd: &RestoreStrategyState) {
-        // Stub: accept the restore command gracefully.
-        // The full implementation will deserialize the blob into
-        // strategy-specific state and attach it to the strategy.
+    /// Handles [`RestoreStrategyState`] (currently a stub — no-op).
+    fn on_restore_strategy_state(cmd: &RestoreStrategyState) {
         tracing::debug!(
             session_id = ?cmd.session_id,
             strategy_id = %cmd.strategy_id,
@@ -215,6 +220,7 @@ mod tests {
             Ok(())
         }
 
+        #[expect(clippy::unwrap_in_result, reason = "test code")]
         fn send_event(&self, event: Event) -> nullslop_actor::SendResult {
             self.events.lock().expect("lock").push(event);
             Ok(())

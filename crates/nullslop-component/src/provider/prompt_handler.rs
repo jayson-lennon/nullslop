@@ -27,6 +27,7 @@ define_handler! {
 }
 
 impl PromptAssemblyHandler {
+    /// Handle prompt assembly completion by starting the send phase.
     fn on_prompt_assembled(
         evt: &PromptAssembled,
         ctx: &mut HandlerContext<'_, AppState, Services>,
@@ -52,6 +53,7 @@ impl PromptAssemblyHandler {
         });
     }
 
+    /// Handle a strategy switch by updating the session's active strategy.
     fn on_prompt_strategy_switched(
         evt: &PromptStrategySwitched,
         ctx: &mut HandlerContext<'_, AppState, Services>,
@@ -60,6 +62,7 @@ impl PromptAssemblyHandler {
         session.switch_strategy(evt.strategy_id.clone());
     }
 
+    /// Persist an updated strategy state blob.
     fn on_strategy_state_updated(
         evt: &StrategyStateUpdated,
         ctx: &mut HandlerContext<'_, AppState, Services>,

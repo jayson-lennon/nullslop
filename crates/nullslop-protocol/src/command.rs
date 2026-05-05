@@ -359,7 +359,11 @@ impl Command {
             | Self::ScrollLineUp
             | Self::ScrollLineDown
             | Self::ScrollToTop
-            | Self::ScrollToBottom => None,
+            | Self::ScrollToBottom
+            | Self::DashboardSelectDown
+            | Self::DashboardSelectUp
+            | Self::DashboardSelectFirst
+            | Self::DashboardSelectLast => None,
             Self::SwitchTab { .. } => Some(SwitchTab::NAME),
             Self::SendMessage { .. } => Some(SendMessage::NAME),
             Self::CancelStream { .. } => Some(CancelStream::NAME),
@@ -388,12 +392,13 @@ impl Command {
             Self::ToolCallReceived { .. } => Some(ToolCallReceived::NAME),
             Self::ToolCallStreaming { .. } => Some(ToolCallStreaming::NAME),
             Self::PushToolResult { .. } => Some(PushToolResult::NAME),
-            Self::DashboardSelectDown | Self::DashboardSelectUp | Self::DashboardSelectFirst | Self::DashboardSelectLast => None,
+
         }
     }
 }
 
 impl std::fmt::Display for Command {
+    #[expect(clippy::too_many_lines, reason = "exhaustive match on all Command variants")]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Command::InsertChar { payload } => write!(f, "insert '{}'", payload.ch),

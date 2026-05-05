@@ -39,6 +39,7 @@ pub struct ActorWorld {
     /// The application core (bus, state, message channel).
     pub core: AppCore,
     /// Runtime services.
+    #[allow(dead_code)]
     pub services: Services,
 }
 

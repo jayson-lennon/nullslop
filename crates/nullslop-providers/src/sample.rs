@@ -184,7 +184,7 @@ mod tests {
         // Given a sample service.
         let service = SampleLlmServiceFactory.create().expect("create service");
         let messages = vec![LlmMessage::User {
-            content: "!response".to_string(),
+            content: "!response".to_owned(),
         }];
 
         // When streaming.
@@ -203,7 +203,7 @@ mod tests {
         // Given a sample service.
         let service = SampleLlmServiceFactory.create().expect("create service");
         let messages = vec![LlmMessage::User {
-            content: "!think".to_string(),
+            content: "!think".to_owned(),
         }];
 
         // When streaming.
@@ -226,7 +226,7 @@ mod tests {
         // Given a sample service.
         let service = SampleLlmServiceFactory.create().expect("create service");
         let messages = vec![LlmMessage::User {
-            content: "hello".to_string(),
+            content: "hello".to_owned(),
         }];
 
         // When streaming.
@@ -263,7 +263,7 @@ mod tests {
         // Given a sample service.
         let service = SampleLlmServiceFactory.create().expect("create service");
         let messages = vec![LlmMessage::User {
-            content: "!response".to_string(),
+            content: "!response".to_owned(),
         }];
 
         // When streaming.
@@ -315,7 +315,7 @@ mod tests {
 
         // When sending "!Response" (mixed case) as a message.
         let messages = vec![LlmMessage::User {
-            content: "!Response".to_string(),
+            content: "!Response".to_owned(),
         }];
         let stream = service.chat_stream(messages).await.expect("chat_stream");
         let output: String = stream

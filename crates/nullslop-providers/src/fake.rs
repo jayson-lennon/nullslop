@@ -3,8 +3,8 @@
 //! Supports both plain text streaming and tool-call streaming.
 //! Use [`FakeLlmServiceFactory::with_tool_calls`] to simulate tool responses.
 //! Use [`FakeLlmServiceFactory::with_tool_loop`] to simulate a multi-turn
-//! tool loop where the first call returns tool_use and subsequent calls
-//! return end_turn.
+//! tool loop where the first call returns `tool_use` and subsequent calls
+//! return `end_turn`.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -20,7 +20,7 @@ use crate::service::{ChatStream, LlmService, LlmServiceError, LlmServiceFactory,
 /// Special prompt that triggers multi-turn tool loop behavior.
 ///
 /// When the last user message contains this string, the fake service
-/// returns a tool_use response on the first call and a text-only response
+/// returns a `tool_use` response on the first call and a text-only response
 /// on subsequent calls.
 pub const TOOL_LOOP_TRIGGER: &str = "__tool_loop_test__";
 
@@ -37,8 +37,8 @@ pub struct FakeLlmServiceFactory {
     tool_calls: Vec<ToolCall>,
     /// Shared call counter for multi-turn tool loop simulation.
     ///
-    /// When set, the first call with the trigger prompt returns tool_use,
-    /// and subsequent calls return end_turn text.
+    /// When set, the first call with the trigger prompt returns `tool_use`,
+    /// and subsequent calls return `end_turn` text.
     tool_loop_call_count: Option<Arc<AtomicUsize>>,
     /// Tool calls to use on the first call of a tool loop.
     tool_loop_first_tool_calls: Vec<ToolCall>,
@@ -78,7 +78,7 @@ impl FakeLlmServiceFactory {
     /// Create a factory that simulates a multi-turn tool loop.
     ///
     /// When the last user message contains [`TOOL_LOOP_TRIGGER`], the fake
-    /// returns a tool_use response (with the given tool calls and tokens) on
+    /// returns a `tool_use` response (with the given tool calls and tokens) on
     /// the first call, and a text-only response (with the subsequent tokens)
     /// on the second call. This simulates the LLM calling a tool, receiving
     /// results, and then producing a final text response.
@@ -107,8 +107,7 @@ impl FakeLlmServiceFactory {
     pub fn tool_loop_call_count(&self) -> usize {
         self.tool_loop_call_count
             .as_ref()
-            .map(|c| c.load(Ordering::SeqCst))
-            .unwrap_or(0)
+            .map_or(0, |c| c.load(Ordering::SeqCst))
     }
 }
 
@@ -156,7 +155,7 @@ impl FakeLlmService {
         Self::last_user_content(messages).is_some_and(|c| c.contains(TOOL_LOOP_TRIGGER))
     }
 
-    /// Builds a tool_use stream for the first call of a tool loop.
+    /// Builds a `tool_use` stream for the first call of a tool loop.
     fn build_tool_loop_first_stream(&self) -> Vec<Result<StreamEvent, Report<LlmServiceError>>> {
         let mut events: Vec<Result<StreamEvent, Report<LlmServiceError>>> = Vec::new();
 
@@ -181,7 +180,7 @@ impl FakeLlmService {
         }
 
         events.push(Ok(StreamEvent::Done {
-            stop_reason: "tool_use".to_string(),
+            stop_reason: "tool_use".to_owned(),
         }));
 
         events
@@ -198,7 +197,7 @@ impl FakeLlmService {
         }
 
         events.push(Ok(StreamEvent::Done {
-            stop_reason: "end_turn".to_string(),
+            stop_reason: "end_turn".to_owned(),
         }));
 
         events
@@ -222,17 +221,16 @@ impl LlmService for FakeLlmService {
         _tools: Vec<nullslop_protocol::tool::ToolDefinition>,
     ) -> Result<ToolStream, Report<LlmServiceError>> {
         // Check for multi-turn tool loop trigger.
-        if let Some(ref counter) = self.tool_loop_call_count {
-            if Self::is_tool_loop_trigger(&messages) {
-                let call_num = counter.fetch_add(1, Ordering::SeqCst);
-                if call_num == 0 {
-                    return Ok(Box::pin(stream::iter(self.build_tool_loop_first_stream())));
-                } else {
-                    return Ok(Box::pin(stream::iter(
-                        self.build_tool_loop_subsequent_stream(),
-                    )));
-                }
+        if let Some(ref counter) = self.tool_loop_call_count
+            && Self::is_tool_loop_trigger(&messages)
+        {
+            let call_num = counter.fetch_add(1, Ordering::SeqCst);
+            if call_num == 0 {
+                return Ok(Box::pin(stream::iter(self.build_tool_loop_first_stream())));
             }
+            return Ok(Box::pin(stream::iter(
+                self.build_tool_loop_subsequent_stream(),
+            )));
         }
 
         let mut events: Vec<Result<StreamEvent, Report<LlmServiceError>>> = Vec::new();
@@ -245,7 +243,7 @@ impl LlmService for FakeLlmService {
         if self.tool_calls.is_empty() {
             // No tool calls — just text and Done(end_turn).
             events.push(Ok(StreamEvent::Done {
-                stop_reason: "end_turn".to_string(),
+                stop_reason: "end_turn".to_owned(),
             }));
         } else {
             // Emit tool call events.
@@ -267,7 +265,7 @@ impl LlmService for FakeLlmService {
 
             // Terminal event.
             events.push(Ok(StreamEvent::Done {
-                stop_reason: "tool_use".to_string(),
+                stop_reason: "tool_use".to_owned(),
             }));
         }
 
@@ -340,7 +338,7 @@ mod tests {
     #[tokio::test]
     async fn fake_service_yields_text_events_and_done() {
         // Given a fake factory with no tool calls.
-        let factory = FakeLlmServiceFactory::new(vec!["Hello".to_string()]);
+        let factory = FakeLlmServiceFactory::new(vec!["Hello".to_owned()]);
 
         // When streaming with tools.
         let service = factory.create().expect("create service");
@@ -352,11 +350,11 @@ mod tests {
 
         // Then text tokens are wrapped in StreamEvent::Text and stream ends with Done.
         assert_eq!(events.len(), 2);
-        assert_eq!(events[0], StreamEvent::Text("Hello".to_string()));
+        assert_eq!(events[0], StreamEvent::Text("Hello".to_owned()));
         assert_eq!(
             events[1],
             StreamEvent::Done {
-                stop_reason: "end_turn".to_string(),
+                stop_reason: "end_turn".to_owned(),
             }
         );
     }
@@ -365,12 +363,12 @@ mod tests {
     async fn fake_service_yields_tool_call_events_and_done() {
         // Given a fake factory with tool calls.
         let tool_call = ToolCall {
-            id: "call_1".to_string(),
-            name: "echo".to_string(),
-            arguments: r#"{"input":"hi"}"#.to_string(),
+            id: "call_1".to_owned(),
+            name: "echo".to_owned(),
+            arguments: r#"{"input":"hi"}"#.to_owned(),
         };
         let factory = FakeLlmServiceFactory::with_tool_calls(
-            vec!["Let me check".to_string()],
+            vec!["Let me check".to_owned()],
             vec![tool_call.clone()],
         );
 
@@ -399,7 +397,7 @@ mod tests {
         assert_eq!(
             events[4],
             StreamEvent::Done {
-                stop_reason: "tool_use".to_string(),
+                stop_reason: "tool_use".to_owned(),
             }
         );
     }
@@ -410,20 +408,20 @@ mod tests {
     async fn tool_loop_first_call_returns_tool_use() {
         // Given a tool loop factory.
         let tool_call = ToolCall {
-            id: "call_1".to_string(),
-            name: "echo".to_string(),
-            arguments: r#"{"input":"hi"}"#.to_string(),
+            id: "call_1".to_owned(),
+            name: "echo".to_owned(),
+            arguments: r#"{"input":"hi"}"#.to_owned(),
         };
         let factory = FakeLlmServiceFactory::with_tool_loop(
-            vec!["Let me check".to_string()],
+            vec!["Let me check".to_owned()],
             vec![tool_call.clone()],
-            vec!["Here is the answer".to_string()],
+            vec!["Here is the answer".to_owned()],
         );
 
         // When creating a service and streaming with the trigger prompt.
         let service = factory.create().expect("create service");
         let messages = vec![LlmMessage::User {
-            content: "__tool_loop_test__".to_string(),
+            content: "__tool_loop_test__".to_owned(),
         }];
         let stream = service
             .chat_stream_with_tools(messages, vec![])
@@ -448,7 +446,7 @@ mod tests {
         assert_eq!(
             events[4],
             StreamEvent::Done {
-                stop_reason: "tool_use".to_string(),
+                stop_reason: "tool_use".to_owned(),
             }
         );
     }
@@ -457,20 +455,20 @@ mod tests {
     async fn tool_loop_second_call_returns_text_only() {
         // Given a tool loop factory.
         let tool_call = ToolCall {
-            id: "call_1".to_string(),
-            name: "echo".to_string(),
-            arguments: r#"{"input":"hi"}"#.to_string(),
+            id: "call_1".to_owned(),
+            name: "echo".to_owned(),
+            arguments: r#"{"input":"hi"}"#.to_owned(),
         };
         let factory = FakeLlmServiceFactory::with_tool_loop(
-            vec!["Let me check".to_string()],
+            vec!["Let me check".to_owned()],
             vec![tool_call],
-            vec!["Here is the answer".to_string()],
+            vec!["Here is the answer".to_owned()],
         );
 
         // When creating a service and making two calls with the trigger.
         let service = factory.create().expect("create service");
         let messages = vec![LlmMessage::User {
-            content: "__tool_loop_test__".to_string(),
+            content: "__tool_loop_test__".to_owned(),
         }];
 
         // First call — consume the tool_use response.
@@ -491,12 +489,12 @@ mod tests {
         assert_eq!(events.len(), 2);
         assert_eq!(
             events[0],
-            StreamEvent::Text("Here is the answer".to_string())
+            StreamEvent::Text("Here is the answer".to_owned())
         );
         assert_eq!(
             events[1],
             StreamEvent::Done {
-                stop_reason: "end_turn".to_string(),
+                stop_reason: "end_turn".to_owned(),
             }
         );
     }
@@ -505,15 +503,15 @@ mod tests {
     async fn tool_loop_ignores_non_trigger_messages() {
         // Given a tool loop factory.
         let factory = FakeLlmServiceFactory::with_tool_loop(
-            vec!["normal response".to_string()],
+            vec!["normal response".to_owned()],
             vec![],
-            vec!["subsequent".to_string()],
+            vec!["subsequent".to_owned()],
         );
 
         // When streaming with a non-trigger message.
         let service = factory.create().expect("create service");
         let messages = vec![LlmMessage::User {
-            content: "regular message".to_string(),
+            content: "regular message".to_owned(),
         }];
         let stream = service
             .chat_stream_with_tools(messages, vec![])
@@ -523,11 +521,11 @@ mod tests {
 
         // Then the stream emits the default tokens (not the tool loop ones).
         assert_eq!(events.len(), 2);
-        assert_eq!(events[0], StreamEvent::Text("normal response".to_string()));
+        assert_eq!(events[0], StreamEvent::Text("normal response".to_owned()));
         assert_eq!(
             events[1],
             StreamEvent::Done {
-                stop_reason: "end_turn".to_string(),
+                stop_reason: "end_turn".to_owned(),
             }
         );
         assert_eq!(factory.tool_loop_call_count(), 0);

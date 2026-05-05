@@ -21,7 +21,7 @@ pub trait TokenEstimator: Send + Sync {
 /// Estimate the token count for a single chat entry's text content.
 ///
 /// Uses the same fields that `entries_to_messages` would convert to LLM messages:
-/// User/Assistant content, ToolCall name+arguments, ToolResult name+content.
+/// [`ChatEntryKind::User`]/[`ChatEntryKind::Assistant`] content, [`ChatEntryKind::ToolCall`] name+arguments, [`ChatEntryKind::ToolResult`] name+content.
 /// System and Actor entries contribute 0 tokens since they are not sent to the LLM.
 pub fn estimate_entry_tokens(estimator: &dyn TokenEstimator, entry: &ChatEntry) -> usize {
     match &entry.kind {
@@ -44,6 +44,7 @@ pub fn estimate_entry_tokens(estimator: &dyn TokenEstimator, entry: &ChatEntry) 
 pub struct CharRatioEstimator;
 
 impl TokenEstimator for CharRatioEstimator {
+    #[expect(clippy::integer_division, reason = "1 token ≈ 4 characters is intentional rounding")]
     fn estimate(&self, text: &str) -> usize {
         text.chars().count() / 4 + 1
     }
@@ -101,8 +102,8 @@ mod tests {
         // When estimating tokens.
         let tokens = estimator.estimate(text);
 
-        // Then it uses character count (3), not byte count (3/4 + 1 = 1).
-        assert_eq!(tokens, 3 / 4 + 1);
+        // Then it uses character count (3), not byte count (3 * 3/4 = 2, rounded = 1).
+        assert_eq!(tokens, 1);
     }
 
     #[test]

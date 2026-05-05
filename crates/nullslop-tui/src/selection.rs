@@ -7,7 +7,7 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use unicode_segmentation::UnicodeSegmentation;
+use unicode_segmentation::UnicodeSegmentation as _;
 use wherror::Error;
 
 /// Screen regions that support text selection, rebuilt each frame.
@@ -17,6 +17,7 @@ use wherror::Error;
 /// the most specific (smallest area) matching rect.
 #[derive(Debug, Clone, Default)]
 pub struct SelectableRects {
+    /// The selectable regions.
     rects: Vec<Rect>,
 }
 
@@ -56,8 +57,10 @@ pub struct SelectionError;
 
 /// The state of an in-progress or finalized mouse text selection.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Default)]
 pub enum SelectionState {
     /// No selection in progress.
+    #[default]
     Idle,
     /// Mouse drag in progress.
     Dragging {
@@ -94,12 +97,13 @@ impl SelectionState {
     /// Updates the focus position during a drag, clamping to bounds.
     ///
     /// No-op for non-`Dragging` states (returns `self` unchanged).
+    #[must_use]
     pub fn update_focus(self, x: u16, y: u16) -> Self {
         match self {
             Self::Dragging {
                 anchor,
-                focus: _,
                 bounds,
+                ..
             } => {
                 let clamped_x = x.clamp(bounds.x, bounds.right().saturating_sub(1));
                 let clamped_y = y.clamp(bounds.y, bounds.bottom().saturating_sub(1));
@@ -116,6 +120,7 @@ impl SelectionState {
     /// Finalizes a `Dragging` selection into an `Active` one.
     ///
     /// No-op for non-`Dragging` states.
+    #[must_use]
     pub fn finalize(self) -> Self {
         match self {
             Self::Dragging {
@@ -132,6 +137,7 @@ impl SelectionState {
     }
 
     /// Cancels any selection, returning to `Idle`.
+    #[must_use]
     pub fn cancel(self) -> Self {
         Self::Idle
     }
@@ -202,8 +208,8 @@ impl SelectionState {
                 .collect::<Vec<_>>()
                 .iter()
                 .rev()
-                .skip_while(|g| g.chars().all(|c| c.is_whitespace()))
-                .cloned()
+                .skip_while(|g| g.chars().all(char::is_whitespace))
+                .copied()
                 .collect::<Vec<_>>()
                 .into_iter()
                 .rev()
@@ -212,7 +218,7 @@ impl SelectionState {
         }
 
         // Strip empty trailing rows.
-        while rows.last().is_some_and(|r| r.is_empty()) {
+        while rows.last().is_some_and(std::string::String::is_empty) {
             rows.pop();
         }
 
@@ -224,11 +230,7 @@ impl SelectionState {
     }
 }
 
-impl Default for SelectionState {
-    fn default() -> Self {
-        Self::Idle
-    }
-}
+
 
 #[cfg(test)]
 mod tests {

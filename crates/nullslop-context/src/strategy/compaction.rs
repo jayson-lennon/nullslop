@@ -91,11 +91,14 @@ impl PromptAssembly for CompactionStrategy {
         }
 
         // Sort indices back to chronological order.
-        included_indices.sort();
+        included_indices.sort_unstable();
 
         let included: Vec<&ChatEntry> = included_indices
             .iter()
-            .map(|&i| &context.history[i])
+            .map(|&i| {
+                // SAFETY: indices come from enumerate on context.history
+                unsafe { context.history.get_unchecked(i) }
+            })
             .collect();
 
         let messages = entries_to_messages(&included.into_iter().cloned().collect::<Vec<_>>());
@@ -157,7 +160,9 @@ mod tests {
     #[tokio::test]
     async fn trims_entries_when_over_threshold() {
         // Given entries that exceed the threshold.
-        let history: Vec<ChatEntry> = (0..10).map(|_| ChatEntry::user(&"a".repeat(400))).collect();
+        let history: Vec<ChatEntry> = std::iter::repeat_with(|| ChatEntry::user("a".repeat(400)))
+            .take(10)
+            .collect();
         let strategy = make_strategy(100);
         let session_id = SessionId::new();
         let context = test_context(&history, &session_id);
@@ -195,7 +200,7 @@ mod tests {
     #[tokio::test]
     async fn single_over_threshold_entry_is_included_anyway() {
         // Given one entry that far exceeds the threshold.
-        let history = vec![ChatEntry::user(&"x".repeat(1000))];
+        let history = vec![ChatEntry::user("x".repeat(1000))];
         let strategy = make_strategy(10);
         let session_id = SessionId::new();
         let context = test_context(&history, &session_id);
@@ -213,8 +218,8 @@ mod tests {
     async fn compaction_system_prompt_differs_from_token_budget() {
         // Given entries that trigger compaction.
         let history = vec![
-            ChatEntry::user(&"a".repeat(200)),
-            ChatEntry::assistant(&"b".repeat(200)),
+            ChatEntry::user("a".repeat(200)),
+            ChatEntry::assistant("b".repeat(200)),
             ChatEntry::user("short"),
         ];
         let strategy = make_strategy(30);
@@ -241,8 +246,8 @@ mod tests {
     async fn preserves_chronological_order() {
         // Given 3 entries where trimming occurs.
         let history = vec![
-            ChatEntry::user(&"a".repeat(200)),
-            ChatEntry::assistant(&"b".repeat(200)),
+            ChatEntry::user("a".repeat(200)),
+            ChatEntry::assistant("b".repeat(200)),
             ChatEntry::user("short"),
         ];
         let strategy = make_strategy(60);
@@ -253,7 +258,7 @@ mod tests {
         let result = strategy.assemble(&context).await.expect("assemble");
 
         // Then the included messages maintain chronological order.
-        assert!(result.messages.len() >= 1);
+        assert!(!result.messages.is_empty());
         let last = result.messages.last().expect("should have messages");
         assert_eq!(
             last,

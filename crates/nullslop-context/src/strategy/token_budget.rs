@@ -70,24 +70,22 @@ impl PromptAssembly for TokenBudgetStrategy {
             included_indices.push(i);
         }
 
-        // Sort indices back to chronological order (oldest to newest).
-        included_indices.sort();
+        included_indices.sort_unstable();
 
         // Collect included entries.
         let included: Vec<&ChatEntry> = included_indices
             .iter()
-            .map(|&i| &context.history[i])
+            .map(|&i| {
+                // SAFETY: indices come from enumerate on context.history
+                unsafe { context.history.get_unchecked(i) }
+            })
             .collect();
 
         let trimmed = included.len() < context.history.len();
         let messages = entries_to_messages(&included.into_iter().cloned().collect::<Vec<_>>());
 
         Ok(AssembledPrompt {
-            system_prompt: if trimmed {
-                Some(TRIMMED_SYSTEM_PROMPT.to_owned())
-            } else {
-                None
-            },
+            system_prompt: trimmed.then(|| TRIMMED_SYSTEM_PROMPT.to_owned()),
             messages,
         })
     }
@@ -125,7 +123,11 @@ mod tests {
         // Given 5 entries with ~100-char content each (~26 tokens each, ~130 total)
         // and a budget of 80 tokens.
         let history: Vec<ChatEntry> = (0..5)
-            .map(|i| ChatEntry::user("a".repeat(100) + &i.to_string()))
+            .map(|i| {
+                let mut s = "a".repeat(100);
+                s.push_str(&i.to_string());
+                ChatEntry::user(s)
+            })
             .collect();
         let strategy = make_strategy(80);
         let session_id = SessionId::new();
@@ -178,7 +180,7 @@ mod tests {
     #[tokio::test]
     async fn single_over_budget_entry_is_included_anyway() {
         // Given one entry that far exceeds the budget.
-        let history = vec![ChatEntry::user(&"x".repeat(1000))];
+        let history = vec![ChatEntry::user("x".repeat(1000))];
         let strategy = make_strategy(10);
         let session_id = SessionId::new();
         let context = test_context(&history, &session_id);
@@ -195,8 +197,8 @@ mod tests {
     async fn system_prompt_set_when_trimmed() {
         // Given entries that exceed the budget.
         let history = vec![
-            ChatEntry::user(&"a".repeat(200)),
-            ChatEntry::assistant(&"b".repeat(200)),
+            ChatEntry::user("a".repeat(200)),
+            ChatEntry::assistant("b".repeat(200)),
             ChatEntry::user("short"),
         ];
         let strategy = make_strategy(30);
@@ -233,8 +235,8 @@ mod tests {
     async fn preserves_chronological_order() {
         // Given 3 entries where the first exceeds the budget when combined.
         let history = vec![
-            ChatEntry::user(&"a".repeat(200)),
-            ChatEntry::assistant(&"b".repeat(200)),
+            ChatEntry::user("a".repeat(200)),
+            ChatEntry::assistant("b".repeat(200)),
             ChatEntry::user("short"),
         ];
         let strategy = make_strategy(60);
@@ -245,7 +247,7 @@ mod tests {
         let result = strategy.assemble(&context).await.expect("assemble");
 
         // Then the included messages maintain chronological order.
-        assert!(result.messages.len() >= 1);
+        assert!(!result.messages.is_empty());
         // The last message should be the most recent ("short" user message).
         let last = result.messages.last().expect("should have messages");
         assert_eq!(
@@ -291,7 +293,7 @@ mod tests {
         // Given many entries where only the newest fits.
         let mut history = Vec::new();
         for _ in 0..10 {
-            history.push(ChatEntry::user(&"x".repeat(100)));
+            history.push(ChatEntry::user("x".repeat(100)));
         }
         // Most recent is short.
         history.push(ChatEntry::user("ok"));

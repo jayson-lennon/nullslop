@@ -241,6 +241,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::too_many_lines, reason = "exhaustive coverage of all Event variants")]
     fn event_type_name_exhaustive_coverage() {
         // Given all Event variants.
         // When calling type_name() on each variant.

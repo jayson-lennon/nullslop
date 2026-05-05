@@ -91,10 +91,10 @@ pub fn run(mut app: TuiApp) -> Result<(), Report<TuiRunError>> {
     if let Err(e) = execute!(terminal.backend_mut(), PopKeyboardEnhancementFlags) {
         tracing::error!(err = ?e, "failed to pop keyboard enhancement flags");
     }
-    if mouse_selection {
-        if let Err(e) = execute!(terminal.backend_mut(), DisableMouseCapture) {
-            tracing::error!(err = ?e, "failed to disable mouse capture");
-        }
+    if mouse_selection
+        && let Err(e) = execute!(terminal.backend_mut(), DisableMouseCapture)
+    {
+        tracing::error!(err = ?e, "failed to disable mouse capture");
     }
     if let Err(e) = disable_raw_mode() {
         tracing::error!(err = ?e, "failed to disable raw mode");

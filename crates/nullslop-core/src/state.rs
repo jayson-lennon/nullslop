@@ -33,6 +33,7 @@ pub struct StateWriteGuard<'a> {
 impl State {
     /// Create a new State wrapping the given `AppState`.
     #[must_use]
+    #[expect(clippy::arc_with_non_send_sync, reason = "State is shared across threads; AppState Sync will be ensured at usage sites")]
     pub fn new(data: AppState) -> Self {
         Self {
             inner: Arc::new(RwLock::new(data)),

@@ -26,12 +26,16 @@ type BoxedToolFuture = Pin<Box<dyn Future<Output = ToolResult> + Send>>;
 enum ToolRegistration {
     /// A built-in tool executed directly by the orchestrator.
     Builtin {
+        /// The tool's JSON-schema definition.
         definition: ToolDefinition,
+        /// The function that executes the tool call.
         execute: fn(ToolCall) -> BoxedToolFuture,
     },
     /// An actor-provided tool routed via [`ExecuteTool`] command.
     Actor {
+        /// The tool's JSON-schema definition.
         definition: ToolDefinition,
+        /// The name of the actor providing this tool.
         provider: String,
     },
 }
@@ -288,7 +292,7 @@ impl ToolOrchestratorActor {
 
     /// Aggregates a tool result into the pending batch.
     ///
-    /// When all calls in a batch have completed, emits [`ToolBatchCompleted`].
+    /// When all calls in a batch have completed, emits [`ToolBatchCompleted`]
     fn handle_tool_execution_completed(
         &mut self,
         session_id: SessionId,
@@ -336,8 +340,11 @@ impl ToolOrchestratorActor {
 // Built-in tools
 // ---------------------------------------------------------------------------
 
+/// A built-in tool entry: its definition paired with its execute function.
+type BuiltinToolEntry = (ToolDefinition, fn(ToolCall) -> BoxedToolFuture);
+
 /// Returns the built-in tool definitions and their execute functions.
-fn builtin_tools() -> Vec<(ToolDefinition, fn(ToolCall) -> BoxedToolFuture)> {
+fn builtin_tools() -> Vec<BuiltinToolEntry> {
     vec![
         (
             echo_definition(),
@@ -358,6 +365,7 @@ fn builtin_tools() -> Vec<(ToolDefinition, fn(ToolCall) -> BoxedToolFuture)> {
     ]
 }
 
+/// Returns the tool definition for the `echo` built-in tool.
 fn echo_definition() -> ToolDefinition {
     ToolDefinition {
         name: "echo".to_owned(),
@@ -375,6 +383,7 @@ fn echo_definition() -> ToolDefinition {
     }
 }
 
+/// Returns the tool definition for the `get_time` built-in tool.
 fn get_time_definition() -> ToolDefinition {
     ToolDefinition {
         name: "get_time".to_owned(),
@@ -386,6 +395,7 @@ fn get_time_definition() -> ToolDefinition {
     }
 }
 
+/// Returns the tool definition for the `file_read` built-in tool.
 fn file_read_definition() -> ToolDefinition {
     ToolDefinition {
         name: "file_read".to_owned(),
@@ -439,6 +449,7 @@ fn execute_get_time(call: ToolCall) -> BoxedToolFuture {
     })
 }
 
+/// Returns the tool definition for the `file_write` built-in tool.
 fn file_write_definition() -> ToolDefinition {
     ToolDefinition {
         name: "file_write".to_owned(),
@@ -527,17 +538,16 @@ fn execute_file_write(call: ToolCall) -> BoxedToolFuture {
             }
         };
 
-        if let Some(parent) = std::path::Path::new(&path).parent() {
-            if !parent.as_os_str().is_empty() {
-                if let Err(e) = tokio::fs::create_dir_all(parent).await {
-                    return ToolResult {
-                        tool_call_id: call.id,
-                        name: call.name,
-                        content: format!("failed to create parent directories for '{path}': {e}"),
-                        success: false,
-                    };
-                }
-            }
+        if let Some(parent) = std::path::Path::new(&path).parent()
+            && !parent.as_os_str().is_empty()
+            && let Err(e) = tokio::fs::create_dir_all(parent).await
+        {
+            return ToolResult {
+                tool_call_id: call.id,
+                name: call.name,
+                content: format!("failed to create parent directories for '{path}': {e}"),
+                success: false,
+            };
         }
 
         match tokio::fs::write(&path, &content).await {
@@ -611,7 +621,7 @@ mod tests {
         ActorContext::new("test-tool-orchestrator", sink.clone())
     }
 
-    /// Extracts ToolBatchCompleted events from a list of events.
+    /// Extracts `ToolBatchCompleted` events from a list of events.
     fn find_batch_completed(events: &[Event]) -> Vec<&ToolBatchCompleted> {
         events
             .iter()
@@ -622,7 +632,7 @@ mod tests {
             .collect()
     }
 
-    /// Extracts ToolExecutionCompleted events from a list of events.
+    /// Extracts `ToolExecutionCompleted` events from a list of events.
     fn find_execution_completed(events: &[Event]) -> Vec<&ToolExecutionCompleted> {
         events
             .iter()
@@ -723,7 +733,7 @@ mod tests {
             ToolRegistration::Actor { provider, .. } => {
                 assert_eq!(provider, "web-actor");
             }
-            other => panic!("expected Actor registration, got {other:?}"),
+            other @ ToolRegistration::Builtin { .. } => panic!("expected Actor registration, got {other:?}"),
         }
     }
 

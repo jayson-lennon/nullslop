@@ -146,11 +146,16 @@ impl ChatEntry {
 
     /// Create a new tool call entry with the current timestamp.
     #[must_use]
-    pub fn tool_call(
-        id: impl Into<String>,
-        name: impl Into<String>,
-        arguments: impl Into<String>,
-    ) -> Self {
+    pub fn tool_call<S1, S2, S3>(
+        id: S1,
+        name: S2,
+        arguments: S3,
+    ) -> Self
+    where
+        S1: Into<String>,
+        S2: Into<String>,
+        S3: Into<String>,
+    {
         Self {
             id: ChatEntryId::new(),
             timestamp: jiff::Timestamp::now(),
@@ -164,12 +169,17 @@ impl ChatEntry {
 
     /// Create a new tool result entry with the current timestamp.
     #[must_use]
-    pub fn tool_result(
-        id: impl Into<String>,
-        name: impl Into<String>,
-        content: impl Into<String>,
+    pub fn tool_result<S1, S2, S3>(
+        id: S1,
+        name: S2,
+        content: S3,
         success: bool,
-    ) -> Self {
+    ) -> Self
+    where
+        S1: Into<String>,
+        S2: Into<String>,
+        S3: Into<String>,
+    {
         Self {
             id: ChatEntryId::new(),
             timestamp: jiff::Timestamp::now(),

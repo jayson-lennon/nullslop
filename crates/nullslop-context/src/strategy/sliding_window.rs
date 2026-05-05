@@ -33,7 +33,8 @@ impl PromptAssembly for SlidingWindowStrategy {
         context: &AssemblyContext<'_>,
     ) -> Result<AssembledPrompt, Report<PromptAssemblyError>> {
         let window = if context.history.len() > self.window_size {
-            &context.history[context.history.len() - self.window_size..]
+            // SAFETY: window_size < history.len(), so the slice is in bounds.
+            unsafe { context.history.get_unchecked(context.history.len() - self.window_size..) }
         } else {
             context.history
         };

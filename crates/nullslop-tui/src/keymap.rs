@@ -11,7 +11,7 @@ use nullslop_protocol::provider_picker::PickerInsertChar;
 use nullslop_protocol::system::SetMode;
 use nullslop_protocol::tab::SwitchTab;
 use nullslop_protocol::{Command, Key, KeyEvent, Mode, SessionId, TabDirection};
-use ratatui_which_key::CrosstermKeymapExt;
+use ratatui_which_key::CrosstermKeymapExt as _;
 use ratatui_which_key::Keymap;
 
 use crate::scope::Scope;

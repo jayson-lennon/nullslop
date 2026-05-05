@@ -39,7 +39,7 @@ pub enum StreamEvent {
     },
     /// The stream ended.
     Done {
-        /// Why the stream stopped (e.g., "end_turn", "tool_use").
+        /// Why the stream stopped (e.g., "`end_turn`", "`tool_use`").
         stop_reason: String,
     },
 }
@@ -51,26 +51,26 @@ mod tests {
     #[test]
     fn debug_formatting() {
         // Given all StreamEvent variants.
-        let text = StreamEvent::Text("hello".to_string());
+        let text = StreamEvent::Text("hello".to_owned());
         let tool_start = StreamEvent::ToolUseStart {
             index: 0,
-            id: "call_1".to_string(),
-            name: "echo".to_string(),
+            id: "call_1".to_owned(),
+            name: "echo".to_owned(),
         };
         let tool_delta = StreamEvent::ToolUseInputDelta {
             index: 0,
-            partial_json: r#"{"input":"h"#.to_string(),
+            partial_json: r#"{"input":"h"#.to_owned(),
         };
         let tool_complete = StreamEvent::ToolUseComplete {
             index: 0,
             tool_call: ToolCall {
-                id: "call_1".to_string(),
-                name: "echo".to_string(),
-                arguments: r#"{"input":"hi"}"#.to_string(),
+                id: "call_1".to_owned(),
+                name: "echo".to_owned(),
+                arguments: r#"{"input":"hi"}"#.to_owned(),
             },
         };
         let done = StreamEvent::Done {
-            stop_reason: "end_turn".to_string(),
+            stop_reason: "end_turn".to_owned(),
         };
 
         // When formatting with Debug.
@@ -85,51 +85,51 @@ mod tests {
     #[test]
     fn partial_eq_all_variants() {
         // Given two identical sets of events.
-        let text_a = StreamEvent::Text("hello".to_string());
-        let text_b = StreamEvent::Text("hello".to_string());
+        let text_a = StreamEvent::Text("hello".to_owned());
+        let text_b = StreamEvent::Text("hello".to_owned());
 
         let start_a = StreamEvent::ToolUseStart {
             index: 0,
-            id: "call_1".to_string(),
-            name: "echo".to_string(),
+            id: "call_1".to_owned(),
+            name: "echo".to_owned(),
         };
         let start_b = StreamEvent::ToolUseStart {
             index: 0,
-            id: "call_1".to_string(),
-            name: "echo".to_string(),
+            id: "call_1".to_owned(),
+            name: "echo".to_owned(),
         };
 
         let delta_a = StreamEvent::ToolUseInputDelta {
             index: 0,
-            partial_json: r#"{"x"#.to_string(),
+            partial_json: r#"{"x"#.to_owned(),
         };
         let delta_b = StreamEvent::ToolUseInputDelta {
             index: 0,
-            partial_json: r#"{"x"#.to_string(),
+            partial_json: r#"{"x"#.to_owned(),
         };
 
         let complete_a = StreamEvent::ToolUseComplete {
             index: 0,
             tool_call: ToolCall {
-                id: "call_1".to_string(),
-                name: "echo".to_string(),
-                arguments: "{}".to_string(),
+                id: "call_1".to_owned(),
+                name: "echo".to_owned(),
+                arguments: "{}".to_owned(),
             },
         };
         let complete_b = StreamEvent::ToolUseComplete {
             index: 0,
             tool_call: ToolCall {
-                id: "call_1".to_string(),
-                name: "echo".to_string(),
-                arguments: "{}".to_string(),
+                id: "call_1".to_owned(),
+                name: "echo".to_owned(),
+                arguments: "{}".to_owned(),
             },
         };
 
         let done_a = StreamEvent::Done {
-            stop_reason: "tool_use".to_string(),
+            stop_reason: "tool_use".to_owned(),
         };
         let done_b = StreamEvent::Done {
-            stop_reason: "tool_use".to_string(),
+            stop_reason: "tool_use".to_owned(),
         };
 
         // Then each pair is equal.

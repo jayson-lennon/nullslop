@@ -79,7 +79,7 @@ impl UiElement<AppState> for DashboardElement {
                     lines.push(Line::from(vec![
                         desc_border,
                         Span::styled(
-                            format!("   {}", desc),
+                            format!("   {desc}"),
                             Style::default().fg(Color::DarkGray),
                         ),
                     ]));
@@ -181,7 +181,7 @@ mod tests {
         let mut element = DashboardElement;
         let state = {
             let mut s = AppState::default();
-            s.dashboard.mark_starting("echo", Some("Echoes messages back".to_string()));
+            s.dashboard.mark_starting("echo", Some("Echoes messages back".to_owned()));
             s
         };
 
@@ -202,7 +202,7 @@ mod tests {
         let mut element = DashboardElement;
         let state = {
             let mut s = AppState::default();
-            s.dashboard.mark_starting("echo", Some("Echoes messages back".to_string()));
+            s.dashboard.mark_starting("echo", Some("Echoes messages back".to_owned()));
             s.dashboard.mark_running("echo", None);
             s
         };
@@ -239,8 +239,8 @@ mod tests {
         let mut element = DashboardElement;
         let state = {
             let mut s = AppState::default();
-            s.dashboard.mark_starting("echo", Some("Echoes messages back".to_string()));
-            s.dashboard.mark_starting("llm", Some("LLM streaming".to_string()));
+            s.dashboard.mark_starting("echo", Some("Echoes messages back".to_owned()));
+            s.dashboard.mark_starting("llm", Some("LLM streaming".to_owned()));
             s
         };
 
@@ -261,8 +261,8 @@ mod tests {
         let mut element = DashboardElement;
         let state = {
             let mut s = AppState::default();
-            s.dashboard.mark_starting("echo", Some("Echoes messages back".to_string()));
-            s.dashboard.mark_starting("llm", Some("LLM streaming".to_string()));
+            s.dashboard.mark_starting("echo", Some("Echoes messages back".to_owned()));
+            s.dashboard.mark_starting("llm", Some("LLM streaming".to_owned()));
             s
         };
 
@@ -297,8 +297,8 @@ mod tests {
         let mut element = DashboardElement;
         let state = {
             let mut s = AppState::default();
-            s.dashboard.mark_starting("echo", Some("Echoes messages back".to_string()));
-            s.dashboard.mark_starting("llm", Some("LLM streaming".to_string()));
+            s.dashboard.mark_starting("echo", Some("Echoes messages back".to_owned()));
+            s.dashboard.mark_starting("llm", Some("LLM streaming".to_owned()));
             s
         };
 
@@ -326,8 +326,8 @@ mod tests {
         let mut element = DashboardElement;
         let state = {
             let mut s = AppState::default();
-            s.dashboard.mark_starting("echo", Some("Echoes messages back".to_string()));
-            s.dashboard.mark_starting("llm", Some("LLM streaming".to_string()));
+            s.dashboard.mark_starting("echo", Some("Echoes messages back".to_owned()));
+            s.dashboard.mark_starting("llm", Some("LLM streaming".to_owned()));
             s.dashboard.select_next();
             s
         };

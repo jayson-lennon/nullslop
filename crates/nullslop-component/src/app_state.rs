@@ -56,7 +56,7 @@ pub struct AppState {
     /// `None` if the model list has never been refreshed.
     pub last_refreshed_at: Option<jiff::Timestamp>,
 
-    /// Persisted strategy state blobs, keyed by (session_id, strategy_id).
+    /// Persisted strategy state blobs, keyed by (`session_id`, `strategy_id`).
     /// Stored as `serde_json::Value` — the host doesn't interpret the blobs.
     /// In-memory only; actual disk/DB persistence is a follow-up.
     pub strategy_state: HashMap<(SessionId, PromptStrategyId), JsonValue>,

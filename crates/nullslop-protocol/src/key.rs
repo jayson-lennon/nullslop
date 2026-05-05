@@ -141,6 +141,7 @@ impl KeyEvent {
 ///
 /// Handles named keys (`"tab"`, `"enter"`, …), function keys (`"f1"`–`"f12"`),
 /// symbolic aliases (`"lt"`, `"gt"`, `"space"`), and bare single characters.
+#[cfg(feature = "which-key")]
 fn parse_key_name(name: &str) -> Option<Key> {
     match name {
         "tab" => Some(Key::Tab),

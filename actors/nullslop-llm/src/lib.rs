@@ -47,6 +47,7 @@ struct SessionData {
 }
 
 impl SessionData {
+    /// Creates a new [`SessionData`] with the given initial messages.
     fn new(messages: Vec<LlmMessage>) -> Self {
         Self {
             state: SessionState::Idle,
@@ -147,7 +148,7 @@ impl LlmActor {
             Event::ToolBatchCompleted { payload } => {
                 self.handle_tool_batch_completed(
                     payload.session_id.clone(),
-                    payload.results.clone(),
+                    &payload.results,
                     ctx,
                 );
             }
@@ -159,6 +160,7 @@ impl LlmActor {
     }
 
     /// Starts an LLM streaming response for a session, aborting any existing stream.
+    #[expect(clippy::too_many_lines, reason = "stream handling is inherently linear; splitting would obscure the flow")]
     fn start_stream(
         &mut self,
         session_id: SessionId,
@@ -275,8 +277,8 @@ impl LlmActor {
                             });
                         }
                         StreamEvent::ToolUseComplete {
-                            index: _,
                             tool_call,
+                            ..
                         } => {
                             accumulated_tool_calls.push(tool_call.clone());
                             let _ = sink.send_command(Command::ToolCallReceived {
@@ -343,19 +345,18 @@ impl LlmActor {
     /// accumulated data and transitions to [`AwaitingToolResults`](SessionState::AwaitingToolResults).
     /// For [`Finished`](StreamCompletedReason::Finished), the session is cleaned up.
     fn handle_stream_completed(&mut self, payload: &StreamCompleted) {
-        let session = match self.sessions.get_mut(&payload.session_id) {
-            Some(s) => s,
-            None => return,
+        let Some(session) = self.sessions.get_mut(&payload.session_id) else {
+            return;
         };
 
         match payload.reason {
             StreamCompletedReason::ToolUse => {
                 // Store accumulated data from the stream task.
                 if let Some(ref text) = payload.assistant_content {
-                    session.accumulated_text = text.clone();
+                    session.accumulated_text.clone_from(text);
                 }
                 if let Some(ref calls) = payload.tool_calls {
-                    session.accumulated_tool_calls = calls.clone();
+                    session.accumulated_tool_calls.clone_from(calls);
                 }
                 session.state = SessionState::AwaitingToolResults;
             }
@@ -373,18 +374,15 @@ impl LlmActor {
     fn handle_tool_batch_completed(
         &mut self,
         session_id: SessionId,
-        results: Vec<ToolResult>,
+        results: &[ToolResult],
         ctx: &ActorContext,
     ) {
-        let session = match self.sessions.get_mut(&session_id) {
-            Some(s) => s,
-            None => {
-                tracing::warn!(
-                    session_id = ?session_id,
-                    "received ToolBatchCompleted for unknown session"
-                );
-                return;
-            }
+        let Some(session) = self.sessions.get_mut(&session_id) else {
+            tracing::warn!(
+                session_id = ?session_id,
+                "received ToolBatchCompleted for unknown session"
+            );
+            return;
         };
 
         if session.state != SessionState::AwaitingToolResults {
@@ -397,7 +395,7 @@ impl LlmActor {
         }
 
         // Emit PushToolResult for each result.
-        for result in &results {
+        for result in results {
             let _ = ctx.send_command(Command::PushToolResult {
                 payload: PushToolResult {
                     session_id: session_id.clone(),
@@ -414,7 +412,7 @@ impl LlmActor {
         session.messages.push(assistant_message);
 
         // Build tool result messages.
-        for result in &results {
+        for result in results {
             session.messages.push(LlmMessage::Tool {
                 tool_call_id: result.tool_call_id.clone(),
                 name: result.name.clone(),
@@ -464,7 +462,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use nullslop_actor::MessageSink;
-    use nullslop_protocol::EventMsg;
+    use nullslop_protocol::EventMsg as _;
     use nullslop_protocol::tool::{ToolDefinition, ToolsRegistered};
     use nullslop_providers::FakeLlmServiceFactory;
 
@@ -507,11 +505,13 @@ mod tests {
     }
 
     impl MessageSink for RecordingSink {
+        #[expect(clippy::unwrap_in_result, reason = "test code")]
         fn send_command(&self, command: Command) -> nullslop_actor::SendResult {
             self.commands.lock().unwrap().push(command);
             Ok(())
         }
 
+        #[expect(clippy::unwrap_in_result, reason = "test code")]
         fn send_event(&self, event: Event) -> nullslop_actor::SendResult {
             self.events.lock().unwrap().push(event);
             Ok(())
@@ -548,7 +548,7 @@ mod tests {
         LlmActor::activate(ctx)
     }
 
-    /// Extracts StreamCompleted events from a list of events.
+    /// Extracts `StreamCompleted` events from a list of events.
     fn find_stream_completed(events: &[Event]) -> Vec<&StreamCompleted> {
         events
             .iter()
@@ -559,7 +559,7 @@ mod tests {
             .collect()
     }
 
-    /// Extracts StreamToken commands.
+    /// Extracts `StreamToken` commands.
     fn find_stream_tokens(commands: &[Command]) -> Vec<&StreamToken> {
         commands
             .iter()
@@ -844,7 +844,7 @@ mod tests {
         assert_eq!(completed[0].reason, StreamCompletedReason::Canceled);
 
         // And the task was removed.
-        assert!(actor.tasks.get(&session_id).is_none());
+        assert!(!actor.tasks.contains_key(&session_id));
     }
 
     // --- ToolsRegistered event tests ---

@@ -1,7 +1,7 @@
 //! LLM service trait and error types.
 
 use error_stack::Report;
-use futures::StreamExt;
+use futures::StreamExt as _;
 use futures::stream;
 use futures::stream::Stream;
 use nullslop_protocol::LlmMessage;
@@ -66,7 +66,7 @@ pub trait LlmService: Send + Sync {
         let events = text_stream.map(|result| result.map(StreamEvent::Text));
         let done = stream::once(async {
             Ok(StreamEvent::Done {
-                stop_reason: "end_turn".to_string(),
+                stop_reason: "end_turn".to_owned(),
             })
         });
         Ok(Box::pin(events.chain(done)))

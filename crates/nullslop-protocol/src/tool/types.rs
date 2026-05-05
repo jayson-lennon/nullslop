@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 /// Actors register these at startup via [`RegisterTools`](super::RegisterTools).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ToolDefinition {
-    /// The unique name of the tool (e.g., "file_read").
+    /// The unique name of the tool (e.g., "`file_read`").
     pub name: String,
     /// Human-readable description of what the tool does.
     pub description: String,

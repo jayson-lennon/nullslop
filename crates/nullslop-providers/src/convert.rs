@@ -16,8 +16,8 @@ use crate::StreamEvent;
 /// Maps each [`LlmMessage`] variant to the appropriate [`ChatMessage`]:
 /// - `System` → system message
 /// - `User` → user text message
-/// - `Assistant` with tool_calls → assistant tool-use message
-/// - `Assistant` without tool_calls → assistant text message
+/// - `Assistant` with `tool_calls` → assistant tool-use message
+/// - `Assistant` without `tool_calls` → assistant text message
 /// - `Tool` → user tool-result message (llm crate convention)
 pub(crate) fn messages_to_llm(messages: &[LlmMessage]) -> Vec<ChatMessage> {
     messages.iter().map(message_to_llm).collect()
@@ -32,7 +32,7 @@ pub(crate) fn tool_definitions_to_llm(defs: &[ToolDefinition]) -> Vec<Tool> {
 pub(crate) fn tool_call_to_llm(tc: &ToolCall) -> LlmToolCall {
     LlmToolCall {
         id: tc.id.clone(),
-        call_type: "function".to_string(),
+        call_type: "function".to_owned(),
         function: FunctionCall {
             name: tc.name.clone(),
             arguments: tc.arguments.clone(),
@@ -105,7 +105,7 @@ fn message_to_llm(msg: &LlmMessage) -> ChatMessage {
             // carrying the tool call ID in a synthetic LlmToolCall.
             let synthetic_call = LlmToolCall {
                 id: tool_call_id.clone(),
-                call_type: "function".to_string(),
+                call_type: "function".to_owned(),
                 function: FunctionCall {
                     name: name.clone(),
                     arguments: content.clone(),
@@ -123,7 +123,7 @@ fn message_to_llm(msg: &LlmMessage) -> ChatMessage {
 /// Convert a single protocol tool definition to an llm crate tool.
 fn tool_definition_to_llm(def: &ToolDefinition) -> Tool {
     Tool {
-        tool_type: "function".to_string(),
+        tool_type: "function".to_owned(),
         function: FunctionTool {
             name: def.name.clone(),
             description: def.description.clone(),
@@ -174,9 +174,9 @@ mod tests {
         let msg = LlmMessage::Assistant {
             content: String::new(),
             tool_calls: Some(vec![ToolCall {
-                id: "call_1".to_string(),
-                name: "echo".to_string(),
-                arguments: r#"{"input":"hi"}"#.to_string(),
+                id: "call_1".to_owned(),
+                name: "echo".to_owned(),
+                arguments: r#"{"input":"hi"}"#.to_owned(),
             }]),
         };
 
@@ -192,9 +192,9 @@ mod tests {
     fn convert_tool_result_message_to_chat_message() {
         // Given a protocol tool result message.
         let msg = LlmMessage::Tool {
-            tool_call_id: "call_1".to_string(),
-            name: "echo".to_string(),
-            content: "result data".to_string(),
+            tool_call_id: "call_1".to_owned(),
+            name: "echo".to_owned(),
+            content: "result data".to_owned(),
         };
 
         // When converting to ChatMessage.
@@ -232,13 +232,13 @@ mod tests {
         // Given tool definitions.
         let defs = vec![
             ToolDefinition {
-                name: "echo".to_string(),
-                description: "Echoes input".to_string(),
+                name: "echo".to_owned(),
+                description: "Echoes input".to_owned(),
                 parameters: serde_json::json!({"type": "object", "properties": {}}),
             },
             ToolDefinition {
-                name: "get_time".to_string(),
-                description: "Returns current time".to_string(),
+                name: "get_time".to_owned(),
+                description: "Returns current time".to_owned(),
                 parameters: serde_json::json!({"type": "object", "properties": {}}),
             },
         ];
@@ -256,9 +256,9 @@ mod tests {
     fn tool_call_to_llm_preserves_fields() {
         // Given a protocol tool call.
         let tc = ToolCall {
-            id: "call_123".to_string(),
-            name: "echo".to_string(),
-            arguments: r#"{"input":"hi"}"#.to_string(),
+            id: "call_123".to_owned(),
+            name: "echo".to_owned(),
+            arguments: r#"{"input":"hi"}"#.to_owned(),
         };
 
         // When converting to llm ToolCall.
@@ -275,9 +275,9 @@ mod tests {
     fn llm_tool_call_to_protocol_roundtrip() {
         // Given a protocol tool call.
         let original = ToolCall {
-            id: "call_abc".to_string(),
-            name: "file_read".to_string(),
-            arguments: r#"{"path":"/tmp/f"}"#.to_string(),
+            id: "call_abc".to_owned(),
+            name: "file_read".to_owned(),
+            arguments: r#"{"path":"/tmp/f"}"#.to_owned(),
         };
 
         // When converting to llm and back.
@@ -293,13 +293,13 @@ mod tests {
     #[test]
     fn stream_chunk_to_event_text() {
         // Given an llm StreamChunk::Text.
-        let chunk = StreamChunk::Text("hello".to_string());
+        let chunk = StreamChunk::Text("hello".to_owned());
 
         // When converting.
         let event = stream_chunk_to_event(chunk);
 
         // Then it produces a StreamEvent::Text.
-        assert_eq!(event, StreamEvent::Text("hello".to_string()));
+        assert_eq!(event, StreamEvent::Text("hello".to_owned()));
     }
 
     #[test]
@@ -307,8 +307,8 @@ mod tests {
         // Given an llm StreamChunk::ToolUseStart.
         let chunk = StreamChunk::ToolUseStart {
             index: 0,
-            id: "call_1".to_string(),
-            name: "echo".to_string(),
+            id: "call_1".to_owned(),
+            name: "echo".to_owned(),
         };
 
         // When converting.
@@ -319,8 +319,8 @@ mod tests {
             event,
             StreamEvent::ToolUseStart {
                 index: 0,
-                id: "call_1".to_string(),
-                name: "echo".to_string(),
+                id: "call_1".to_owned(),
+                name: "echo".to_owned(),
             }
         );
     }
@@ -331,11 +331,11 @@ mod tests {
         let chunk = StreamChunk::ToolUseComplete {
             index: 0,
             tool_call: LlmToolCall {
-                id: "call_1".to_string(),
-                call_type: "function".to_string(),
+                id: "call_1".to_owned(),
+                call_type: "function".to_owned(),
                 function: FunctionCall {
-                    name: "echo".to_string(),
-                    arguments: r#"{"input":"hi"}"#.to_string(),
+                    name: "echo".to_owned(),
+                    arguments: r#"{"input":"hi"}"#.to_owned(),
                 },
             },
         };
@@ -349,9 +349,9 @@ mod tests {
             StreamEvent::ToolUseComplete {
                 index: 0,
                 tool_call: ToolCall {
-                    id: "call_1".to_string(),
-                    name: "echo".to_string(),
-                    arguments: r#"{"input":"hi"}"#.to_string(),
+                    id: "call_1".to_owned(),
+                    name: "echo".to_owned(),
+                    arguments: r#"{"input":"hi"}"#.to_owned(),
                 },
             }
         );
@@ -361,7 +361,7 @@ mod tests {
     fn stream_chunk_to_event_done() {
         // Given an llm StreamChunk::Done.
         let chunk = StreamChunk::Done {
-            stop_reason: "tool_use".to_string(),
+            stop_reason: "tool_use".to_owned(),
         };
 
         // When converting.
@@ -371,7 +371,7 @@ mod tests {
         assert_eq!(
             event,
             StreamEvent::Done {
-                stop_reason: "tool_use".to_string(),
+                stop_reason: "tool_use".to_owned(),
             }
         );
     }

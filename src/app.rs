@@ -123,10 +123,7 @@ impl App {
                 load_model_cache(&core);
 
                 // Resolve mouse selection config from environment.
-                let mouse_selection = match std::env::var("NULLSLOP_MOUSE_SELECTION") {
-                    Ok(val) if val.eq_ignore_ascii_case("false") || val == "0" => false,
-                    _ => true,
-                };
+                let mouse_selection = !matches!(std::env::var("NULLSLOP_MOUSE_SELECTION"), Ok(val) if val.eq_ignore_ascii_case("false") || val == "0");
                 let tui_config =
                     nullslop_tui::config::TuiConfig::new(mouse_selection);
 

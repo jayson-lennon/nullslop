@@ -6,7 +6,7 @@ use nullslop_core::{AppCore, AppMsg};
 use nullslop_protocol::{ActiveTab, Command, Mode};
 use ratatui::Frame;
 use ratatui_tabs::TabManager;
-use ratatui_which_key::{CrosstermKeymapExt, WhichKeyState};
+use ratatui_which_key::{CrosstermKeymapExt as _, WhichKeyState};
 
 use std::mem;
 
@@ -26,6 +26,8 @@ pub type WhichKeyInstance =
     WhichKeyState<nullslop_protocol::KeyEvent, Scope, Command, crate::keymap::KeyCategory>;
 
 /// Top-level application state and event loop.
+#[expect(clippy::partial_pub_fields, reason = "only public fields exposed externally; pub(crate) fields are internal")]
+#[expect(clippy::field_scoped_visibility_modifiers, reason = "internal fields use pub(crate) for cross-module access within the crate")]
 #[derive(Debug)]
 pub struct TuiApp {
     /// Application core (bus, state, message channel).
@@ -177,7 +179,7 @@ impl TuiApp {
                             return; // consumed by selection
                         }
                         // Fall through to keymap for scroll, etc.
-                        let scope = self.which_key.scope().clone();
+                        let scope = *self.which_key.scope();
                         let Some(cmd) = self
                             .which_key
                             .keymap()
@@ -297,7 +299,7 @@ mod tests {
 
     use super::*;
 
-    /// Creates a minimal TuiApp for testing.
+    /// Creates a minimal `TuiApp` for testing.
     fn test_app() -> TuiApp {
         let services = nullslop_services::test_services::TestServices::builder().build();
         TuiApp::new(services)

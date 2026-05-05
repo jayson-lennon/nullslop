@@ -196,6 +196,7 @@ impl ChatSessionState {
         clippy::indexing_slicing,
         reason = "index comes from push_entry which always returns a valid index"
     )]
+    #[expect(clippy::expect_used, reason = "stream index is always tracked before delta arrives")]
     pub fn append_tool_call_delta(&mut self, index: usize, partial_json: &str) {
         let history_index = self
             .streaming_tool_call_indices
@@ -219,15 +220,14 @@ impl ChatSessionState {
             if let ChatEntryKind::ToolCall {
                 id: ref entry_id, ..
             } = entry.kind
+                && entry_id == id
             {
-                if entry_id == id {
-                    entry.kind = ChatEntryKind::ToolCall {
-                        id: id.to_owned(),
-                        name: name.to_owned(),
-                        arguments: arguments.to_owned(),
-                    };
-                    return;
-                }
+                entry.kind = ChatEntryKind::ToolCall {
+                    id: id.to_owned(),
+                    name: name.to_owned(),
+                    arguments: arguments.to_owned(),
+                };
+                return;
             }
         }
         // If not found (shouldn't happen), push a new entry.
@@ -277,6 +277,10 @@ impl ChatSessionState {
     }
 
     /// Clear the assembling flag (called when prompt assembly completes).
+    ///
+    /// # Panics
+    ///
+    /// Panics if called while not in the assembling state.
     pub fn finish_assembling(&mut self) {
         assert!(
             self.is_assembling,

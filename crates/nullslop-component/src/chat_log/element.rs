@@ -125,9 +125,9 @@ fn entry_to_lines(entry: &nullslop_protocol::ChatEntry) -> Vec<Line<'static>> {
             multiline_styled(text, "✦ ", "  ", Style::default().fg(Color::Cyan))
         }
         ChatEntryKind::ToolCall {
-            id: _,
             name,
             arguments,
+            ..
         } => multiline_styled(
             format!("🔧 {name}({arguments})"),
             "  ",
@@ -135,10 +135,10 @@ fn entry_to_lines(entry: &nullslop_protocol::ChatEntry) -> Vec<Line<'static>> {
             Style::default().fg(Color::Magenta),
         ),
         ChatEntryKind::ToolResult {
-            id: _,
             name,
             content,
             success,
+            ..
         } => {
             let icon = if *success { "✅" } else { "❌" };
             multiline_styled(

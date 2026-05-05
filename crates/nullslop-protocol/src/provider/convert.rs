@@ -250,7 +250,7 @@ mod tests {
                 tool_calls,
             } => {
                 assert_eq!(content, "");
-                assert_eq!(tool_calls.as_ref().map(|v| v.len()), Some(1));
+                assert_eq!(tool_calls.as_ref().map(std::vec::Vec::len), Some(1));
             }
             other => panic!("expected Assistant, got {other:?}"),
         }
