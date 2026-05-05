@@ -46,7 +46,10 @@ pub trait PromptAssembly: Send + Sync {
     /// # Errors
     ///
     /// Returns an error if assembly fails (e.g., token estimation overflow).
-    async fn assemble(&self, context: &AssemblyContext<'_>) -> Result<AssembledPrompt, Report<PromptAssemblyError>>;
+    async fn assemble(
+        &self,
+        context: &AssemblyContext<'_>,
+    ) -> Result<AssembledPrompt, Report<PromptAssemblyError>>;
 
     /// The name of this strategy, for debugging.
     fn name(&self) -> &'static str;
@@ -65,7 +68,9 @@ pub trait StrategySessionData: Send + Sync {
     /// # Errors
     ///
     /// Returns an error if deserialization fails.
-    fn deserialize(value: serde_json::Value) -> Result<Box<dyn StrategySessionData>, Report<PromptAssemblyError>>
+    fn deserialize(
+        value: serde_json::Value,
+    ) -> Result<Box<dyn StrategySessionData>, Report<PromptAssemblyError>>
     where
         Self: Sized;
 }
@@ -79,7 +84,10 @@ pub trait StrategyFactory: Send + Sync {
     /// # Errors
     ///
     /// Returns an error if strategy creation fails.
-    fn create(&self, id: &PromptStrategyId) -> Result<Box<dyn PromptAssembly>, Report<PromptAssemblyError>>;
+    fn create(
+        &self,
+        id: &PromptStrategyId,
+    ) -> Result<Box<dyn PromptAssembly>, Report<PromptAssemblyError>>;
 
     /// The name of this factory, for debugging.
     fn name(&self) -> &'static str;

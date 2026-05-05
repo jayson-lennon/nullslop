@@ -3,14 +3,12 @@
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Style};
-use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
 use ratatui_tabs::{TabManager, TabsBar, TabsStyle};
 use ratatui_which_key::{PopupPosition, WhichKey};
 
 use crate::TuiApp;
-use nullslop_component::provider_picker::entries::{filtered_entries, sorted_entries};
-use nullslop_protocol::Mode;
+use nullslop_protocol::{Mode, PickerKind};
 
 /// Minimum terminal width.
 pub const MIN_WIDTH: u16 = 40;
@@ -135,7 +133,7 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
     render_which_key(frame, &mut app.which_key);
 
     if state.mode == Mode::Picker {
-        render_provider_picker(frame, area, &state, &app.services);
+        render_picker(frame, area, &state);
     }
 }
 
@@ -160,268 +158,30 @@ fn render_which_key(frame: &mut Frame<'_>, state: &mut crate::app::WhichKeyInsta
     widget.render(buf, state);
 }
 
-/// Horizontal padding as a fraction of terminal width (10% each side = 20% total).
-const PICKER_H_PAD_FRAC: f32 = 0.10;
-/// Minimum popup width.
-const PICKER_MIN_WIDTH: u16 = 30;
-/// Maximum fraction of terminal height the picker popup may consume.
-const PICKER_MAX_HEIGHT_FRAC: f32 = 0.75;
-
-/// Computes the popup rectangle for the provider picker.
-///
-/// Uses ~20% total horizontal padding (10% each side) and positions the popup
-/// in the top third of the terminal. Height scales with terminal size.
-#[must_use]
-fn compute_popup_rect(area: Rect) -> Rect {
-    let popup_width = ((f32::from(area.width) * (1.0 - 2.0 * PICKER_H_PAD_FRAC)).ceil() as u16)
-        .max(PICKER_MIN_WIDTH)
-        .min(area.width);
-    // Layout: border(2) + input(1) + separator(1) + results(N) + footer(1)
-    // Reserve at least 4 rows for the chrome, use up to 75% of terminal height.
-    let max_body_rows = (f32::from(area.height) * PICKER_MAX_HEIGHT_FRAC).floor() as u16;
-    let popup_height = (max_body_rows + 4).min(area.height);
-
-    // Integer division is intentional — we're computing cell positions for centering.
-    #[expect(clippy::integer_division, reason = "cell positions are integers")]
-    let popup_x = area.width.saturating_sub(popup_width) / 2;
-    #[expect(clippy::integer_division, reason = "cell positions are integers")]
-    let popup_y = area.height.saturating_sub(popup_height) / 3; // bias toward top third
-
-    Rect::new(popup_x, popup_y, popup_width, popup_height)
+/// Renders the active picker overlay, dispatching on [`PickerKind`].
+fn render_picker(frame: &mut Frame<'_>, area: Rect, state: &nullslop_component::AppState) {
+    match state.active_picker_kind {
+        Some(PickerKind::Provider) => render_provider_picker(frame, area, state),
+        None => {} // Shouldn't happen — mode is Picker but no kind set
+    }
 }
 
-/// Renders the provider picker overlay.
+/// Renders the provider picker overlay using [`SelectionWidget`].
 ///
 /// Telescope-style layout: bordered popup with filter input at top,
 /// horizontal separator, scrollable results, and a footer line.
-fn render_provider_picker(
-    frame: &mut Frame<'_>,
-    area: Rect,
-    state: &nullslop_component::AppState,
-    services: &nullslop_services::Services,
-) {
-    use ratatui::widgets::{Block, Borders};
+fn render_provider_picker(frame: &mut Frame<'_>, area: Rect, state: &nullslop_component::AppState) {
+    use nullslop_component::provider_picker::entries;
+    use nullslop_selection_widget::SelectionWidget;
 
-    let popup_area = compute_popup_rect(area);
-
-    let registry = services.provider_registry().read();
-    let api_keys = services.api_keys().read();
-    let unsorted = filtered_entries(
-        &registry,
-        &api_keys,
-        &state.picker.filter,
-        state.model_cache.as_ref(),
-    );
-    let entries = sorted_entries(&unsorted, &state.picker.filter, &state.active_provider);
-
-    // Render popup block with muted border.
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .title(" Model ");
-    frame.render_widget(block, popup_area);
-
-    // Layout: input line -> separator -> results -> footer.
-    let inner = {
-        let b = Block::default().borders(Borders::ALL);
-        b.inner(popup_area)
-    };
-    let [input_area, separator_area, results_area, footer_area] = Layout::vertical([
-        Constraint::Length(1),
-        Constraint::Length(1),
-        Constraint::Min(0),
-        Constraint::Length(1),
-    ])
-    .areas(inner);
-
-    // Filter input with real cursor.
-    let prompt = "> ";
-    let filter_text = format!("{}{}", prompt, state.picker.filter);
-    let filter_paragraph = Paragraph::new(filter_text).style(Style::default().fg(Color::White));
-    frame.render_widget(filter_paragraph, input_area);
-    let cursor_col = input_area.x + (prompt.len() + state.picker.cursor_pos()) as u16;
-    frame.set_cursor_position((cursor_col, input_area.y));
-
-    // Separator line.
-    let separator = "\u{2500}".repeat(separator_area.width as usize);
-    let sep_paragraph = Paragraph::new(separator).style(Style::default().fg(Color::DarkGray));
-    frame.render_widget(sep_paragraph, separator_area);
-
-    // Results area \u2014 windowed display with scroll_offset.
-    let max_visible = results_area.height as usize;
-    let result_lines =
-        build_result_lines(&entries, &state.picker, &state.active_provider, max_visible);
-    frame.render_widget(Paragraph::new(result_lines), results_area);
-
-    // Footer: last updated timestamp + refresh hint (right-aligned).
-    let footer_line = format_footer(state.last_refreshed_at.as_ref(), footer_area.width as usize);
-    let footer_paragraph = Paragraph::new(footer_line)
-        .style(Style::default().fg(Color::DarkGray))
-        .right_aligned();
-    frame.render_widget(footer_paragraph, footer_area);
+    let footer = entries::format_footer(state.last_refreshed_at.as_ref(), area.width as usize);
+    let widget = SelectionWidget::new(&state.provider_picker)
+        .title(ratatui::text::Line::from(" Model "))
+        .footer(footer);
+    widget.render(frame, area);
 }
 
-/// Builds the result lines for the picker, using scroll offset for windowed display.
-///
-/// Empty rows are added when there are fewer entries than `max_visible`
-/// to maintain a fixed-height popup.
-fn build_result_lines<'a>(
-    entries: &[nullslop_component::provider_picker::entries::PickerEntry],
-    picker: &nullslop_component::provider_picker::ProviderPickerState,
-    active_provider: &str,
-    max_visible: usize,
-) -> Vec<ratatui::text::Line<'a>> {
-    use ratatui::style::Modifier;
-    use ratatui::text::{Line, Span};
 
-    let scroll_offset = picker.scroll_offset();
-    let selection = picker.selection;
-    let mut lines = Vec::with_capacity(max_visible);
-
-    for row in 0..max_visible {
-        let entry_idx = scroll_offset + row;
-        if let Some(entry) = entries.get(entry_idx) {
-            let is_selected = entry_idx == selection;
-            let is_active = entry.provider_id == active_provider;
-
-            let active_marker = Span::styled(
-                if is_active { "> " } else { "  " },
-                if is_active {
-                    Style::default()
-                        .fg(Color::Green)
-                        .add_modifier(Modifier::BOLD)
-                } else {
-                    Style::default()
-                },
-            );
-
-            let status = if !entry.is_available {
-                "\u{2717} " // ✗
-            } else if entry.is_alias {
-                "\u{2192} " // →
-            } else if entry.is_remote {
-                "* "
-            } else {
-                "  "
-            };
-
-            let label = if entry.is_alias {
-                format!(
-                    "{}{} \u{2192} {} ({})",
-                    status, entry.name, entry.model, entry.provider_name
-                )
-            } else {
-                format!("{}{} ({})", status, entry.model, entry.provider_name)
-            };
-
-            let label_style = if is_selected {
-                Style::default().fg(Color::White).bg(Color::DarkGray)
-            } else if !entry.is_available {
-                Style::default().fg(Color::DarkGray)
-            } else {
-                Style::default()
-            };
-
-            lines.push(Line::from(vec![
-                active_marker,
-                Span::styled(label, label_style),
-            ]));
-        } else {
-            // Empty row to maintain fixed height.
-            lines.push(Line::from(""));
-        }
-    }
-
-    lines
-}
-
-/// Formats the footer line showing refresh keybind and last update time.
-///
-/// Returns a styled [`Line`] with the pipe separator in dark gray.
-/// Format: `CTRL+R to refresh | Updated <timestamp> (<humantime> ago)`
-fn format_footer(last_refreshed_at: Option<&jiff::Timestamp>, width: usize) -> Line<'static> {
-    let gray = Style::default().fg(Color::DarkGray);
-    let orange = Style::default().fg(Color::Rgb(255, 165, 0));
-
-    if let Some(ts) = last_refreshed_at {
-        let elapsed = jiff::Timestamp::now() - *ts;
-        let secs = elapsed.total(jiff::Unit::Second).unwrap_or(0.0).round() as u64;
-        let duration = std::time::Duration::from_secs(secs);
-        let human = humantime::format_duration(duration);
-        let age_color = age_color(secs);
-
-        // Format timestamp without fractional seconds.
-        let formatted_ts = format!("{ts:.0}");
-
-        let left = "CTRL+R to refresh ";
-        let pipe = "|";
-        let mid = format!(" Updated {formatted_ts} (");
-        let right = format!("{human} ago)");
-
-        let line = Line::from(vec![
-            Span::styled(left.to_owned(), orange),
-            Span::styled(pipe.to_owned(), gray),
-            Span::styled(mid, gray),
-            Span::styled(right, Style::default().fg(age_color)),
-        ]);
-        truncate_line(line, width)
-    } else {
-        let left = "CTRL+R to refresh ";
-        let pipe = "|";
-        let right = " Updated never";
-
-        let line = Line::from(vec![
-            Span::styled(left.to_owned(), orange),
-            Span::styled(pipe.to_owned(), gray),
-            Span::styled(right.to_owned(), gray),
-        ]);
-        truncate_line(line, width)
-    }
-}
-
-/// Returns the age-based color for the "time ago" text.
-///
-/// - `<= 2 weeks` → light green
-/// - `> 2 weeks, <= 4 weeks` → yellow
-/// - `> 4 weeks` → red
-fn age_color(secs: u64) -> Color {
-    const TWO_WEEKS: u64 = 14 * 24 * 60 * 60;
-    const FOUR_WEEKS: u64 = 28 * 24 * 60 * 60;
-    if secs <= TWO_WEEKS {
-        Color::LightGreen
-    } else if secs <= FOUR_WEEKS {
-        Color::Yellow
-    } else {
-        Color::Red
-    }
-}
-
-/// Truncates a styled line to fit within `width` terminal columns.
-fn truncate_line(line: Line<'static>, width: usize) -> Line<'static> {
-    let total_len: usize = line.spans.iter().map(|s| s.content.chars().count()).sum();
-    if total_len <= width {
-        return line;
-    }
-
-    // Rebuild spans, trimming characters that overflow.
-    let mut remaining = width;
-    let mut spans = Vec::new();
-    for span in line.spans {
-        let char_count = span.content.chars().count();
-        if remaining == 0 {
-            break;
-        }
-        if char_count <= remaining {
-            spans.push(span);
-            remaining -= char_count;
-        } else {
-            let truncated: String = span.content.chars().take(remaining).collect();
-            spans.push(Span::styled(truncated, span.style));
-            remaining = 0;
-        }
-    }
-    Line::from(spans)
-}
 
 /// Renders a "terminal too small" message.
 fn render_too_small(frame: &mut Frame<'_>, area: Rect) {
@@ -526,15 +286,27 @@ mod tests {
         (nullslop_component::AppState::default(), services)
     }
 
+    /// Helper to load provider entries into the picker state.
+    fn load_picker_items(
+        state: &mut nullslop_component::AppState,
+        services: &nullslop_services::Services,
+    ) {
+        nullslop_component::provider_picker::load_provider_picker_items(services, state);
+    }
+
     #[test]
     fn render_provider_picker_shows_telescope_layout() {
         // Given a terminal area and picker state with filter "ol".
+        use nullslop_selection_widget::compute_popup_rect;
         use ratatui::Terminal;
         use ratatui::backend::TestBackend;
 
         let (mut state, services) = picker_state_with_ollama();
-        state.mode = nullslop_protocol::Mode::Picker;
-        state.picker.filter = "ol".to_owned();
+        state.mode = Mode::Picker;
+        state.active_picker_kind = Some(PickerKind::Provider);
+        load_picker_items(&mut state, &services);
+        state.provider_picker.insert_char('o');
+        state.provider_picker.insert_char('l');
 
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -543,7 +315,7 @@ mod tests {
         terminal
             .draw(|frame| {
                 let area = frame.area();
-                render_provider_picker(frame, area, &state, &services);
+                render_provider_picker(frame, area, &state);
             })
             .unwrap();
 
@@ -564,6 +336,8 @@ mod tests {
     #[test]
     fn render_provider_picker_height_scales_with_terminal() {
         // Given two terminal sizes.
+        use nullslop_selection_widget::compute_popup_rect;
+
         let small_area = Rect::new(0, 0, 80, 24);
         let large_area = Rect::new(0, 0, 80, 42);
 
@@ -582,10 +356,12 @@ mod tests {
     #[test]
     fn render_provider_picker_uses_dark_gray_border() {
         // Given a picker render.
+        use nullslop_selection_widget::compute_popup_rect;
         use ratatui::Terminal;
         use ratatui::backend::TestBackend;
 
-        let (state, services) = picker_state_with_ollama();
+        let (mut state, services) = picker_state_with_ollama();
+        load_picker_items(&mut state, &services);
 
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -593,7 +369,7 @@ mod tests {
         terminal
             .draw(|frame| {
                 let area = frame.area();
-                render_provider_picker(frame, area, &state, &services);
+                render_provider_picker(frame, area, &state);
             })
             .unwrap();
 
@@ -606,13 +382,16 @@ mod tests {
 
     #[test]
     fn render_provider_picker_shows_active_model_marker() {
-        // Given a state with active_provider set to "ollama/llama3" and empty filter.
+        // Given a state with active_provider set to "ollama/llama3" and items loaded.
+        use nullslop_selection_widget::compute_popup_rect;
         use ratatui::Terminal;
         use ratatui::backend::TestBackend;
 
         let (mut state, services) = picker_state_with_ollama();
-        state.mode = nullslop_protocol::Mode::Picker;
+        state.mode = Mode::Picker;
         state.active_provider = "ollama/llama3".to_owned();
+        state.active_picker_kind = Some(PickerKind::Provider);
+        load_picker_items(&mut state, &services);
 
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -621,7 +400,7 @@ mod tests {
         terminal
             .draw(|frame| {
                 let area = frame.area();
-                render_provider_picker(frame, area, &state, &services);
+                render_provider_picker(frame, area, &state);
             })
             .unwrap();
 

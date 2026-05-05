@@ -113,7 +113,9 @@ mod tests {
     use crate::AppState;
     use npr::Command;
     use npr::provider::StreamToken;
-    use npr::tool::{PushToolResult, ToolCall, ToolCallReceived, ToolCallStreaming, ToolUseStarted};
+    use npr::tool::{
+        PushToolResult, ToolCall, ToolCallReceived, ToolCallStreaming, ToolUseStarted,
+    };
     use npr::{ChatEntryKind, ToolResult};
     use nullslop_component_core::Bus;
     use nullslop_protocol as npr;
@@ -286,7 +288,7 @@ mod tests {
             payload: ToolCallStreaming {
                 session_id: sid.clone(),
                 index: 0,
-                partial_json: r#"{"input":"# .to_owned(),
+                partial_json: r#"{"input":"#.to_owned(),
             },
         });
         bus.process_commands(&mut state, &services);
@@ -295,7 +297,7 @@ mod tests {
             payload: ToolCallStreaming {
                 session_id: sid.clone(),
                 index: 0,
-                partial_json: r#""hello"}"# .to_owned(),
+                partial_json: r#""hello"}"#.to_owned(),
             },
         });
         bus.process_commands(&mut state, &services);
@@ -335,7 +337,7 @@ mod tests {
             payload: ToolCallStreaming {
                 session_id: sid.clone(),
                 index: 0,
-                partial_json: r#"{"input":"# .to_owned(),
+                partial_json: r#"{"input":"#.to_owned(),
             },
         });
         bus.process_commands(&mut state, &services);

@@ -148,14 +148,7 @@ fn create_actor_core(
     let mut llm_ctx = ActorContext::new("nullslop-llm", sink.clone());
     llm_ctx.set_data(llm_service.clone());
     let llm_actor = LlmActor::activate(&mut llm_ctx);
-    let llm_result = spawn_actor(
-        "nullslop-llm",
-        llm_actor,
-        &llm_ref,
-        llm_rx,
-        llm_ctx,
-        handle,
-    );
+    let llm_result = spawn_actor("nullslop-llm", llm_actor, &llm_ref, llm_rx, llm_ctx, handle);
 
     let host =
         InMemoryActorHost::from_actors_with_handle(vec![orch_result, llm_result], handle.clone());

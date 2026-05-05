@@ -7,6 +7,7 @@
 //! the message queue handler to dispatch. The input buffer is cleared immediately.
 
 use crate::AppState;
+use crate::provider_picker::handler::load_provider_picker_items;
 use npr::CommandAction;
 use npr::chat_input::{
     Clear, DeleteGrapheme, DeleteGraphemeForward, InsertChar, Interrupt, MoveCursorDown,
@@ -117,9 +118,24 @@ impl ChatInputBoxHandler {
             });
         }
 
-        // Reset picker state when entering Picker mode.
+        // Reset and load picker state when entering Picker mode.
         if cmd.mode == npr::Mode::Picker {
-            ctx.state.picker.reset();
+            // Default to provider picker if no kind is set.
+            if ctx.state.active_picker_kind.is_none() {
+                ctx.state.active_picker_kind = Some(npr::PickerKind::Provider);
+            }
+            match ctx.state.active_picker_kind {
+                Some(npr::PickerKind::Provider) => {
+                    load_provider_picker_items(ctx.services, ctx.state);
+                    ctx.state.provider_picker.reset();
+                }
+                None => {}
+            }
+        }
+
+        // When leaving picker mode, clear the kind.
+        if ctx.state.mode == npr::Mode::Picker && cmd.mode != npr::Mode::Picker {
+            ctx.state.active_picker_kind = None;
         }
 
         ctx.state.mode = cmd.mode;
@@ -209,5 +225,3 @@ impl ChatInputBoxHandler {
         CommandAction::Continue
     }
 }
-
-

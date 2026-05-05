@@ -74,8 +74,8 @@ impl PromptAssemblyHandler {
 #[cfg(test)]
 mod tests {
     use crate::AppState;
-    use npr::context::StrategyStateUpdated;
     use npr::Event;
+    use npr::context::StrategyStateUpdated;
     use nullslop_component_core::Bus;
     use nullslop_protocol as npr;
     use nullslop_services::Services;

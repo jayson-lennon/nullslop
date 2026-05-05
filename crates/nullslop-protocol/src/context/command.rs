@@ -2,11 +2,11 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::ChatEntry;
 use crate::CommandMsg;
 use crate::SessionId;
 use crate::context::PromptStrategyId;
 use crate::tool::ToolDefinition;
-use crate::ChatEntry;
 
 /// Request to assemble a prompt from the given history.
 ///

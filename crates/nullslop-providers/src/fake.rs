@@ -6,16 +6,16 @@
 //! tool loop where the first call returns tool_use and subsequent calls
 //! return end_turn.
 
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use error_stack::Report;
 use futures::stream;
-use nullslop_protocol::tool::ToolCall;
 use nullslop_protocol::LlmMessage;
+use nullslop_protocol::tool::ToolCall;
 
-use crate::service::{ChatStream, LlmService, LlmServiceFactory, LlmServiceError, ToolStream};
 use crate::StreamEvent;
+use crate::service::{ChatStream, LlmService, LlmServiceError, LlmServiceFactory, ToolStream};
 
 /// Special prompt that triggers multi-turn tool loop behavior.
 ///
@@ -153,14 +153,11 @@ impl FakeLlmService {
 
     /// Returns true if the messages contain the tool loop trigger.
     fn is_tool_loop_trigger(messages: &[LlmMessage]) -> bool {
-        Self::last_user_content(messages)
-            .is_some_and(|c| c.contains(TOOL_LOOP_TRIGGER))
+        Self::last_user_content(messages).is_some_and(|c| c.contains(TOOL_LOOP_TRIGGER))
     }
 
     /// Builds a tool_use stream for the first call of a tool loop.
-    fn build_tool_loop_first_stream(
-        &self,
-    ) -> Vec<Result<StreamEvent, Report<LlmServiceError>>> {
+    fn build_tool_loop_first_stream(&self) -> Vec<Result<StreamEvent, Report<LlmServiceError>>> {
         let mut events: Vec<Result<StreamEvent, Report<LlmServiceError>>> = Vec::new();
 
         for token in &self.tokens {
@@ -231,7 +228,9 @@ impl LlmService for FakeLlmService {
                 if call_num == 0 {
                     return Ok(Box::pin(stream::iter(self.build_tool_loop_first_stream())));
                 } else {
-                    return Ok(Box::pin(stream::iter(self.build_tool_loop_subsequent_stream())));
+                    return Ok(Box::pin(stream::iter(
+                        self.build_tool_loop_subsequent_stream(),
+                    )));
                 }
             }
         }
@@ -370,10 +369,10 @@ mod tests {
             name: "echo".to_string(),
             arguments: r#"{"input":"hi"}"#.to_string(),
         };
-        let factory =
-            FakeLlmServiceFactory::with_tool_calls(vec!["Let me check".to_string()], vec![
-                tool_call.clone(),
-            ]);
+        let factory = FakeLlmServiceFactory::with_tool_calls(
+            vec!["Let me check".to_string()],
+            vec![tool_call.clone()],
+        );
 
         // When streaming with tools.
         let service = factory.create().expect("create service");
@@ -385,9 +384,18 @@ mod tests {
 
         // Then the stream emits text, tool events, and Done with tool_use.
         assert!(matches!(&events[0], StreamEvent::Text(t) if t == "Let me check"));
-        assert!(matches!(&events[1], StreamEvent::ToolUseStart { index: 0, .. }));
-        assert!(matches!(&events[2], StreamEvent::ToolUseInputDelta { index: 0, .. }));
-        assert!(matches!(&events[3], StreamEvent::ToolUseComplete { index: 0, .. }));
+        assert!(matches!(
+            &events[1],
+            StreamEvent::ToolUseStart { index: 0, .. }
+        ));
+        assert!(matches!(
+            &events[2],
+            StreamEvent::ToolUseInputDelta { index: 0, .. }
+        ));
+        assert!(matches!(
+            &events[3],
+            StreamEvent::ToolUseComplete { index: 0, .. }
+        ));
         assert_eq!(
             events[4],
             StreamEvent::Done {
@@ -425,9 +433,18 @@ mod tests {
 
         // Then the stream emits text, tool events, and Done with tool_use.
         assert!(matches!(&events[0], StreamEvent::Text(t) if t == "Let me check"));
-        assert!(matches!(&events[1], StreamEvent::ToolUseStart { index: 0, .. }));
-        assert!(matches!(&events[2], StreamEvent::ToolUseInputDelta { index: 0, .. }));
-        assert!(matches!(&events[3], StreamEvent::ToolUseComplete { index: 0, .. }));
+        assert!(matches!(
+            &events[1],
+            StreamEvent::ToolUseStart { index: 0, .. }
+        ));
+        assert!(matches!(
+            &events[2],
+            StreamEvent::ToolUseInputDelta { index: 0, .. }
+        ));
+        assert!(matches!(
+            &events[3],
+            StreamEvent::ToolUseComplete { index: 0, .. }
+        ));
         assert_eq!(
             events[4],
             StreamEvent::Done {
@@ -506,10 +523,7 @@ mod tests {
 
         // Then the stream emits the default tokens (not the tool loop ones).
         assert_eq!(events.len(), 2);
-        assert_eq!(
-            events[0],
-            StreamEvent::Text("normal response".to_string())
-        );
+        assert_eq!(events[0], StreamEvent::Text("normal response".to_string()));
         assert_eq!(
             events[1],
             StreamEvent::Done {

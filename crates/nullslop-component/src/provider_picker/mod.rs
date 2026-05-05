@@ -2,12 +2,17 @@
 //!
 //! Manages the picker overlay state and handles keyboard input for
 //! filtering, navigating, and confirming provider selection.
+//!
+//! The picker uses [`SelectionState`]`<`[`PickerEntry`]`>` from the
+//! `nullslop-selection-widget` crate for all state management and rendering.
+//! A [`PickerKind`] dispatch on [`AppState`](crate::AppState) determines which
+//! picker is active when commands arrive.
 
 pub mod entries;
 pub mod handler;
-pub mod state;
 
-pub use state::ProviderPickerState;
+pub use entries::PickerEntry;
+pub use handler::load_provider_picker_items;
 
 use crate::{AppBus, AppUiRegistry};
 

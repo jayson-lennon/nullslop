@@ -355,9 +355,15 @@ mod tests {
         assert_eq!(PromptAssembled::TYPE_NAME, "context::PromptAssembled");
 
         // Then PromptStrategySwitched has the correct TYPE_NAME.
-        assert_eq!(PromptStrategySwitched::TYPE_NAME, "context::PromptStrategySwitched");
+        assert_eq!(
+            PromptStrategySwitched::TYPE_NAME,
+            "context::PromptStrategySwitched"
+        );
 
         // Then StrategyStateUpdated has the correct TYPE_NAME.
-        assert_eq!(StrategyStateUpdated::TYPE_NAME, "context::StrategyStateUpdated");
+        assert_eq!(
+            StrategyStateUpdated::TYPE_NAME,
+            "context::StrategyStateUpdated"
+        );
     }
 }

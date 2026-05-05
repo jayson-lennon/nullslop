@@ -192,8 +192,7 @@ impl ChatSessionState {
             .copied()
             .expect("append_tool_call_delta: no entry tracked for this stream index");
         if let ChatEntryKind::ToolCall {
-            ref mut arguments,
-            ..
+            ref mut arguments, ..
         } = self.history[history_index].kind
         {
             arguments.push_str(partial_json);
@@ -207,8 +206,7 @@ impl ChatSessionState {
     pub(crate) fn finalize_tool_call(&mut self, id: &str, name: &str, arguments: &str) {
         for entry in self.history.iter_mut().rev() {
             if let ChatEntryKind::ToolCall {
-                id: ref entry_id,
-                ..
+                id: ref entry_id, ..
             } = entry.kind
             {
                 if entry_id == id {
@@ -269,7 +267,10 @@ impl ChatSessionState {
 
     /// Clear the assembling flag (called when prompt assembly completes).
     pub fn finish_assembling(&mut self) {
-        assert!(self.is_assembling, "finish_assembling called while not assembling");
+        assert!(
+            self.is_assembling,
+            "finish_assembling called while not assembling"
+        );
         self.is_assembling = false;
     }
 
@@ -891,7 +892,10 @@ mod tests {
         let session = ChatSessionState::new();
 
         // Then the default strategy is passthrough.
-        assert_eq!(session.active_strategy(), &nullslop_protocol::PromptStrategyId::passthrough());
+        assert_eq!(
+            session.active_strategy(),
+            &nullslop_protocol::PromptStrategyId::passthrough()
+        );
     }
 
     #[test]
@@ -903,6 +907,9 @@ mod tests {
         session.switch_strategy(nullslop_protocol::PromptStrategyId::sliding_window());
 
         // Then the active strategy is updated.
-        assert_eq!(session.active_strategy(), &nullslop_protocol::PromptStrategyId::sliding_window());
+        assert_eq!(
+            session.active_strategy(),
+            &nullslop_protocol::PromptStrategyId::sliding_window()
+        );
     }
 }

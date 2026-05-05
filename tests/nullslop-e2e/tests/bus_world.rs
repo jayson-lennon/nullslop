@@ -186,10 +186,7 @@ fn given_active_provider_is(world: &mut BusWorld, provider: String) {
 #[cucumber::given(expr = "the input buffer contains {string}")]
 fn given_input_buffer_contains(world: &mut BusWorld, text: String) {
     let text = text.replace("\\n", "\n").replace("\\t", "\t");
-    world
-        .state
-        .active_chat_input_mut()
-        .replace_all(text);
+    world.state.active_chat_input_mut().replace_all(text);
 }
 
 #[cucumber::given(expr = "the app is in {word} mode")]
@@ -217,7 +214,7 @@ fn given_session_idle(_world: &mut BusWorld) {}
 
 #[cucumber::given(expr = "the picker selection is {int}")]
 fn given_picker_selection_is(world: &mut BusWorld, index: u64) {
-    world.state.picker.selection = index as usize;
+    world.state.provider_picker.set_selection(index as usize);
 }
 
 #[cucumber::given(expr = "services with an ollama provider")]
@@ -423,7 +420,10 @@ fn then_input_buffer_should_be(world: &mut BusWorld, expected: String) {
 #[cucumber::then(expr = "the input buffer should be empty")]
 fn then_input_buffer_empty(world: &mut BusWorld) {
     let text = world.state.active_chat_input().text().to_owned();
-    assert!(text.is_empty(), "expected empty input buffer, got: {text:?}");
+    assert!(
+        text.is_empty(),
+        "expected empty input buffer, got: {text:?}"
+    );
 }
 
 #[cucumber::then(expr = "the cursor position should be {int}")]
@@ -435,7 +435,11 @@ fn then_cursor_position(world: &mut BusWorld, expected: u64) {
 #[cucumber::then(expr = "the cursor row should be {int} and column should be {int}")]
 fn then_cursor_row_col(world: &mut BusWorld, row: u64, col: u64) {
     let (actual_row, actual_col) = world.state.active_chat_input().cursor_row_col();
-    assert_eq!((actual_row, actual_col), (row as usize, col as usize), "cursor row/col mismatch");
+    assert_eq!(
+        (actual_row, actual_col),
+        (row as usize, col as usize),
+        "cursor row/col mismatch"
+    );
 }
 
 #[cucumber::then(expr = "the mode should be {word}")]
@@ -447,7 +451,10 @@ fn then_mode_should_be(world: &mut BusWorld, mode: String) {
 #[cucumber::then(expr = "the chat history should contain {int} entry")]
 fn then_chat_history_count(world: &mut BusWorld, count: u64) {
     let actual = world.state.active_session().history().len();
-    assert_eq!(actual, count as usize, "expected {count} history entries, got {actual}");
+    assert_eq!(
+        actual, count as usize,
+        "expected {count} history entries, got {actual}"
+    );
 }
 
 #[cucumber::then(expr = "chat history entry {int} should be a User message with text {string}")]
@@ -467,7 +474,8 @@ fn then_app_should_quit(world: &mut BusWorld) {
 
 #[cucumber::then(expr = "a SendToLlmProvider command should have been submitted")]
 fn then_send_to_llm_submitted(world: &mut BusWorld) {
-    let found = world.has_processed_command(|c| matches!(c, npr::Command::SendToLlmProvider { .. }));
+    let found =
+        world.has_processed_command(|c| matches!(c, npr::Command::SendToLlmProvider { .. }));
     assert!(found, "expected SendToLlmProvider command");
 }
 
@@ -480,12 +488,16 @@ fn then_assemble_prompt_submitted(world: &mut BusWorld) {
 #[cucumber::then(expr = "exactly {int} AssemblePrompt command should have been submitted")]
 fn then_exactly_n_assemble_prompt(world: &mut BusWorld, count: u64) {
     let n = world.count_processed_commands(|c| matches!(c, npr::Command::AssemblePrompt { .. }));
-    assert_eq!(n, count as usize, "expected {count} AssemblePrompt commands, got {n}");
+    assert_eq!(
+        n, count as usize,
+        "expected {count} AssemblePrompt commands, got {n}"
+    );
 }
 
 #[cucumber::then(expr = "no SendToLlmProvider command should have been submitted")]
 fn then_no_send_to_llm_submitted(world: &mut BusWorld) {
-    let found = world.has_processed_command(|c| matches!(c, npr::Command::SendToLlmProvider { .. }));
+    let found =
+        world.has_processed_command(|c| matches!(c, npr::Command::SendToLlmProvider { .. }));
     assert!(!found, "did not expect SendToLlmProvider command");
 }
 
@@ -503,32 +515,51 @@ fn then_no_cancel_stream_submitted(world: &mut BusWorld) {
 
 #[cucumber::then(expr = "no commands should be pending")]
 fn then_no_pending_commands(world: &mut BusWorld) {
-    assert!(!world.bus.has_pending(), "expected no pending commands/events");
+    assert!(
+        !world.bus.has_pending(),
+        "expected no pending commands/events"
+    );
 }
 
 #[cucumber::then(expr = "the session should be sending")]
 fn then_session_sending(world: &mut BusWorld) {
-    assert!(world.state.active_session().is_sending(), "expected session to be sending");
+    assert!(
+        world.state.active_session().is_sending(),
+        "expected session to be sending"
+    );
 }
 
 #[cucumber::then(expr = "the session should be assembling")]
 fn then_session_assembling(world: &mut BusWorld) {
-    assert!(world.state.active_session().is_assembling(), "expected session to be assembling");
+    assert!(
+        world.state.active_session().is_assembling(),
+        "expected session to be assembling"
+    );
 }
 
 #[cucumber::then(expr = "the session should be idle")]
 fn then_session_idle(world: &mut BusWorld) {
-    assert!(world.state.active_session().is_idle(), "expected session to be idle");
+    assert!(
+        world.state.active_session().is_idle(),
+        "expected session to be idle"
+    );
 }
 
 #[cucumber::then(expr = "the session should not be streaming")]
 fn then_session_not_streaming(world: &mut BusWorld) {
-    assert!(!world.state.active_session().is_streaming(), "expected session to not be streaming");
+    assert!(
+        !world.state.active_session().is_streaming(),
+        "expected session to not be streaming"
+    );
 }
 
 #[cucumber::then(expr = "the message queue should be empty")]
 fn then_queue_empty(world: &mut BusWorld) {
-    assert_eq!(world.state.active_session().queue_len(), 0, "expected empty queue");
+    assert_eq!(
+        world.state.active_session().queue_len(),
+        0,
+        "expected empty queue"
+    );
 }
 
 #[cucumber::then(expr = "the message queue should contain {int} message")]
@@ -544,7 +575,8 @@ fn then_queue_count(world: &mut BusWorld, count: u64) {
 fn then_queue_entry(world: &mut BusWorld, index: u64, text: String) {
     let queue = world.state.active_session().queue();
     assert_eq!(
-        queue[(index - 1) as usize], text,
+        queue[(index - 1) as usize],
+        text,
         "queue entry {index} mismatch"
     );
 }
@@ -557,24 +589,35 @@ fn then_set_chat_input_text_submitted(world: &mut BusWorld, text: String) {
         npr::Command::SetChatInputText { payload } => payload.text == text,
         _ => false,
     });
-    assert!(found, "expected SetChatInputText command with text {text:?}");
+    assert!(
+        found,
+        "expected SetChatInputText command with text {text:?}"
+    );
 }
 
 #[cucumber::then(expr = "exactly {int} SendToLlmProvider command should have been submitted")]
 fn then_exactly_n_send_to_llm(world: &mut BusWorld, count: u64) {
     let n = world.count_processed_commands(|c| matches!(c, npr::Command::SendToLlmProvider { .. }));
-    assert_eq!(n, count as usize, "expected {count} SendToLlmProvider commands, got {n}");
+    assert_eq!(
+        n, count as usize,
+        "expected {count} SendToLlmProvider commands, got {n}"
+    );
 }
 
 #[cucumber::then(expr = "the picker filter should be {string}")]
 fn then_picker_filter_should_be(world: &mut BusWorld, expected: String) {
-    assert_eq!(world.state.picker.filter, expected, "picker filter mismatch");
+    assert_eq!(
+        world.state.provider_picker.filter(),
+        expected,
+        "picker filter mismatch"
+    );
 }
 
 #[cucumber::then(expr = "the picker selection should be {int}")]
 fn then_picker_selection_should_be(world: &mut BusWorld, expected: u64) {
     assert_eq!(
-        world.state.picker.selection, expected as usize,
+        world.state.provider_picker.selection(),
+        expected as usize,
         "picker selection mismatch"
     );
 }
@@ -582,14 +625,18 @@ fn then_picker_selection_should_be(world: &mut BusWorld, expected: u64) {
 #[cucumber::then(expr = "the picker cursor position should be {int}")]
 fn then_picker_cursor_pos(world: &mut BusWorld, expected: u64) {
     assert_eq!(
-        world.state.picker.cursor_pos(), expected as usize,
+        world.state.provider_picker.cursor_pos(),
+        expected as usize,
         "picker cursor position mismatch"
     );
 }
 
 #[cucumber::then(expr = "the active provider should be {string}")]
 fn then_active_provider_is(world: &mut BusWorld, expected: String) {
-    assert_eq!(world.state.active_provider, expected, "active provider mismatch");
+    assert_eq!(
+        world.state.active_provider, expected,
+        "active provider mismatch"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -601,9 +648,13 @@ fn when_provider_switch(world: &mut BusWorld, provider_id: String) {
     world.bus.submit_command(npr::Command::ProviderSwitch {
         payload: npr::provider::ProviderSwitch { provider_id },
     });
-    world.bus.process_commands(&mut world.state, &world.services);
+    world
+        .bus
+        .process_commands(&mut world.state, &world.services);
     world.bus.process_events(&mut world.state, &world.services);
-    world.bus.process_commands(&mut world.state, &world.services);
+    world
+        .bus
+        .process_commands(&mut world.state, &world.services);
 }
 
 #[cucumber::then(expr = "a ProviderSwitched event should have been submitted")]
@@ -644,7 +695,9 @@ fn given_model_cache_file(_world: &mut BusWorld, provider: String, models: Strin
     cache.save(&path).expect("save cache");
 }
 
-#[cucumber::when(expr = "I submit a ModelsRefreshed event for provider {string} with models {string}")]
+#[cucumber::when(
+    expr = "I submit a ModelsRefreshed event for provider {string} with models {string}"
+)]
 fn when_models_refreshed_for_provider(world: &mut BusWorld, provider: String, models: String) {
     let model_list: Vec<String> = models.split(", ").map(|s| s.to_owned()).collect();
     let results = std::collections::HashMap::from([(provider.clone(), model_list)]);
@@ -660,7 +713,10 @@ fn when_models_refreshed_for_provider(world: &mut BusWorld, provider: String, mo
 fn when_models_refreshed_2p3m(world: &mut BusWorld) {
     let results = std::collections::HashMap::from([
         ("ollama".to_owned(), vec!["llama3".to_owned()]),
-        ("openrouter".to_owned(), vec!["gpt-4".to_owned(), "claude".to_owned()]),
+        (
+            "openrouter".to_owned(),
+            vec!["gpt-4".to_owned(), "claude".to_owned()],
+        ),
     ]);
     world.submit_event_and_process(npr::Event::ModelsRefreshed {
         payload: npr::provider::ModelsRefreshed {
@@ -672,11 +728,10 @@ fn when_models_refreshed_2p3m(world: &mut BusWorld) {
 
 #[cucumber::when(expr = "I submit a ModelsRefreshed event with 1 provider and 1 model and errors")]
 fn when_models_refreshed_with_errors(world: &mut BusWorld) {
-    let results = std::collections::HashMap::from([("ollama".to_owned(), vec!["llama3".to_owned()])]);
-    let errors = std::collections::HashMap::from([(
-        "lmstudio".to_owned(),
-        "connection refused".to_owned(),
-    )]);
+    let results =
+        std::collections::HashMap::from([("ollama".to_owned(), vec!["llama3".to_owned()])]);
+    let errors =
+        std::collections::HashMap::from([("lmstudio".to_owned(), "connection refused".to_owned())]);
     world.submit_event_and_process(npr::Event::ModelsRefreshed {
         payload: npr::provider::ModelsRefreshed { results, errors },
     });
@@ -699,7 +754,11 @@ fn then_model_cache_provider_count(world: &mut BusWorld, count: u64) {
         .model_cache
         .as_ref()
         .expect("model cache should be loaded");
-    assert_eq!(cache.entries.len(), count as usize, "model cache provider count mismatch");
+    assert_eq!(
+        cache.entries.len(),
+        count as usize,
+        "model cache provider count mismatch"
+    );
 }
 
 #[cucumber::then(expr = "the model cache entry for {string} should have {int} models")]
@@ -738,12 +797,18 @@ fn when_push_user_entry(world: &mut BusWorld, text: String) {
             entry: npr::ChatEntry::user(text),
         },
     });
-    world.bus.process_commands(&mut world.state, &world.services);
+    world
+        .bus
+        .process_commands(&mut world.state, &world.services);
     world.bus.process_events(&mut world.state, &world.services);
-    world.bus.process_commands(&mut world.state, &world.services);
+    world
+        .bus
+        .process_commands(&mut world.state, &world.services);
 }
 
-#[cucumber::when(expr = "I submit PushChatEntry with an Actor message from {string} with text {string}")]
+#[cucumber::when(
+    expr = "I submit PushChatEntry with an Actor message from {string} with text {string}"
+)]
 fn when_push_actor_entry(world: &mut BusWorld, source: String, text: String) {
     world.bus.submit_command(npr::Command::PushChatEntry {
         payload: npr::chat_input::PushChatEntry {
@@ -751,9 +816,13 @@ fn when_push_actor_entry(world: &mut BusWorld, source: String, text: String) {
             entry: npr::ChatEntry::actor(source, text),
         },
     });
-    world.bus.process_commands(&mut world.state, &world.services);
+    world
+        .bus
+        .process_commands(&mut world.state, &world.services);
     world.bus.process_events(&mut world.state, &world.services);
-    world.bus.process_commands(&mut world.state, &world.services);
+    world
+        .bus
+        .process_commands(&mut world.state, &world.services);
 }
 
 #[cucumber::when(expr = "I submit ScrollUp")]
@@ -776,7 +845,9 @@ fn then_chat_entry_submitted_event(world: &mut BusWorld) {
     assert!(found, "expected ChatEntrySubmitted event");
 }
 
-#[cucumber::then(expr = "chat history entry {int} should be an Actor message from {string} with text {string}")]
+#[cucumber::then(
+    expr = "chat history entry {int} should be an Actor message from {string} with text {string}"
+)]
 fn then_history_entry_is_actor(world: &mut BusWorld, index: u64, source: String, text: String) {
     let entry = &world.state.active_session().history()[(index - 1) as usize];
     assert_eq!(
@@ -857,13 +928,15 @@ fn then_shutdown_pending_includes(world: &mut BusWorld, name: String) {
 
 #[cucumber::then(expr = "a ProceedWithShutdown command should have been submitted")]
 fn then_proceed_with_shutdown_submitted(world: &mut BusWorld) {
-    let found = world.has_processed_command(|c| matches!(c, npr::Command::ProceedWithShutdown { .. }));
+    let found =
+        world.has_processed_command(|c| matches!(c, npr::Command::ProceedWithShutdown { .. }));
     assert!(found, "expected ProceedWithShutdown command");
 }
 
 #[cucumber::then(expr = "no ProceedWithShutdown command should have been submitted")]
 fn then_no_proceed_with_shutdown_submitted(world: &mut BusWorld) {
-    let found = world.has_processed_command(|c| matches!(c, npr::Command::ProceedWithShutdown { .. }));
+    let found =
+        world.has_processed_command(|c| matches!(c, npr::Command::ProceedWithShutdown { .. }));
     assert!(!found, "did not expect ProceedWithShutdown command");
 }
 

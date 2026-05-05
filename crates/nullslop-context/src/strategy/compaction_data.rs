@@ -40,7 +40,9 @@ impl StrategySessionData for CompactionSessionData {
         serde_json::to_value(self).ok()
     }
 
-    fn deserialize(value: serde_json::Value) -> Result<Box<dyn StrategySessionData>, Report<PromptAssemblyError>>
+    fn deserialize(
+        value: serde_json::Value,
+    ) -> Result<Box<dyn StrategySessionData>, Report<PromptAssemblyError>>
     where
         Self: Sized,
     {
@@ -64,7 +66,8 @@ mod tests {
 
         // When serializing and deserializing via StrategySessionData.
         let blob = StrategySessionData::serialize(&data).expect("serialize");
-        let back = <CompactionSessionData as StrategySessionData>::deserialize(blob.clone()).expect("deserialize");
+        let back = <CompactionSessionData as StrategySessionData>::deserialize(blob.clone())
+            .expect("deserialize");
 
         // Then the data round-trips correctly (verify via re-serialization).
         let back_blob = StrategySessionData::serialize(&*back).expect("re-serialize");

@@ -3,9 +3,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::EventMsg;
-use crate::provider::LlmMessage;
-use crate::context::PromptStrategyId;
 use crate::SessionId;
+use crate::context::PromptStrategyId;
+use crate::provider::LlmMessage;
 
 /// Emitted when a prompt has been assembled and is ready to send.
 ///
@@ -97,7 +97,10 @@ mod tests {
 
     #[test]
     fn prompt_strategy_switched_has_type_name() {
-        assert_eq!(PromptStrategySwitched::TYPE_NAME, "context::PromptStrategySwitched");
+        assert_eq!(
+            PromptStrategySwitched::TYPE_NAME,
+            "context::PromptStrategySwitched"
+        );
     }
 
     #[test]
@@ -120,6 +123,9 @@ mod tests {
 
     #[test]
     fn strategy_state_updated_has_type_name() {
-        assert_eq!(StrategyStateUpdated::TYPE_NAME, "context::StrategyStateUpdated");
+        assert_eq!(
+            StrategyStateUpdated::TYPE_NAME,
+            "context::StrategyStateUpdated"
+        );
     }
 }

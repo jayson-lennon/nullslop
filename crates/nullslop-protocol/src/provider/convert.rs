@@ -1,9 +1,9 @@
 //! Conversion from chat entries to LLM messages.
 
 use super::message::LlmMessage;
-use crate::tool::ToolCall;
 use crate::ChatEntry;
 use crate::ChatEntryKind;
+use crate::tool::ToolCall;
 
 /// Convert chat history entries to LLM messages.
 ///
@@ -241,7 +241,9 @@ mod tests {
 
         // Then four messages are produced: user, assistant+tool_calls, tool, assistant.
         assert_eq!(messages.len(), 4);
-        assert!(matches!(&messages[0], LlmMessage::User { content } if content == "what time is it?"));
+        assert!(
+            matches!(&messages[0], LlmMessage::User { content } if content == "what time is it?")
+        );
         match &messages[1] {
             LlmMessage::Assistant {
                 content,
@@ -252,10 +254,14 @@ mod tests {
             }
             other => panic!("expected Assistant, got {other:?}"),
         }
-        assert!(matches!(&messages[2], LlmMessage::Tool { tool_call_id, name, content }
-            if tool_call_id == "call_1" && name == "get_time" && content == "12:00"));
-        assert!(matches!(&messages[3], LlmMessage::Assistant { content, tool_calls }
-            if content == "It's 12:00!" && tool_calls.is_none()));
+        assert!(
+            matches!(&messages[2], LlmMessage::Tool { tool_call_id, name, content }
+            if tool_call_id == "call_1" && name == "get_time" && content == "12:00")
+        );
+        assert!(
+            matches!(&messages[3], LlmMessage::Assistant { content, tool_calls }
+            if content == "It's 12:00!" && tool_calls.is_none())
+        );
     }
 
     #[test]

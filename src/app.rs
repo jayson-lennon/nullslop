@@ -12,13 +12,12 @@ use nullslop_actor_host::{ActorHostService, InMemoryActorHost, spawn_actor};
 use nullslop_cli::Cli;
 use nullslop_component::AppState;
 use nullslop_component_core::Bus;
+use nullslop_context::{DefaultStrategyFactory, StrategyFactory};
+use nullslop_context_actor::PromptAssemblyActor;
 use nullslop_core::{ActorMessageSink, AppCore, AppMsg, State};
 use nullslop_echo::EchoActor;
 use nullslop_llm::LlmActor;
 use nullslop_llm_discover::DiscoverActor;
-use nullslop_context_actor::PromptAssemblyActor;
-use nullslop_context::{DefaultStrategyFactory, StrategyFactory};
-use nullslop_tool_orchestrator::ToolOrchestratorActor;
 use nullslop_protocol::Event;
 use nullslop_protocol::actor::{ActorStarted, ActorStarting};
 use nullslop_providers::ApiKeys;
@@ -33,6 +32,7 @@ use nullslop_providers::ProviderRegistry;
 use nullslop_providers::ProviderRegistryService;
 use nullslop_providers::cache_path;
 use nullslop_services::Services;
+use nullslop_tool_orchestrator::ToolOrchestratorActor;
 use tokio::runtime::Runtime;
 use wherror::Error;
 
@@ -285,9 +285,7 @@ fn create_core_with_actor_host(
         kanal::unbounded::<ActorEnvelope<nullslop_context_actor::ContextDirectMsg>>();
     let ctx_ref = ActorRef::new(ctx_tx);
     let mut prompt_ctx = ActorContext::new("nullslop-context-actor", sink.clone());
-    prompt_ctx.set_data::<Box<dyn StrategyFactory>>(
-        Box::new(DefaultStrategyFactory),
-    );
+    prompt_ctx.set_data::<Box<dyn StrategyFactory>>(Box::new(DefaultStrategyFactory));
     let prompt_actor = PromptAssemblyActor::activate(&mut prompt_ctx);
     let prompt_result = spawn_actor(
         "nullslop-context-actor",
@@ -351,7 +349,13 @@ fn create_core_with_actor_host(
     });
 
     let host = InMemoryActorHost::from_actors_with_handle(
-        vec![echo_result, llm_result, discover_result, orch_result, prompt_result],
+        vec![
+            echo_result,
+            llm_result,
+            discover_result,
+            orch_result,
+            prompt_result,
+        ],
         handle.clone(),
     );
     let host_arc: Arc<dyn nullslop_actor_host::ActorHost> = Arc::new(host);

@@ -6,8 +6,8 @@
 
 use llm::chat::{ChatMessage, ChatRole, FunctionTool, MessageType, StreamChunk, Tool};
 use llm::{FunctionCall, ToolCall as LlmToolCall};
-use nullslop_protocol::tool::{ToolCall, ToolDefinition};
 use nullslop_protocol::LlmMessage;
+use nullslop_protocol::tool::{ToolCall, ToolDefinition};
 
 use crate::StreamEvent;
 
@@ -53,11 +53,9 @@ pub(crate) fn llm_tool_call_to_protocol(tc: &LlmToolCall) -> ToolCall {
 pub(crate) fn stream_chunk_to_event(chunk: StreamChunk) -> StreamEvent {
     match chunk {
         StreamChunk::Text(text) => StreamEvent::Text(text),
-        StreamChunk::ToolUseStart { index, id, name } => StreamEvent::ToolUseStart {
-            index,
-            id,
-            name,
-        },
+        StreamChunk::ToolUseStart { index, id, name } => {
+            StreamEvent::ToolUseStart { index, id, name }
+        }
         StreamChunk::ToolUseInputDelta {
             index,
             partial_json,

@@ -91,4 +91,3 @@ fn format_refresh_summary(
 
     msg
 }
-

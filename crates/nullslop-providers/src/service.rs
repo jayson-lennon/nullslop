@@ -1,11 +1,11 @@
 //! LLM service trait and error types.
 
 use error_stack::Report;
+use futures::StreamExt;
 use futures::stream;
 use futures::stream::Stream;
-use futures::StreamExt;
-use nullslop_protocol::tool::ToolDefinition;
 use nullslop_protocol::LlmMessage;
+use nullslop_protocol::tool::ToolDefinition;
 use std::pin::Pin;
 use wherror::Error;
 
@@ -32,7 +32,8 @@ pub enum LlmServiceError {
 pub type ChatStream = Pin<Box<dyn Stream<Item = Result<String, Report<LlmServiceError>>> + Send>>;
 
 /// A streaming LLM chat response with tool support.
-pub type ToolStream = Pin<Box<dyn Stream<Item = Result<StreamEvent, Report<LlmServiceError>>> + Send>>;
+pub type ToolStream =
+    Pin<Box<dyn Stream<Item = Result<StreamEvent, Report<LlmServiceError>>> + Send>>;
 
 /// Trait for a single LLM streaming chat session.
 ///

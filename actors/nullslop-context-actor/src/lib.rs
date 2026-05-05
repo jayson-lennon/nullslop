@@ -11,7 +11,10 @@ use std::collections::HashMap;
 
 use nullslop_actor::{Actor, ActorContext, ActorEnvelope, SystemMessage};
 use nullslop_context::{AssemblyContext, DefaultStrategyFactory, PromptAssembly, StrategyFactory};
-use nullslop_protocol::context::{AssemblePrompt, PromptAssembled, PromptStrategySwitched, RestoreStrategyState, SwitchPromptStrategy};
+use nullslop_protocol::context::{
+    AssemblePrompt, PromptAssembled, PromptStrategySwitched, RestoreStrategyState,
+    SwitchPromptStrategy,
+};
 use nullslop_protocol::tool::ToolsRegistered;
 use nullslop_protocol::{Event, SessionId, ToolDefinition};
 
@@ -33,7 +36,8 @@ impl Actor for PromptAssemblyActor {
         ctx.subscribe_command::<SwitchPromptStrategy>();
         ctx.subscribe_command::<RestoreStrategyState>();
         ctx.subscribe_event::<ToolsRegistered>();
-        let factory = ctx.take_data::<Box<dyn StrategyFactory>>()
+        let factory = ctx
+            .take_data::<Box<dyn StrategyFactory>>()
             .unwrap_or_else(|| Box::new(DefaultStrategyFactory));
         Self {
             strategies: HashMap::new(),
@@ -42,11 +46,7 @@ impl Actor for PromptAssemblyActor {
         }
     }
 
-    async fn handle(
-        &mut self,
-        msg: ActorEnvelope<Self::Message>,
-        ctx: &ActorContext,
-    ) {
+    async fn handle(&mut self, msg: ActorEnvelope<Self::Message>, ctx: &ActorContext) {
         match msg {
             ActorEnvelope::Command(cmd) => {
                 self.handle_command(&cmd, ctx).await;
@@ -94,7 +94,10 @@ impl PromptAssemblyActor {
 
     fn ensure_strategy(&mut self, session_id: &SessionId) {
         if !self.strategies.contains_key(session_id) {
-            self.strategies.insert(session_id.clone(), Box::new(nullslop_context::PassthroughStrategy));
+            self.strategies.insert(
+                session_id.clone(),
+                Box::new(nullslop_context::PassthroughStrategy),
+            );
         }
     }
 
@@ -112,7 +115,10 @@ impl PromptAssemblyActor {
                     .filter(|td| !cmd.tools.iter().any(|t| t.name == td.name)),
             )
             .collect();
-        let strategy = self.strategies.get(&session_id).expect("strategy was just ensured");
+        let strategy = self
+            .strategies
+            .get(&session_id)
+            .expect("strategy was just ensured");
         let context = AssemblyContext {
             history: &cmd.history,
             tools: &tools,
@@ -205,17 +211,11 @@ mod tests {
     }
 
     impl MessageSink for RecordingSink {
-        fn send_command(
-            &self,
-            _command: nullslop_protocol::Command,
-        ) -> nullslop_actor::SendResult {
+        fn send_command(&self, _command: nullslop_protocol::Command) -> nullslop_actor::SendResult {
             Ok(())
         }
 
-        fn send_event(
-            &self,
-            event: Event,
-        ) -> nullslop_actor::SendResult {
+        fn send_event(&self, event: Event) -> nullslop_actor::SendResult {
             self.events.lock().expect("lock").push(event);
             Ok(())
         }
@@ -508,7 +508,9 @@ mod tests {
         assert!(assembled.messages.len() < 100);
         assert_eq!(
             assembled.system_prompt.as_deref(),
-            Some("Context was compacted to fit within the token budget. Earlier conversation history was summarized.")
+            Some(
+                "Context was compacted to fit within the token budget. Earlier conversation history was summarized."
+            )
         );
     }
 

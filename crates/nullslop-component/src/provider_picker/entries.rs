@@ -1,8 +1,12 @@
-//! Filtered provider entries for the picker.
+//! Provider entries for the picker.
 //!
-//! Shared between the picker handler (component layer) and the picker
-//! renderer (TUI layer). Computes the list of providers and aliases
-//! matching the current filter text.
+//! Builds the list of providers and aliases available for selection,
+//! and implements [`PickerItem`] so [`SelectionState`] can fuzzy-filter
+//! and render them. Also provides footer formatting utilities for the
+//! provider picker overlay.
+//!
+//! [`PickerItem`]: nullslop_selection_widget::PickerItem
+//! [`SelectionState`]: nullslop_selection_widget::SelectionState
 
 /// A provider entry ready for display in the picker.
 #[derive(Debug, Clone)]
@@ -27,11 +31,66 @@ pub struct PickerEntry {
     pub is_available: bool,
     /// Whether this entry was discovered from a remote provider (not in static config).
     pub is_remote: bool,
+    /// Whether this entry is the currently active provider.
+    pub is_active: bool,
+}
+
+impl nullslop_selection_widget::PickerItem for PickerEntry {
+    fn display_label(&self) -> &str {
+        // Use model as the primary label. Fuzzy matching via SelectionState
+        // searches this plus name/backend through the matcher.
+        &self.model
+    }
+
+    fn render_row(&self, is_selected: bool) -> ratatui::text::Line<'static> {
+        use ratatui::style::{Color, Modifier, Style};
+        use ratatui::text::{Line, Span};
+
+        let active_marker = Span::styled(
+            if self.is_active { "> " } else { "  " },
+            if self.is_active {
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+            },
+        );
+
+        let status = if !self.is_available {
+            "\u{2717} " // ✗
+        } else if self.is_alias {
+            "\u{2192} " // →
+        } else if self.is_remote {
+            "* "
+        } else {
+            "  "
+        };
+
+        let label = if self.is_alias {
+            format!(
+                "{}{} → {} ({})",
+                status, self.name, self.model, self.provider_name
+            )
+        } else {
+            format!("{}{} ({})", status, self.model, self.provider_name)
+        };
+
+        let label_style = if is_selected {
+            Style::default().fg(Color::White).bg(Color::DarkGray)
+        } else if !self.is_available {
+            Style::default().fg(Color::DarkGray)
+        } else {
+            Style::default()
+        };
+
+        Line::from(vec![active_marker, Span::styled(label, label_style)])
+    }
 }
 
 /// Reorders entries so that available entries appear first (sorted by model name),
 /// followed by unavailable entries (sorted by model name). When `filter` is empty,
-/// the entry matching `active_provider` is promoted to the very top.
+/// the entry matching `active_provider` is promoted to the very top and marked active.
 ///
 /// `active_provider` is in `{name}/{model}` format (e.g., `"ollama/llama3"`).
 pub fn sorted_entries(
@@ -67,25 +126,136 @@ pub fn sorted_entries(
         available[0..=pos].rotate_right(1);
     }
 
+    // Mark active entries.
+    for entry in &mut available {
+        entry.is_active = entry.provider_id == active_provider;
+    }
+    // Unavailable entries are never active.
+    // (is_active defaults to false from load_provider_entries)
+
     // Merge: available first, then unavailable.
     available.extend(unavailable);
     available
 }
+
+/// Formats the footer line showing refresh keybind and last update time.
 ///
-/// Reads the provider registry, API keys, filter text, and optional model cache
-/// to produce a list of matching entries. Providers and aliases are included if
-/// their name, backend, or model contains the filter text (case-insensitive).
+/// Returns a styled [`Line`] with the pipe separator in dark gray.
+/// Format: `CTRL+R to refresh | Updated <timestamp> (<humantime> ago)`
+pub fn format_footer(
+    last_refreshed_at: Option<&jiff::Timestamp>,
+    width: usize,
+) -> ratatui::text::Line<'static> {
+    use ratatui::style::{Color, Style};
+    use ratatui::text::{Line, Span};
+
+    let gray = Style::default().fg(Color::DarkGray);
+    let orange = Style::default().fg(Color::Rgb(255, 165, 0));
+
+    if let Some(ts) = last_refreshed_at {
+        let elapsed = jiff::Timestamp::now() - *ts;
+        let secs = elapsed.total(jiff::Unit::Second).unwrap_or(0.0).round() as u64;
+        let duration = std::time::Duration::from_secs(secs);
+        let human = humantime::format_duration(duration);
+        let age_color = age_color(secs);
+
+        // Format timestamp without fractional seconds.
+        let formatted_ts = format!("{ts:.0}");
+
+        let left = "CTRL+R to refresh ";
+        let pipe = "|";
+        let mid = format!(" Updated {formatted_ts} (");
+        let right = format!("{human} ago)");
+
+        let line = Line::from(vec![
+            Span::styled(left.to_owned(), orange),
+            Span::styled(pipe.to_owned(), gray),
+            Span::styled(mid, gray),
+            Span::styled(right, Style::default().fg(age_color)),
+        ]);
+        truncate_line(line, width)
+    } else {
+        let left = "CTRL+R to refresh ";
+        let pipe = "|";
+        let right = " Updated never";
+
+        let line = Line::from(vec![
+            Span::styled(left.to_owned(), orange),
+            Span::styled(pipe.to_owned(), gray),
+            Span::styled(right.to_owned(), gray),
+        ]);
+        truncate_line(line, width)
+    }
+}
+
+/// Returns the age-based color for the "time ago" text.
+///
+/// - `<= 2 weeks` → light green
+/// - `> 2 weeks, <= 4 weeks` → yellow
+/// - `> 4 weeks` → red
+pub fn age_color(secs: u64) -> ratatui::style::Color {
+    use ratatui::style::Color;
+
+    const TWO_WEEKS: u64 = 14 * 24 * 60 * 60;
+    const FOUR_WEEKS: u64 = 28 * 24 * 60 * 60;
+    if secs <= TWO_WEEKS {
+        Color::LightGreen
+    } else if secs <= FOUR_WEEKS {
+        Color::Yellow
+    } else {
+        Color::Red
+    }
+}
+
+/// Truncates a styled line to fit within `width` terminal columns.
+pub fn truncate_line(
+    line: ratatui::text::Line<'static>,
+    width: usize,
+) -> ratatui::text::Line<'static> {
+    use ratatui::text::{Line, Span};
+
+    let total_len: usize = line.spans.iter().map(|s| s.content.chars().count()).sum();
+    if total_len <= width {
+        return line;
+    }
+
+    // Rebuild spans, trimming characters that overflow.
+    let mut remaining = width;
+    let mut spans = Vec::new();
+    for span in line.spans {
+        let char_count = span.content.chars().count();
+        if remaining == 0 {
+            break;
+        }
+        if char_count <= remaining {
+            spans.push(span);
+            remaining -= char_count;
+        } else {
+            let truncated: String = span.content.chars().take(remaining).collect();
+            spans.push(Span::styled(truncated, span.style));
+            remaining = 0;
+        }
+    }
+    Line::from(spans)
+}
+
+/// Loads all provider and alias entries from the registry, ready for `set_items()`.
+///
+/// Reads the provider registry, API keys, and optional model cache
+/// to produce the full list of entries. No filtering is applied — that is
+/// handled by [`SelectionState`] via fuzzy matching on [`PickerItem::display_label`].
 ///
 /// Remote models from the cache are merged in after static entries. Static entries
 /// win on collision (same `{provider_name}/{model}` key). Remote entries are marked
 /// with `is_remote: true`.
-pub fn filtered_entries(
+///
+/// [`SelectionState`]: nullslop_selection_widget::SelectionState
+/// [`PickerItem`]: nullslop_selection_widget::PickerItem
+pub fn load_provider_entries(
     registry: &nullslop_providers::ProviderRegistry,
     api_keys: &nullslop_providers::ApiKeys,
-    filter: &str,
     model_cache: Option<&nullslop_providers::ModelCache>,
 ) -> Vec<PickerEntry> {
-    let filter_lower = filter.to_lowercase();
     let mut entries = Vec::new();
 
     // Collect static provider IDs for collision detection.
@@ -102,17 +272,11 @@ pub fn filtered_entries(
             alias_target: None,
             is_available: registry.is_available(&provider.id.clone(), api_keys),
             is_remote: false,
+            is_active: false,
         };
 
         static_ids.insert(entry.provider_id.clone());
-
-        if filter_lower.is_empty()
-            || entry.name.to_lowercase().contains(&filter_lower)
-            || entry.backend.to_lowercase().contains(&filter_lower)
-            || entry.model.to_lowercase().contains(&filter_lower)
-        {
-            entries.push(entry);
-        }
+        entries.push(entry);
     }
 
     for alias in registry.aliases() {
@@ -129,15 +293,10 @@ pub fn filtered_entries(
             alias_target: resolved.map(|r| r.id.to_string()),
             is_available,
             is_remote: false,
+            is_active: false,
         };
 
-        if filter_lower.is_empty()
-            || entry.name.to_lowercase().contains(&filter_lower)
-            || entry.backend.to_lowercase().contains(&filter_lower)
-            || entry.model.to_lowercase().contains(&filter_lower)
-        {
-            entries.push(entry);
-        }
+        entries.push(entry);
     }
 
     // Merge remote models from cache.
@@ -182,15 +341,10 @@ pub fn filtered_entries(
                     alias_target: None,
                     is_available,
                     is_remote: true,
+                    is_active: false,
                 };
 
-                if filter_lower.is_empty()
-                    || entry.name.to_lowercase().contains(&filter_lower)
-                    || entry.backend.to_lowercase().contains(&filter_lower)
-                    || entry.model.to_lowercase().contains(&filter_lower)
-                {
-                    entries.push(entry);
-                }
+                entries.push(entry);
             }
         }
     }
@@ -239,15 +393,15 @@ mod tests {
     }
 
     #[test]
-    fn filtered_entries_returns_all_providers_with_empty_filter() {
+    fn load_provider_entries_returns_all_providers() {
         // Given a registry with one keyless and one key-required provider (key present).
         let config = make_config(vec![ollama_entry(), openrouter_entry()], vec![], None);
         let registry = ProviderRegistry::from_config(config).expect("registry");
         let mut api_keys = ApiKeys::new();
         api_keys.insert("OPENROUTER_API_KEY".to_owned(), "sk-test".to_owned());
 
-        // When filtering with an empty string.
-        let entries = filtered_entries(&registry, &api_keys, "", None);
+        // When loading provider entries.
+        let entries = load_provider_entries(&registry, &api_keys, None);
 
         // Then both providers are returned with correct availability.
         assert_eq!(entries.len(), 2);
@@ -262,74 +416,28 @@ mod tests {
     }
 
     #[test]
-    fn filtered_entries_filters_by_name() {
+    fn load_provider_entries_includes_all_regardless_of_text() {
         // Given a registry with "ollama" and "openrouter".
         let config = make_config(vec![ollama_entry(), openrouter_entry()], vec![], None);
         let registry = ProviderRegistry::from_config(config).expect("registry");
         let api_keys = ApiKeys::new();
 
-        // When filtering by name fragment "oll".
-        let entries = filtered_entries(&registry, &api_keys, "oll", None);
+        // When loading entries (no filter — returns everything).
+        let entries = load_provider_entries(&registry, &api_keys, None);
 
-        // Then only the "ollama" entry is returned.
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].name, "ollama");
+        // Then both providers are returned.
+        assert_eq!(entries.len(), 2);
     }
 
     #[test]
-    fn filtered_entries_filters_by_backend() {
-        // Given a registry with providers using different backends.
-        let config = make_config(vec![ollama_entry(), openrouter_entry()], vec![], None);
-        let registry = ProviderRegistry::from_config(config).expect("registry");
-        let api_keys = ApiKeys::new();
-
-        // When filtering by backend fragment "openr".
-        let entries = filtered_entries(&registry, &api_keys, "openr", None);
-
-        // Then only the "openrouter" entry is returned.
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].name, "openrouter");
-    }
-
-    #[test]
-    fn filtered_entries_filters_by_model() {
-        // Given a registry with providers using different models.
-        let config = make_config(vec![ollama_entry(), openrouter_entry()], vec![], None);
-        let registry = ProviderRegistry::from_config(config).expect("registry");
-        let api_keys = ApiKeys::new();
-
-        // When filtering by model fragment "gpt".
-        let entries = filtered_entries(&registry, &api_keys, "gpt", None);
-
-        // Then only the "openrouter" entry (model "gpt-4") is returned.
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].name, "openrouter");
-    }
-
-    #[test]
-    fn filtered_entries_filter_is_case_insensitive() {
-        // Given a registry with "ollama".
-        let config = make_config(vec![ollama_entry()], vec![], None);
-        let registry = ProviderRegistry::from_config(config).expect("registry");
-        let api_keys = ApiKeys::new();
-
-        // When filtering with uppercase "OLLA".
-        let entries = filtered_entries(&registry, &api_keys, "OLLA", None);
-
-        // Then "ollama" is matched.
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].name, "ollama");
-    }
-
-    #[test]
-    fn filtered_entries_marks_key_required_unavailable_when_key_missing() {
+    fn load_provider_entries_marks_key_required_unavailable_when_key_missing() {
         // Given a registry with a key-required provider and no API key.
         let config = make_config(vec![openrouter_entry()], vec![], None);
         let registry = ProviderRegistry::from_config(config).expect("registry");
         let api_keys = ApiKeys::new();
 
-        // When computing filtered entries.
-        let entries = filtered_entries(&registry, &api_keys, "", None);
+        // When loading provider entries.
+        let entries = load_provider_entries(&registry, &api_keys, None);
 
         // Then the provider is marked unavailable.
         assert_eq!(entries.len(), 1);
@@ -337,15 +445,15 @@ mod tests {
     }
 
     #[test]
-    fn filtered_entries_marks_key_required_available_when_key_present() {
+    fn load_provider_entries_marks_key_required_available_when_key_present() {
         // Given a registry with a key-required provider and the key set.
         let config = make_config(vec![openrouter_entry()], vec![], None);
         let registry = ProviderRegistry::from_config(config).expect("registry");
         let mut api_keys = ApiKeys::new();
         api_keys.insert("OPENROUTER_API_KEY".to_owned(), "sk-test".to_owned());
 
-        // When computing filtered entries.
-        let entries = filtered_entries(&registry, &api_keys, "", None);
+        // When loading provider entries.
+        let entries = load_provider_entries(&registry, &api_keys, None);
 
         // Then the provider is marked available.
         assert_eq!(entries.len(), 1);
@@ -353,14 +461,14 @@ mod tests {
     }
 
     #[test]
-    fn filtered_entries_marks_keyless_always_available() {
+    fn load_provider_entries_marks_keyless_always_available() {
         // Given a registry with a keyless provider and no API keys.
         let config = make_config(vec![ollama_entry()], vec![], None);
         let registry = ProviderRegistry::from_config(config).expect("registry");
         let api_keys = ApiKeys::new();
 
-        // When computing filtered entries.
-        let entries = filtered_entries(&registry, &api_keys, "", None);
+        // When loading provider entries.
+        let entries = load_provider_entries(&registry, &api_keys, None);
 
         // Then the keyless provider is always available.
         assert_eq!(entries.len(), 1);
@@ -368,7 +476,7 @@ mod tests {
     }
 
     #[test]
-    fn filtered_entries_includes_aliases() {
+    fn load_provider_entries_includes_aliases() {
         // Given a registry with a provider and an alias.
         let config = make_config(
             vec![ollama_entry()],
@@ -381,8 +489,8 @@ mod tests {
         let registry = ProviderRegistry::from_config(config).expect("registry");
         let api_keys = ApiKeys::new();
 
-        // When computing filtered entries.
-        let entries = filtered_entries(&registry, &api_keys, "", None);
+        // When loading provider entries.
+        let entries = load_provider_entries(&registry, &api_keys, None);
 
         // Then both the provider and alias are present.
         assert_eq!(entries.len(), 2);
@@ -396,7 +504,7 @@ mod tests {
     }
 
     #[test]
-    fn filtered_entries_alias_inherits_availability() {
+    fn load_provider_entries_alias_inherits_availability() {
         // Given a registry with an alias pointing to an available provider
         // and an alias pointing to an unavailable provider.
         let config = make_config(
@@ -416,8 +524,8 @@ mod tests {
         let registry = ProviderRegistry::from_config(config).expect("registry");
         let api_keys = ApiKeys::new(); // No keys — openrouter is unavailable.
 
-        // When computing filtered entries.
-        let entries = filtered_entries(&registry, &api_keys, "", None);
+        // When loading provider entries.
+        let entries = load_provider_entries(&registry, &api_keys, None);
 
         // Then the "fast" alias (→ollama) is available and "cloud" alias (→openrouter) is not.
         let fast = entries.iter().find(|e| e.name == "fast").expect("fast");
@@ -426,24 +534,10 @@ mod tests {
         assert!(!cloud.is_available);
     }
 
-    #[test]
-    fn filtered_entries_returns_empty_for_no_match() {
-        // Given a registry with providers.
-        let config = make_config(vec![ollama_entry()], vec![], None);
-        let registry = ProviderRegistry::from_config(config).expect("registry");
-        let api_keys = ApiKeys::new();
-
-        // When filtering with a string that matches nothing.
-        let entries = filtered_entries(&registry, &api_keys, "xyzzy", None);
-
-        // Then no entries are returned.
-        assert!(entries.is_empty());
-    }
-
     // --- Remote model cache tests ---
 
     #[test]
-    fn filtered_entries_merges_remote_models_from_cache() {
+    fn load_provider_entries_merges_remote_models_from_cache() {
         // Given a registry with one keyless provider (ollama/llama3).
         let config = make_config(vec![ollama_entry()], vec![], None);
         let registry = ProviderRegistry::from_config(config).expect("registry");
@@ -455,8 +549,8 @@ mod tests {
             .entries
             .insert("ollama".to_owned(), vec!["mistral".to_owned()]);
 
-        // When computing filtered entries with the cache.
-        let entries = filtered_entries(&registry, &api_keys, "", Some(&cache));
+        // When loading provider entries with the cache.
+        let entries = load_provider_entries(&registry, &api_keys, Some(&cache));
 
         // Then both static and remote entries are present.
         assert_eq!(entries.len(), 2);
@@ -475,7 +569,7 @@ mod tests {
     }
 
     #[test]
-    fn filtered_entries_static_wins_on_collision_with_cache() {
+    fn load_provider_entries_static_wins_on_collision_with_cache() {
         // Given a registry with ollama/llama3.
         let config = make_config(vec![ollama_entry()], vec![], None);
         let registry = ProviderRegistry::from_config(config).expect("registry");
@@ -488,8 +582,8 @@ mod tests {
             vec!["llama3".to_owned(), "mistral".to_owned()],
         );
 
-        // When computing filtered entries.
-        let entries = filtered_entries(&registry, &api_keys, "", Some(&cache));
+        // When loading provider entries.
+        let entries = load_provider_entries(&registry, &api_keys, Some(&cache));
 
         // Then the static entry is kept (not duplicated) and only the new remote model is added.
         let llama3_entries: Vec<_> = entries.iter().filter(|e| e.model == "llama3").collect();
@@ -502,7 +596,7 @@ mod tests {
     }
 
     #[test]
-    fn filtered_entries_marks_remote_unavailable_when_key_missing() {
+    fn load_provider_entries_marks_remote_unavailable_when_key_missing() {
         // Given a registry with a key-required provider (openrouter).
         let config = make_config(vec![openrouter_entry()], vec![], None);
         let registry = ProviderRegistry::from_config(config).expect("registry");
@@ -514,8 +608,8 @@ mod tests {
             .entries
             .insert("openrouter".to_owned(), vec!["claude-3".to_owned()]);
 
-        // When computing filtered entries.
-        let entries = filtered_entries(&registry, &api_keys, "", Some(&cache));
+        // When loading provider entries.
+        let entries = load_provider_entries(&registry, &api_keys, Some(&cache));
 
         // Then the remote model is marked unavailable (no API key).
         let remote = entries
@@ -527,7 +621,7 @@ mod tests {
     }
 
     #[test]
-    fn filtered_entries_remote_models_filtered_by_text() {
+    fn load_provider_entries_includes_all_remote_models() {
         // Given a registry and cache with remote models.
         let config = make_config(vec![ollama_entry()], vec![], None);
         let registry = ProviderRegistry::from_config(config).expect("registry");
@@ -539,13 +633,11 @@ mod tests {
             vec!["mistral".to_owned(), "codellama".to_owned()],
         );
 
-        // When filtering by "code".
-        let entries = filtered_entries(&registry, &api_keys, "code", Some(&cache));
+        // When loading entries (no filter — returns everything).
+        let entries = load_provider_entries(&registry, &api_keys, Some(&cache));
 
-        // Then only codellama is returned (remote).
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].model, "codellama");
-        assert!(entries[0].is_remote);
+        // Then all 3 entries are present (1 static + 2 remote).
+        assert_eq!(entries.len(), 3);
     }
 
     // --- sorted_entries tests ---
@@ -564,6 +656,7 @@ mod tests {
                 alias_target: None,
                 is_available: true,
                 is_remote: false,
+                is_active: false,
             },
             PickerEntry {
                 provider_id: "b/model".into(),
@@ -575,6 +668,7 @@ mod tests {
                 alias_target: None,
                 is_available: true,
                 is_remote: false,
+                is_active: false,
             },
             PickerEntry {
                 provider_id: "c/model".into(),
@@ -586,16 +680,20 @@ mod tests {
                 alias_target: None,
                 is_available: true,
                 is_remote: false,
+                is_active: false,
             },
         ];
 
         // When sorting with empty filter and active_provider "c/model".
         let result = sorted_entries(&entries, "", "c/model");
 
-        // Then "c/model" is first and order of others is preserved.
+        // Then "c/model" is first (promoted) and marked active.
         assert_eq!(result[0].provider_id, "c/model");
+        assert!(result[0].is_active);
         assert_eq!(result[1].provider_id, "a/model");
+        assert!(!result[1].is_active);
         assert_eq!(result[2].provider_id, "b/model");
+        assert!(!result[2].is_active);
     }
 
     #[test]
@@ -612,6 +710,7 @@ mod tests {
                 alias_target: None,
                 is_available: true,
                 is_remote: false,
+                is_active: false,
             },
             PickerEntry {
                 provider_id: "b/model".into(),
@@ -623,6 +722,7 @@ mod tests {
                 alias_target: None,
                 is_available: true,
                 is_remote: false,
+                is_active: false,
             },
         ];
 
@@ -648,6 +748,7 @@ mod tests {
                 alias_target: None,
                 is_available: true,
                 is_remote: false,
+                is_active: false,
             },
             PickerEntry {
                 provider_id: "b/model".into(),
@@ -659,6 +760,7 @@ mod tests {
                 alias_target: None,
                 is_available: true,
                 is_remote: false,
+                is_active: false,
             },
         ];
 
@@ -684,6 +786,7 @@ mod tests {
                 alias_target: None,
                 is_available: false,
                 is_remote: false,
+                is_active: false,
             },
             PickerEntry {
                 provider_id: "a/model".into(),
@@ -695,6 +798,7 @@ mod tests {
                 alias_target: None,
                 is_available: true,
                 is_remote: false,
+                is_active: false,
             },
             PickerEntry {
                 provider_id: "b/model".into(),
@@ -706,6 +810,7 @@ mod tests {
                 alias_target: None,
                 is_available: false,
                 is_remote: false,
+                is_active: false,
             },
         ];
 
@@ -734,6 +839,7 @@ mod tests {
                 alias_target: None,
                 is_available: true,
                 is_remote: false,
+                is_active: false,
             },
             PickerEntry {
                 provider_id: "b/alpha".into(),
@@ -745,6 +851,7 @@ mod tests {
                 alias_target: None,
                 is_available: true,
                 is_remote: false,
+                is_active: false,
             },
         ];
 
@@ -754,5 +861,166 @@ mod tests {
         // Then entries are sorted alphabetically by model name.
         assert_eq!(result[0].provider_id, "b/alpha");
         assert_eq!(result[1].provider_id, "a/zebra");
+    }
+
+    // --- format_footer / age_color / truncate_line tests ---
+
+    #[test]
+    fn format_footer_without_timestamp_shows_never() {
+        // Given no last_refreshed_at timestamp.
+        // When formatting the footer.
+        let line = format_footer(None, 80);
+
+        // Then the footer contains "Updated never".
+        let text: String = line.spans.iter().map(|s| &*s.content).collect();
+        assert!(text.contains("Updated never"));
+        assert!(text.contains("CTRL+R to refresh"));
+    }
+
+    #[test]
+    fn format_footer_with_timestamp_shows_age() {
+        // Given a recent timestamp (1 second ago).
+        let ts = jiff::Timestamp::now().checked_sub(
+            jiff::Span::new().try_seconds(1).unwrap(),
+        ).unwrap();
+
+        // When formatting the footer.
+        let line = format_footer(Some(&ts), 120);
+
+        // Then the footer contains "Updated" and "ago".
+        let text: String = line.spans.iter().map(|s| &*s.content).collect();
+        assert!(text.contains("Updated"));
+        assert!(text.contains("ago"));
+        assert!(text.contains("CTRL+R to refresh"));
+    }
+
+    #[test]
+    fn format_footer_truncates_to_width() {
+        // Given no timestamp and a very narrow width.
+        // When formatting the footer with width 10.
+        let line = format_footer(None, 10);
+
+        // Then the total character count fits within 10.
+        let total_len: usize = line.spans.iter().map(|s| s.content.chars().count()).sum();
+        assert!(total_len <= 10);
+    }
+
+    #[test]
+    fn age_color_returns_light_green_within_two_weeks() {
+        // Given 1 second (well within 2 weeks).
+        // When computing age color.
+        let color = age_color(1);
+
+        // Then the color is LightGreen.
+        assert_eq!(color, ratatui::style::Color::LightGreen);
+    }
+
+    #[test]
+    fn age_color_returns_light_green_at_exactly_two_weeks() {
+        // Given exactly 2 weeks in seconds.
+        let two_weeks = 14 * 24 * 60 * 60;
+
+        // When computing age color.
+        let color = age_color(two_weeks);
+
+        // Then the color is LightGreen.
+        assert_eq!(color, ratatui::style::Color::LightGreen);
+    }
+
+    #[test]
+    fn age_color_returns_yellow_between_two_and_four_weeks() {
+        // Given 3 weeks in seconds (between 2 and 4 weeks).
+        let three_weeks = 21 * 24 * 60 * 60;
+
+        // When computing age color.
+        let color = age_color(three_weeks);
+
+        // Then the color is Yellow.
+        assert_eq!(color, ratatui::style::Color::Yellow);
+    }
+
+    #[test]
+    fn age_color_returns_yellow_at_exactly_four_weeks() {
+        // Given exactly 4 weeks in seconds.
+        let four_weeks = 28 * 24 * 60 * 60;
+
+        // When computing age color.
+        let color = age_color(four_weeks);
+
+        // Then the color is Yellow.
+        assert_eq!(color, ratatui::style::Color::Yellow);
+    }
+
+    #[test]
+    fn age_color_returns_red_beyond_four_weeks() {
+        // Given 5 weeks in seconds (beyond 4 weeks).
+        let five_weeks = 35 * 24 * 60 * 60;
+
+        // When computing age color.
+        let color = age_color(five_weeks);
+
+        // Then the color is Red.
+        assert_eq!(color, ratatui::style::Color::Red);
+    }
+
+    #[test]
+    fn truncate_line_noop_when_fits() {
+        use ratatui::style::{Color, Style};
+        use ratatui::text::{Line, Span};
+
+        // Given a line that is 10 characters wide.
+        let line = Line::from(vec![
+            Span::styled("hello ".to_owned(), Style::default()),
+            Span::styled("world".to_owned(), Style::default().fg(Color::Red)),
+        ]);
+
+        // When truncating to width 20.
+        let result = truncate_line(line.clone(), 20);
+
+        // Then the line is unchanged.
+        assert_eq!(result.spans.len(), 2);
+        assert_eq!(result.spans[0].content, "hello ");
+        assert_eq!(result.spans[1].content, "world");
+    }
+
+    #[test]
+    fn truncate_line_fits_within_width() {
+        use ratatui::style::{Color, Style};
+        use ratatui::text::{Line, Span};
+
+        // Given a line that is 20 characters wide.
+        let line = Line::from(vec![
+            Span::styled("hello world ".to_owned(), Style::default()),
+            Span::styled("test12345".to_owned(), Style::default().fg(Color::Red)),
+        ]);
+
+        // When truncating to width 8.
+        let result = truncate_line(line, 8);
+
+        // Then the total character count is exactly 8.
+        let total_len: usize = result.spans.iter().map(|s| s.content.chars().count()).sum();
+        assert_eq!(total_len, 8);
+    }
+
+    #[test]
+    fn truncate_line_preserves_style_on_partial_span() {
+        use ratatui::style::{Color, Style};
+        use ratatui::text::{Line, Span};
+
+        // Given a line where the second span will be partially truncated.
+        let line = Line::from(vec![
+            Span::styled("hello ".to_owned(), Style::default()),
+            Span::styled("world".to_owned(), Style::default().fg(Color::Red)),
+        ]);
+
+        // When truncating to width 8.
+        let result = truncate_line(line, 8);
+
+        // Then the first span is kept whole and the second is truncated.
+        assert_eq!(result.spans.len(), 2);
+        assert_eq!(result.spans[0].content, "hello ");
+        assert_eq!(result.spans[1].content, "wo");
+        // And the partial span retains its style.
+        assert_eq!(result.spans[1].style.fg, Some(Color::Red));
     }
 }

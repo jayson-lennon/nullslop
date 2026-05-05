@@ -424,11 +424,7 @@ impl std::fmt::Display for Command {
                 )
             }
             Command::ExecuteToolBatch { payload } => {
-                write!(
-                    f,
-                    "execute {} tool calls",
-                    payload.tool_calls.len()
-                )
+                write!(f, "execute {} tool calls", payload.tool_calls.len())
             }
             Command::ExecuteTool { payload } => {
                 write!(
@@ -438,11 +434,7 @@ impl std::fmt::Display for Command {
                 )
             }
             Command::ToolUseStarted { payload } => {
-                write!(
-                    f,
-                    "tool use started '{}' ({})",
-                    payload.name, payload.id
-                )
+                write!(f, "tool use started '{}' ({})", payload.name, payload.id)
             }
             Command::ToolCallReceived { payload } => {
                 write!(
