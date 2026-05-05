@@ -210,16 +210,22 @@ fn flush_pending_clipboard(app: &mut TuiApp, buf: &ratatui::buffer::Buffer) {
 
     // Spawn a thread to hold the clipboard open for clipboard managers.
     std::thread::spawn(move || {
-        match arboard::Clipboard::new().and_then(|mut cb| cb.set_text(&text)) {
-            Ok(()) => {
-                tracing::debug!(len = text.len(), "copied selection to clipboard");
-                // Hold clipboard open so clipboard managers can sync.
-                std::thread::sleep(std::time::Duration::from_secs(2));
-            }
+        let mut cb = match arboard::Clipboard::new() {
+            Ok(cb) => cb,
             Err(e) => {
-                tracing::warn!(err = %e, "failed to copy selection to clipboard");
+                tracing::warn!(err = %e, "failed to create clipboard");
+                return;
             }
+        };
+        if let Err(e) = cb.set_text(&text) {
+            tracing::warn!(err = %e, "failed to copy selection to clipboard");
+            return;
         }
+        tracing::debug!(len = text.len(), "copied selection to clipboard");
+        // Hold clipboard open so clipboard managers can sync.
+        // cb must live through the sleep — X11 clipboard data is only
+        // available while the Clipboard instance is alive.
+        std::thread::sleep(std::time::Duration::from_secs(2));
     });
 }
 
