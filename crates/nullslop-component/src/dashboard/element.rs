@@ -21,6 +21,10 @@ impl UiElement<AppState> for DashboardElement {
         "dashboard".to_owned()
     }
 
+    fn is_selectable(&self) -> bool {
+        true
+    }
+
     fn render(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppState) {
         let lines: Vec<Line> = if state.dashboard.actors().is_empty() {
             vec![Line::from(Span::styled(
@@ -166,5 +170,17 @@ mod tests {
         // Then the actor name and status appear.
         assert!(rows[1].contains("actor-a"));
         assert!(rows[1].contains("Started"));
+    }
+
+    #[test]
+    fn dashboard_element_is_selectable() {
+        // Given a DashboardElement.
+        let element = DashboardElement;
+
+        // When calling is_selectable.
+        let selectable: &dyn UiElement<AppState> = &element;
+
+        // Then it returns true.
+        assert!(selectable.is_selectable());
     }
 }

@@ -85,7 +85,7 @@ pub fn init_tab_manager() -> TabManager {
 pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
     let area = frame.area();
     if !AppLayout::meets_min_size(area) {
-        render_too_small(frame, area);
+        render_too_small(frame, area, app);
         return;
     }
 
@@ -100,11 +100,17 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
     // Tab bar — always visible.
     render_tab_bar(frame, layout.tabs, &app.tab_manager);
 
+    // Collect selectable rects during rendering.
+    let mut rects = vec![];
+
     match state.active_tab {
         nullslop_protocol::ActiveTab::Chat => {
             // Chat log
             if let Some(element) = app.ui_registry.get_mut("chat-log") {
                 element.render(frame, layout.content, &state);
+                if element.is_selectable() {
+                    rects.push(layout.content);
+                }
             }
             // Streaming indicator (dedicated row between content and input)
             if let Some(element) = app.ui_registry.get_mut("streaming-indicator") {
@@ -127,6 +133,9 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
             // Dashboard fills the entire content area
             if let Some(element) = app.ui_registry.get_mut("dashboard") {
                 element.render(frame, layout.content, &state);
+                if element.is_selectable() {
+                    rects.push(layout.content);
+                }
             }
         }
     }
@@ -136,6 +145,63 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
 
     if state.mode == Mode::Picker {
         render_provider_picker(frame, area, &state, &app.services);
+        // Provider picker popup is selectable — not a UiElement, register inline.
+        rects.push(compute_popup_rect(area));
+    }
+
+    // Release the state read lock before clipboard flush needs &mut app.
+    drop(state);
+
+    app.selectable_rects.rebuild(rects);
+
+    // Apply selection highlight after all elements have rendered.
+    apply_selection_highlight(app, frame.buffer_mut());
+
+    // Flush pending clipboard copy (reads buffer, writes system clipboard).
+    flush_pending_clipboard(app, frame.buffer_mut());
+}
+
+/// Inverts foreground and background for cells within the active selection rect.
+///
+/// This is a post-rendering pass applied after all UI elements have drawn.
+/// The selection rect comes from [`SelectionState::selection_rect()`], which is
+/// already normalized and clamped to the constraining bounds.
+fn apply_selection_highlight(app: &TuiApp, buf: &mut ratatui::buffer::Buffer) {
+    if let Some(sel_rect) = app.selection.selection_rect() {
+        for y in sel_rect.top()..sel_rect.bottom() {
+            for x in sel_rect.left()..sel_rect.right() {
+                if let Some(cell) = buf.cell_mut((x, y)) {
+                    let fg = cell.fg;
+                    let bg = cell.bg;
+                    cell.set_fg(bg);
+                    cell.set_bg(fg);
+                }
+            }
+        }
+    }
+}
+
+/// If a clipboard copy is pending, extracts the selected text from the buffer
+/// and copies it to the system clipboard. Clears the pending flag regardless
+/// of success or failure.
+fn flush_pending_clipboard(app: &mut TuiApp, buf: &ratatui::buffer::Buffer) {
+    if !app.pending_clipboard {
+        return;
+    }
+    app.pending_clipboard = false;
+
+    if let Some(text) = app.selection.extract_text(buf) {
+        if text.is_empty() {
+            return;
+        }
+        match arboard::Clipboard::new().and_then(|mut cb| cb.set_text(&text)) {
+            Ok(()) => {
+                tracing::debug!(len = text.len(), "copied selection to clipboard");
+            }
+            Err(e) => {
+                tracing::warn!(err = %e, "failed to copy selection to clipboard");
+            }
+        }
     }
 }
 
@@ -424,15 +490,18 @@ fn truncate_line(line: Line<'static>, width: usize) -> Line<'static> {
 }
 
 /// Renders a "terminal too small" message.
-fn render_too_small(frame: &mut Frame<'_>, area: Rect) {
+fn render_too_small(frame: &mut Frame<'_>, area: Rect, app: &mut TuiApp) {
     let msg = format!("Terminal too small\n{MIN_WIDTH}x{MIN_HEIGHT} minimum");
     let paragraph = Paragraph::new(msg).wrap(Wrap { trim: true });
     frame.render_widget(paragraph, area);
+    // Clear selectable rects when terminal is too small.
+    app.selectable_rects.rebuild(vec![]);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::selection::SelectionState;
 
     #[test]
     fn app_layout_meets_min_size() {
@@ -633,5 +702,265 @@ mod tests {
         let marker_cell = buffer.cell((popup.x + 1, result_y)).expect("marker cell");
         assert_eq!(marker_cell.symbol(), ">");
         assert_eq!(marker_cell.fg, Color::Green);
+    }
+
+    // --- Selection highlight tests ---
+
+    #[test]
+    fn selection_highlight_inverts_cells_within_selection() {
+        // Given a buffer with distinctively colored cells and an active selection.
+        let area = Rect::new(0, 0, 20, 10);
+        let mut buf = ratatui::buffer::Buffer::empty(area);
+        // Paint a cell inside the selection with known colors.
+        buf.cell_mut((3, 3)).unwrap().set_fg(Color::Yellow);
+        buf.cell_mut((3, 3)).unwrap().set_bg(Color::Blue);
+        // Paint a cell outside the selection with known colors.
+        buf.cell_mut((15, 8)).unwrap().set_fg(Color::Red);
+        buf.cell_mut((15, 8)).unwrap().set_bg(Color::Green);
+
+        // And an app with an Active selection covering (2,2) to (5,4).
+        let services = nullslop_services::test_services::TestServices::builder().build();
+        let mut app = crate::TuiApp::new(services);
+        app.selection = SelectionState::Active {
+            anchor: (2, 2),
+            focus: (5, 4),
+            bounds: area,
+        };
+
+        // When applying selection highlight.
+        apply_selection_highlight(&app, &mut buf);
+
+        // Then cell (3, 3) inside the selection has swapped fg/bg.
+        let inside = buf.cell((3, 3)).expect("cell inside selection");
+        assert_eq!(inside.fg, Color::Blue); // was bg
+        assert_eq!(inside.bg, Color::Yellow); // was fg
+
+        // And cell (15, 8) outside the selection is unchanged.
+        let outside = buf.cell((15, 8)).expect("cell outside selection");
+        assert_eq!(outside.fg, Color::Red);
+        assert_eq!(outside.bg, Color::Green);
+    }
+
+    #[test]
+    fn selection_highlight_respects_constraining_bounds() {
+        // Given a buffer covering a large area and a selection where the raw anchor
+        // extends beyond the selection's constraining bounds.
+        let full_area = Rect::new(0, 0, 30, 30);
+        let mut buf = ratatui::buffer::Buffer::empty(full_area);
+        // Paint cell inside bounds (will be in clamped selection).
+        buf.cell_mut((7, 7)).unwrap().set_fg(Color::Cyan);
+        buf.cell_mut((7, 7)).unwrap().set_bg(Color::Magenta);
+        // Paint cell at raw anchor position (0, 0) — outside bounds.
+        buf.cell_mut((0, 0)).unwrap().set_fg(Color::White);
+        buf.cell_mut((0, 0)).unwrap().set_bg(Color::Black);
+
+        // And an Active selection with anchor outside bounds.
+        // bounds=(5,5,10,10) means valid range is (5,5)-(14,14).
+        // anchor=(0,0) is outside bounds, focus=(8,8) is inside.
+        // selection_rect() should clamp to (5,5)-(8,8).
+        let bounds = Rect::new(5, 5, 10, 10);
+        let services = nullslop_services::test_services::TestServices::builder().build();
+        let mut app = crate::TuiApp::new(services);
+        app.selection = SelectionState::Active {
+            anchor: (0, 0),
+            focus: (8, 8),
+            bounds,
+        };
+
+        // When applying selection highlight.
+        apply_selection_highlight(&app, &mut buf);
+
+        // Then cell (7, 7) inside the clamped selection is inverted.
+        let inside = buf.cell((7, 7)).expect("cell inside clamped selection");
+        assert_eq!(inside.fg, Color::Magenta); // was bg
+        assert_eq!(inside.bg, Color::Cyan); // was fg
+
+        // And cell (0, 0) at the raw anchor position is NOT inverted.
+        let outside = buf.cell((0, 0)).expect("cell at raw anchor");
+        assert_eq!(outside.fg, Color::White); // unchanged
+        assert_eq!(outside.bg, Color::Black); // unchanged
+    }
+
+    #[test]
+    fn selection_highlight_does_nothing_when_idle() {
+        // Given a buffer with distinctly colored cells and an Idle selection.
+        let area = Rect::new(0, 0, 20, 10);
+        let mut buf = ratatui::buffer::Buffer::empty(area);
+        buf.cell_mut((5, 5)).unwrap().set_fg(Color::Yellow);
+        buf.cell_mut((5, 5)).unwrap().set_bg(Color::Blue);
+
+        // And an app with an Idle selection.
+        let services = nullslop_services::test_services::TestServices::builder().build();
+        let mut app = crate::TuiApp::new(services);
+        app.selection = SelectionState::Idle;
+
+        // When applying selection highlight.
+        apply_selection_highlight(&app, &mut buf);
+
+        // Then no cells are inverted — colors remain unchanged.
+        let cell = buf.cell((5, 5)).expect("colored cell");
+        assert_eq!(cell.fg, Color::Yellow); // unchanged
+        assert_eq!(cell.bg, Color::Blue); // unchanged
+    }
+
+    // --- Clipboard flush tests ---
+
+    #[test]
+    fn clipboard_copy_clears_pending_flag_on_idle_selection() {
+        // Given an app with pending_clipboard set but Idle selection.
+        let services = nullslop_services::test_services::TestServices::builder().build();
+        let mut app = crate::TuiApp::new(services);
+        app.selection = SelectionState::Idle;
+        app.pending_clipboard = true;
+
+        let area = Rect::new(0, 0, 20, 5);
+        let buf = ratatui::buffer::Buffer::empty(area);
+
+        // When flushing the pending clipboard.
+        flush_pending_clipboard(&mut app, &buf);
+
+        // Then the pending flag is cleared (even though there was nothing to copy).
+        assert!(!app.pending_clipboard);
+    }
+
+    #[test]
+    fn clipboard_copy_skips_empty_selection() {
+        // Given an app with pending_clipboard and an Active selection over empty cells.
+        let area = Rect::new(0, 0, 20, 5);
+        let buf = ratatui::buffer::Buffer::empty(area);
+
+        let services = nullslop_services::test_services::TestServices::builder().build();
+        let mut app = crate::TuiApp::new(services);
+        app.selection = SelectionState::Active {
+            anchor: (0, 0),
+            focus: (3, 0),
+            bounds: area,
+        };
+        app.pending_clipboard = true;
+
+        // When flushing the pending clipboard.
+        flush_pending_clipboard(&mut app, &buf);
+
+        // Then the pending flag is cleared.
+        assert!(!app.pending_clipboard);
+    }
+
+    #[test]
+    #[ignore = "requires clipboard access (run with --ignored)"]
+    fn clipboard_copy_extracts_selected_text() {
+        // Given a buffer with known text and an active selection.
+        let area = Rect::new(0, 0, 20, 5);
+        let mut buf = ratatui::buffer::Buffer::empty(area);
+        // Write "Hello" on row 2.
+        for (i, ch) in "Hello".chars().enumerate() {
+            buf.cell_mut((2 + i as u16, 2))
+                .unwrap()
+                .set_symbol(&ch.to_string());
+        }
+
+        let services = nullslop_services::test_services::TestServices::builder().build();
+        let mut app = crate::TuiApp::new(services);
+        app.selection = SelectionState::Active {
+            anchor: (2, 2),
+            focus: (6, 2),
+            bounds: area,
+        };
+        app.pending_clipboard = true;
+
+        // When flushing the pending clipboard.
+        flush_pending_clipboard(&mut app, &buf);
+
+        // Then the clipboard contains the selected text.
+        let mut clipboard = arboard::Clipboard::new().expect("clipboard access");
+        let content = clipboard.get_text().expect("read clipboard");
+        assert_eq!(content, "Hello");
+
+        // And pending_clipboard is cleared.
+        assert!(!app.pending_clipboard);
+    }
+
+    // --- Element-driven selectable rect tests ---
+
+    #[test]
+    fn render_registers_content_rect_for_selectable_chat_log() {
+        // Given a TuiApp rendered in Chat tab with a 80x24 terminal.
+        use ratatui::Terminal;
+        use ratatui::backend::TestBackend;
+
+        let services = nullslop_services::test_services::TestServices::builder().build();
+        let mut app = crate::TuiApp::new(services);
+        // Default tab is Chat.
+
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        // When rendering.
+        terminal
+            .draw(|frame| {
+                app.render(frame);
+            })
+            .unwrap();
+
+        // Then the content area rect is registered as selectable.
+        // Chat log is selectable, so layout.content should be in selectable_rects.
+        let layout = AppLayout::new(frame_area(80, 24), 1, 0);
+        let found = app.selectable_rects.find_for_position(
+            layout.content.x + 1,
+            layout.content.y + 1,
+        );
+        assert!(
+            found.is_some(),
+            "chat log content rect should be selectable"
+        );
+        assert_eq!(found.unwrap(), layout.content);
+    }
+
+    #[test]
+    fn render_registers_picker_popup_rect_when_active() {
+        // Given a TuiApp rendered with Mode::Picker.
+        use ratatui::Terminal;
+        use ratatui::backend::TestBackend;
+
+        let services = nullslop_services::test_services::TestServices::builder().build();
+        let mut app = crate::TuiApp::new(services);
+        // Switch to Picker mode.
+        app.core.state.write().mode = nullslop_protocol::Mode::Picker;
+
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        // When rendering.
+        terminal
+            .draw(|frame| {
+                app.render(frame);
+            })
+            .unwrap();
+
+        // Then the picker popup rect is registered as selectable.
+        let popup_rect = compute_popup_rect(Rect::new(0, 0, 80, 24));
+        let found = app
+            .selectable_rects
+            .find_for_position(popup_rect.x + 1, popup_rect.y + 1);
+        assert!(
+            found.is_some(),
+            "picker popup rect should be selectable"
+        );
+        assert_eq!(found.unwrap(), popup_rect);
+
+        // And the content area rect is also still selectable (chat-log is selectable).
+        let layout = AppLayout::new(frame_area(80, 24), 1, 0);
+        let content_found = app.selectable_rects.find_for_position(
+            layout.content.x + 1,
+            layout.content.y + 1,
+        );
+        assert!(
+            content_found.is_some(),
+            "content rect should also be selectable alongside picker"
+        );
+    }
+
+    /// Helper to create a Rect matching the terminal dimensions.
+    fn frame_area(w: u16, h: u16) -> Rect {
+        Rect::new(0, 0, w, h)
     }
 }

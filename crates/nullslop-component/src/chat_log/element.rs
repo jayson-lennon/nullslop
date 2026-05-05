@@ -27,6 +27,10 @@ impl UiElement<AppState> for ChatLogElement {
         "chat-log".to_owned()
     }
 
+    fn is_selectable(&self) -> bool {
+        true
+    }
+
     fn render(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppState) {
         let lines: Vec<Line> = state
             .active_session()
@@ -515,5 +519,17 @@ mod tests {
         let bottom_cell = buffer.cell((0, 9)).expect("cell should exist");
         assert_eq!(bottom_cell.symbol(), ">");
         assert!(bottom_cell.style().add_modifier.contains(Modifier::BOLD));
+    }
+
+    #[test]
+    fn chat_log_element_is_selectable() {
+        // Given a ChatLogElement.
+        let element = ChatLogElement;
+
+        // When calling is_selectable.
+        let selectable: &dyn UiElement<AppState> = &element;
+
+        // Then it returns true.
+        assert!(selectable.is_selectable());
     }
 }

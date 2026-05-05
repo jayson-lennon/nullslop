@@ -121,9 +121,20 @@ impl App {
                 );
                 core.state.write().active_provider = initial_provider;
                 load_model_cache(&core);
-                let runner = Runner::Tui(Box::new(nullslop_tui::TuiApp::new_with_core(
-                    services, core,
-                )));
+
+                // Resolve mouse selection config from environment.
+                let mouse_selection = match std::env::var("NULLSLOP_MOUSE_SELECTION") {
+                    Ok(val) if val.eq_ignore_ascii_case("false") || val == "0" => false,
+                    _ => true,
+                };
+                let tui_config =
+                    nullslop_tui::config::TuiConfig::new(mouse_selection);
+
+                let runner = Runner::Tui(Box::new(
+                    nullslop_tui::TuiApp::new_with_core_and_config(
+                        services, core, tui_config,
+                    ),
+                ));
                 runner.run().change_context(AppError)?;
             }
             Commands::Headless { command, .. } => {

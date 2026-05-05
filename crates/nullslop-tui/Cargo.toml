@@ -25,6 +25,7 @@ parking_lot = { workspace = true }
 derive_more = { workspace = true }
 unicode-segmentation = { workspace = true }
 dialoguer = { workspace = true }
+arboard = { workspace = true }
 tracing = { workspace = true }
 jiff = { workspace = true }
 humantime = { workspace = true }

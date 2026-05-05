@@ -46,10 +46,14 @@ pub fn run(mut app: TuiApp) -> Result<(), Report<TuiRunError>> {
         .change_context(TuiRunError)
         .attach("failed to enter alternate screen")?;
 
+    let mouse_selection = app.config.mouse_selection;
+
     // Enable mouse capture so scroll wheel and click events are reported.
-    execute!(stdout, EnableMouseCapture)
-        .change_context(TuiRunError)
-        .attach("failed to enable mouse capture")?;
+    if mouse_selection {
+        execute!(stdout, EnableMouseCapture)
+            .change_context(TuiRunError)
+            .attach("failed to enable mouse capture")?;
+    }
 
     // Enable Kitty keyboard protocol so crossterm can distinguish
     // modified special keys (e.g. Shift+Enter, Ctrl+Enter).
@@ -87,8 +91,10 @@ pub fn run(mut app: TuiApp) -> Result<(), Report<TuiRunError>> {
     if let Err(e) = execute!(terminal.backend_mut(), PopKeyboardEnhancementFlags) {
         tracing::error!(err = ?e, "failed to pop keyboard enhancement flags");
     }
-    if let Err(e) = execute!(terminal.backend_mut(), DisableMouseCapture) {
-        tracing::error!(err = ?e, "failed to disable mouse capture");
+    if mouse_selection {
+        if let Err(e) = execute!(terminal.backend_mut(), DisableMouseCapture) {
+            tracing::error!(err = ?e, "failed to disable mouse capture");
+        }
     }
     if let Err(e) = disable_raw_mode() {
         tracing::error!(err = ?e, "failed to disable raw mode");

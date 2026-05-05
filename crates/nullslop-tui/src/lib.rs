@@ -5,12 +5,14 @@
 
 pub mod app;
 pub mod app_state;
+pub mod config;
 pub mod convert;
 pub mod keymap;
 pub mod msg;
 pub mod render;
 pub mod run;
 pub mod scope;
+pub mod selection;
 pub mod suspend;
 pub mod terminal;
 
