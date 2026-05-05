@@ -2,7 +2,7 @@
 
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Color, Style};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
 use ratatui_tabs::{TabManager, TabsBar, TabsStyle};
@@ -173,8 +173,16 @@ fn apply_selection_highlight(app: &TuiApp, buf: &mut ratatui::buffer::Buffer) {
                 if let Some(cell) = buf.cell_mut((x, y)) {
                     let fg = cell.fg;
                     let bg = cell.bg;
-                    cell.set_fg(bg);
-                    cell.set_bg(fg);
+                    if fg == bg {
+                        // Swapping identical colors is invisible
+                        // (e.g. both Reset — the default for user messages
+                        // and empty cells). Use explicit highlight colors.
+                        cell.set_fg(Color::Black);
+                        cell.set_bg(Color::White);
+                    } else {
+                        cell.set_fg(bg);
+                        cell.set_bg(fg);
+                    }
                 }
             }
         }
@@ -184,25 +192,35 @@ fn apply_selection_highlight(app: &TuiApp, buf: &mut ratatui::buffer::Buffer) {
 /// If a clipboard copy is pending, extracts the selected text from the buffer
 /// and copies it to the system clipboard. Clears the pending flag regardless
 /// of success or failure.
+///
+/// The clipboard write runs on a spawned thread that holds the
+/// [`arboard::Clipboard`] open for a few seconds after writing. On X11,
+/// clipboard data is only available while the `Clipboard` instance is alive —
+/// dropping it immediately prevents clipboard managers from syncing.
 fn flush_pending_clipboard(app: &mut TuiApp, buf: &ratatui::buffer::Buffer) {
     if !app.pending_clipboard {
         return;
     }
     app.pending_clipboard = false;
 
-    if let Some(text) = app.selection.extract_text(buf) {
-        if text.is_empty() {
-            return;
-        }
+    let text = match app.selection.extract_text(buf) {
+        Some(text) if !text.is_empty() => text,
+        _ => return,
+    };
+
+    // Spawn a thread to hold the clipboard open for clipboard managers.
+    std::thread::spawn(move || {
         match arboard::Clipboard::new().and_then(|mut cb| cb.set_text(&text)) {
             Ok(()) => {
                 tracing::debug!(len = text.len(), "copied selection to clipboard");
+                // Hold clipboard open so clipboard managers can sync.
+                std::thread::sleep(std::time::Duration::from_secs(2));
             }
             Err(e) => {
                 tracing::warn!(err = %e, "failed to copy selection to clipboard");
             }
         }
-    }
+    });
 }
 
 /// Renders the tab bar.
@@ -803,6 +821,42 @@ mod tests {
         assert_eq!(cell.bg, Color::Blue); // unchanged
     }
 
+    #[test]
+    fn selection_highlight_uses_explicit_colors_when_fg_equals_bg() {
+        // Given a buffer where cells have matching fg and bg (e.g. both Reset,
+        // as with user messages rendered with Style::default().bold()).
+        let area = Rect::new(0, 0, 20, 10);
+        let mut buf = ratatui::buffer::Buffer::empty(area);
+        // User-message-style cell: fg = Reset, bg = Reset (bold modifier).
+        buf.cell_mut((3, 3))
+            .unwrap()
+            .set_style(Style::default().add_modifier(Modifier::BOLD));
+        // Adjacent cell with distinct colors (assistant-style).
+        buf.cell_mut((4, 3)).unwrap().set_fg(Color::Cyan);
+
+        // And an Active selection covering both cells.
+        let services = nullslop_services::test_services::TestServices::builder().build();
+        let mut app = crate::TuiApp::new(services);
+        app.selection = SelectionState::Active {
+            anchor: (2, 2),
+            focus: (5, 4),
+            bounds: area,
+        };
+
+        // When applying selection highlight.
+        apply_selection_highlight(&app, &mut buf);
+
+        // Then the Reset/Reset cell gets explicit highlight colors.
+        let reset_cell = buf.cell((3, 3)).expect("reset cell");
+        assert_eq!(reset_cell.fg, Color::Black);
+        assert_eq!(reset_cell.bg, Color::White);
+
+        // And the distinct-colors cell gets swapped fg/bg.
+        let cyan_cell = buf.cell((4, 3)).expect("cyan cell");
+        assert_eq!(cyan_cell.fg, Color::Reset); // was bg
+        assert_eq!(cyan_cell.bg, Color::Cyan); // was fg
+    }
+
     // --- Clipboard flush tests ---
 
     #[test]
@@ -870,13 +924,15 @@ mod tests {
         // When flushing the pending clipboard.
         flush_pending_clipboard(&mut app, &buf);
 
-        // Then the clipboard contains the selected text.
+        // Then the pending flag is cleared immediately.
+        assert!(!app.pending_clipboard);
+
+        // And after the clipboard thread completes, the clipboard contains
+        // the selected text.
+        std::thread::sleep(std::time::Duration::from_millis(500));
         let mut clipboard = arboard::Clipboard::new().expect("clipboard access");
         let content = clipboard.get_text().expect("read clipboard");
         assert_eq!(content, "Hello");
-
-        // And pending_clipboard is cleared.
-        assert!(!app.pending_clipboard);
     }
 
     // --- Element-driven selectable rect tests ---
