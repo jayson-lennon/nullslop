@@ -6,7 +6,7 @@ use nullslop_core::{AppCore, AppMsg};
 use nullslop_protocol::{Command, Mode};
 use ratatui::Frame;
 use ratatui_tabs::TabManager;
-use ratatui_which_key::WhichKeyState;
+use ratatui_which_key::{CrosstermKeymapExt, WhichKeyState};
 
 use crate::keymap;
 use crate::msg::Msg;
@@ -99,30 +99,44 @@ impl TuiApp {
         match msg {
             Msg::Tick => {}
             Msg::Input(event) => {
-                let crossterm::event::Event::Key(key) = event else {
-                    return;
-                };
-                if key.kind != crossterm::event::KeyEventKind::Press {
-                    return;
+                match event {
+                    crossterm::event::Event::Key(key) => {
+                        if key.kind != crossterm::event::KeyEventKind::Press {
+                            return;
+                        }
+                        let Some(protocol_key) = crate::convert::from_crossterm(key) else {
+                            tracing::info!(
+                                crossterm_code = ?key.code,
+                                crossterm_mods = ?key.modifiers,
+                                "key converted to None"
+                            );
+                            return;
+                        };
+                        tracing::info!(
+                            key = ?protocol_key.key,
+                            mods = ?protocol_key.modifiers,
+                            scope = ?self.which_key.scope(),
+                            "key event received"
+                        );
+                        let Some(cmd) = self.which_key.handle_key(protocol_key) else {
+                            return;
+                        };
+                        self.route_command(cmd);
+                    }
+                    crossterm::event::Event::Mouse(mouse) => {
+                        let scope = self.which_key.scope().clone();
+                        let Some(cmd) = self
+                            .which_key
+                            .keymap()
+                            .mouse_handler()
+                            .and_then(|h| h(mouse, &scope))
+                        else {
+                            return;
+                        };
+                        self.route_command(cmd);
+                    }
+                    _ => {}
                 }
-                let Some(protocol_key) = crate::convert::from_crossterm(key) else {
-                    tracing::info!(
-                        crossterm_code = ?key.code,
-                        crossterm_mods = ?key.modifiers,
-                        "key converted to None"
-                    );
-                    return;
-                };
-                tracing::info!(
-                    key = ?protocol_key.key,
-                    mods = ?protocol_key.modifiers,
-                    scope = ?self.which_key.scope(),
-                    "key event received"
-                );
-                let Some(cmd) = self.which_key.handle_key(protocol_key) else {
-                    return;
-                };
-                self.route_command(cmd);
             }
             Msg::Command(cmd) => {
                 self.route_command(cmd);

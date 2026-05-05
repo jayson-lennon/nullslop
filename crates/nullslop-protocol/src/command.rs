@@ -217,6 +217,12 @@ pub enum Command {
     /// Scroll the chat log down (toward newer messages).
     #[serde(rename = "scroll_down")]
     ScrollDown,
+    /// Scroll the chat log up by a small amount (mouse wheel).
+    #[serde(rename = "mouse_scroll_up")]
+    MouseScrollUp,
+    /// Scroll the chat log down by a small amount (mouse wheel).
+    #[serde(rename = "mouse_scroll_down")]
+    MouseScrollDown,
     /// Refresh the model list from all providers.
     #[serde(rename = "refresh_models")]
     RefreshModels,
@@ -323,7 +329,9 @@ impl Command {
             | Self::EditInput
             | Self::ToggleWhichKey
             | Self::ScrollUp
-            | Self::ScrollDown => None,
+            | Self::ScrollDown
+            | Self::MouseScrollUp
+            | Self::MouseScrollDown => None,
             Self::SwitchTab { .. } => Some(SwitchTab::NAME),
             Self::SendMessage { .. } => Some(SendMessage::NAME),
             Self::CancelStream { .. } => Some(CancelStream::NAME),
@@ -407,6 +415,8 @@ impl std::fmt::Display for Command {
             }
             Command::ScrollUp => write!(f, "scroll up"),
             Command::ScrollDown => write!(f, "scroll down"),
+            Command::MouseScrollUp => write!(f, "mouse scroll up"),
+            Command::MouseScrollDown => write!(f, "mouse scroll down"),
             Command::RefreshModels => write!(f, "refresh models"),
             Command::PickerInsertChar { payload } => write!(f, "picker insert '{}'", payload.ch),
             Command::PickerBackspace => write!(f, "picker backspace"),
@@ -530,6 +540,8 @@ mod tests {
     #[case::provider_switch(Command::ProviderSwitch { payload: ProviderSwitch { provider_id: "ollama".into() } })]
     #[case::scroll_up(Command::ScrollUp)]
     #[case::scroll_down(Command::ScrollDown)]
+    #[case::mouse_scroll_up(Command::MouseScrollUp)]
+    #[case::mouse_scroll_down(Command::MouseScrollDown)]
     #[case::move_cursor_up(Command::MoveCursorUp)]
     #[case::move_cursor_down(Command::MoveCursorDown)]
     #[case::picker_insert_char(Command::PickerInsertChar { payload: PickerInsertChar { ch: 'x' } })]

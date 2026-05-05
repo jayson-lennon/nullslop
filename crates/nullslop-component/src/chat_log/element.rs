@@ -63,13 +63,39 @@ impl UiElement<AppState> for ChatLogElement {
         // When content overflows, allow scrolling up to total − viewport height.
         let total_display = total_wrapped + blank_count as u16;
         let max_offset = total_display.saturating_sub(area.height);
-        let clamped = scroll_offset.min(max_offset);
+
+        // Feed max_offset back to state so scroll handlers can resolve "at bottom".
+        state.active_session().set_last_max_offset(max_offset);
+
+        // Resolve scroll offset: None means "show bottom" → use max_offset.
+        let resolved = scroll_offset.unwrap_or(max_offset);
+        let clamped = resolved.min(max_offset);
 
         let chat_widget = Paragraph::new(display_lines)
             .block(Block::default().borders(Borders::NONE))
             .wrap(Wrap { trim: true })
             .scroll((clamped, 0));
         frame.render_widget(chat_widget, area);
+
+        // Render a scroll indicator when the user has scrolled up from the bottom.
+        if clamped < max_offset {
+            let hidden = max_offset - clamped;
+            let label = format!(" ↑ {hidden} lines above ");
+            let label_len = label.len();
+            let indicator = Paragraph::new(Line::from(Span::styled(
+                label,
+                Style::default().fg(Color::DarkGray).bg(Color::Black),
+            )));
+            // Render in the bottom-right corner of the chat area.
+            let indicator_width = u16::try_from(label_len).unwrap_or(area.width).min(area.width);
+            let indicator_area = Rect {
+                x: area.x + area.width.saturating_sub(indicator_width),
+                y: area.y + area.height.saturating_sub(1),
+                width: indicator_width,
+                height: 1,
+            };
+            frame.render_widget(indicator, indicator_area);
+        }
     }
 }
 

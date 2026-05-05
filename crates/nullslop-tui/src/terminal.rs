@@ -8,6 +8,7 @@ use std::io;
 
 use crossterm::{
     execute,
+    event::{DisableMouseCapture, EnableMouseCapture},
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use error_stack::{Report, ResultExt as _};
@@ -41,6 +42,9 @@ impl<'a> TerminalGuard<'a> {
         disable_raw_mode()
             .change_context(TerminalSuspendError)
             .attach("failed to disable raw mode")?;
+        execute!(terminal.backend_mut(), DisableMouseCapture)
+            .change_context(TerminalSuspendError)
+            .attach("failed to disable mouse capture")?;
         execute!(terminal.backend_mut(), LeaveAlternateScreen)
             .change_context(TerminalSuspendError)
             .attach("failed to leave alternate screen")?;
@@ -56,6 +60,7 @@ impl Drop for TerminalGuard<'_> {
     fn drop(&mut self) {
         let _ = enable_raw_mode();
         let _ = execute!(self.terminal.backend_mut(), EnterAlternateScreen);
+        let _ = execute!(self.terminal.backend_mut(), EnableMouseCapture);
         let _ = self.terminal.hide_cursor();
         let _ = self.terminal.clear();
     }

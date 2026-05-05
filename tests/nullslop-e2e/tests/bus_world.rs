@@ -766,7 +766,7 @@ fn then_history_entry_is_actor(world: &mut BusWorld, index: u64, source: String,
 fn then_scroll_offset(world: &mut BusWorld, expected: u64) {
     assert_eq!(
         world.state.active_session().scroll_offset(),
-        expected as u16,
+        Some(expected as u16),
         "scroll offset mismatch"
     );
 }
@@ -784,6 +784,14 @@ fn given_session_has_n_entries(world: &mut BusWorld, count: u64) {
 #[cucumber::given(expr = "the scroll offset is at the top")]
 fn given_scroll_offset_at_top(world: &mut BusWorld) {
     world.state.active_session_mut().scroll_up(u16::MAX);
+}
+
+#[cucumber::given(expr = "the last max offset is {int}")]
+fn given_last_max_offset(world: &mut BusWorld, offset: u64) {
+    world
+        .state
+        .active_session()
+        .set_last_max_offset(offset as u16);
 }
 
 // ---------------------------------------------------------------------------

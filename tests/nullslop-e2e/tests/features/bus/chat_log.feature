@@ -18,15 +18,17 @@ Feature: Chat Log
     Then the chat history should contain 1 entry
     And chat history entry 1 should be an Actor message from "nullslop-echo" with text "HELLO"
 
-  Scenario: Scroll up decrements session offset
+  Scenario: Scroll up from bottom resolves to concrete offset
     Given a fresh bus with all handlers
     And the session has 20 history entries
+    And the last max offset is 100
     When I submit ScrollUp
-    Then the scroll offset should be 65525
+    Then the scroll offset should be 90
 
-  Scenario: Scroll down increments session offset
+  Scenario: Scroll down from known offset increments
     Given a fresh bus with all handlers
     And the session has 1 history entries
+    And the last max offset is 100
     And the scroll offset is at the top
     When I submit ScrollDown
     Then the scroll offset should be 10
