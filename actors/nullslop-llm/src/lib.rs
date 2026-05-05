@@ -326,6 +326,20 @@ impl LlmActor {
                     },
                     Err(e) => {
                         tracing::error!(err = ?e, "LLM stream error");
+                        let _ = sink.send_command(Command::PushChatEntry {
+                            payload: PushChatEntry {
+                                session_id: sid.clone(),
+                                entry: ChatEntry::error(format!("LLM stream error: {e:?}")),
+                            },
+                        });
+                        let _ = sink.send_event(Event::StreamCompleted {
+                            payload: StreamCompleted {
+                                session_id: sid.clone(),
+                                reason: StreamCompletedReason::Finished,
+                                assistant_content: Some(accumulated_text.clone()),
+                                tool_calls: None,
+                            },
+                        });
                         break;
                     }
                 }
@@ -1011,10 +1025,60 @@ mod tests {
     // --- Error handling tests ---
 
     #[tokio::test]
-    async fn stream_error_emits_system_entry_and_completed() {
-        // Given an actor — we can't easily make FakeLlmServiceFactory::create()
-        // fail, so we test the stream error path by not starting a stream.
-        // Instead, let's verify the session state is correctly tracked.
-        // This is covered by other tests.
+    async fn stream_error_emits_error_entry_and_completed() {
+        // Given an actor configured with a stream that errors.
+        let sink = Arc::new(RecordingSink::new());
+        let mut ctx = test_context(&sink);
+        let factory = FakeLlmServiceFactory::with_stream_error();
+        let factory_service =
+            nullslop_providers::LlmServiceFactoryService::new(Arc::new(factory));
+        ctx.set_data(factory_service);
+        let mut actor = LlmActor::activate(&mut ctx);
+        sink.clear();
+
+        let session_id = SessionId::new();
+
+        // When sending SendToLlmProvider.
+        let cmd = Command::SendToLlmProvider {
+            payload: SendToLlmProvider {
+                session_id: session_id.clone(),
+                messages: vec![LlmMessage::User {
+                    content: "hi".to_owned(),
+                }],
+                provider_id: None,
+            },
+        };
+        actor.handle_command(&cmd, &ctx);
+
+        // Wait for the stream task to complete.
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        // Then a PushChatEntry command was emitted for the session.
+        let commands = sink.commands();
+        let has_error_entry = commands.iter().any(|c| {
+            matches!(
+                c,
+                Command::PushChatEntry { payload }
+                if payload.session_id == session_id
+            )
+        });
+        assert!(has_error_entry, "expected PushChatEntry error command");
+
+        // And a StreamCompleted event was emitted with Finished reason.
+        let events = sink.events();
+        let completed = find_stream_completed(&events);
+        assert_eq!(completed.len(), 1);
+        assert_eq!(completed[0].reason, StreamCompletedReason::Finished);
+        assert_eq!(completed[0].session_id, session_id);
+
+        // And feeding the StreamCompleted back to the actor cleans up the session.
+        let events = sink.take_events();
+        for event in events {
+            actor.handle_event(&event, &ctx);
+        }
+        assert!(
+            !actor.sessions.contains_key(&session_id),
+            "session should be removed after stream error"
+        );
     }
 }
