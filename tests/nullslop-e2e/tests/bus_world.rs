@@ -1020,3 +1020,49 @@ fn then_no_prompt_strategy_switched_event(world: &mut BusWorld) {
         .any(|e| matches!(e.event, npr::Event::PromptStrategySwitched { .. }));
     assert!(!found, "did not expect PromptStrategySwitched event");
 }
+
+// ---------------------------------------------------------------------------
+// Step definitions — Dashboard Selection (Phase 4)
+// ---------------------------------------------------------------------------
+
+#[cucumber::given(expr = "the dashboard has actors {word} and {word}")]
+fn given_dashboard_has_2_actors(world: &mut BusWorld, a: String, b: String) {
+    world.state.dashboard.mark_starting(&a, None);
+    world.state.dashboard.mark_starting(&b, None);
+}
+
+#[cucumber::given(expr = "the dashboard has actors {word}, {word}, and {word}")]
+fn given_dashboard_has_3_actors(world: &mut BusWorld, a: String, b: String, c: String) {
+    world.state.dashboard.mark_starting(&a, None);
+    world.state.dashboard.mark_starting(&b, None);
+    world.state.dashboard.mark_starting(&c, None);
+}
+
+#[cucumber::when(expr = "I submit DashboardSelectDown")]
+fn when_dashboard_select_down(world: &mut BusWorld) {
+    world.submit_and_process(npr::Command::DashboardSelectDown);
+}
+
+#[cucumber::when(expr = "I submit DashboardSelectUp")]
+fn when_dashboard_select_up(world: &mut BusWorld) {
+    world.submit_and_process(npr::Command::DashboardSelectUp);
+}
+
+#[cucumber::when(expr = "I submit DashboardSelectFirst")]
+fn when_dashboard_select_first(world: &mut BusWorld) {
+    world.submit_and_process(npr::Command::DashboardSelectFirst);
+}
+
+#[cucumber::when(expr = "I submit DashboardSelectLast")]
+fn when_dashboard_select_last(world: &mut BusWorld) {
+    world.submit_and_process(npr::Command::DashboardSelectLast);
+}
+
+#[cucumber::then(expr = "the dashboard selected index should be {int}")]
+fn then_dashboard_selected_index(world: &mut BusWorld, expected: u64) {
+    assert_eq!(
+        world.state.dashboard.selected_index(),
+        expected as usize,
+        "dashboard selected index mismatch"
+    );
+}

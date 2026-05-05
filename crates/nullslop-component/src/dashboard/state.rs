@@ -78,6 +78,24 @@ impl DashboardState {
         }
     }
 
+    /// Moves the selection to the first actor entry.
+    ///
+    /// No-op if there are no actors.
+    pub fn select_first(&mut self) {
+        if !self.order.is_empty() {
+            self.selected_index = 0;
+        }
+    }
+
+    /// Moves the selection to the last actor entry.
+    ///
+    /// No-op if there are no actors.
+    pub fn select_last(&mut self) {
+        if !self.order.is_empty() {
+            self.selected_index = self.order.len() - 1;
+        }
+    }
+
     /// Record that an actor has started the startup process.
     pub fn mark_starting<S>(&mut self, name: S, description: Option<String>)
     where
@@ -227,6 +245,63 @@ mod tests {
 
         // When selecting next.
         state.select_next();
+
+        // Then the index stays at 0.
+        assert_eq!(state.selected_index(), 0);
+    }
+
+    #[test]
+    fn select_first_goes_to_index_zero() {
+        // Given 3 actors with selection at index 2.
+        let mut state = DashboardState::new();
+        state.mark_starting("a", None);
+        state.mark_starting("b", None);
+        state.mark_starting("c", None);
+        state.select_next();
+        state.select_next();
+        assert_eq!(state.selected_index(), 2);
+
+        // When selecting first.
+        state.select_first();
+
+        // Then the selected index is 0.
+        assert_eq!(state.selected_index(), 0);
+    }
+
+    #[test]
+    fn select_last_goes_to_last_index() {
+        // Given 3 actors with selection at index 0.
+        let mut state = DashboardState::new();
+        state.mark_starting("a", None);
+        state.mark_starting("b", None);
+        state.mark_starting("c", None);
+
+        // When selecting last.
+        state.select_last();
+
+        // Then the selected index is 2.
+        assert_eq!(state.selected_index(), 2);
+    }
+
+    #[test]
+    fn select_first_noop_with_no_actors() {
+        // Given an empty dashboard.
+        let mut state = DashboardState::new();
+
+        // When selecting first.
+        state.select_first();
+
+        // Then the index stays at 0.
+        assert_eq!(state.selected_index(), 0);
+    }
+
+    #[test]
+    fn select_last_noop_with_no_actors() {
+        // Given an empty dashboard.
+        let mut state = DashboardState::new();
+
+        // When selecting last.
+        state.select_last();
 
         // Then the index stays at 0.
         assert_eq!(state.selected_index(), 0);

@@ -3,7 +3,7 @@
 use derive_more::Debug;
 use nullslop_component::AppUiRegistry;
 use nullslop_core::{AppCore, AppMsg};
-use nullslop_protocol::{Command, Mode};
+use nullslop_protocol::{ActiveTab, Command, Mode};
 use ratatui::Frame;
 use ratatui_tabs::TabManager;
 use ratatui_which_key::{CrosstermKeymapExt, WhichKeyState};
@@ -278,10 +278,13 @@ impl TuiApp {
     }
 }
 
-/// Returns the scope corresponding to the given mode.
-pub fn scope_for_mode(mode: Mode) -> Scope {
+/// Returns the scope corresponding to the given mode and active tab.
+pub fn scope_for_mode(mode: Mode, active_tab: ActiveTab) -> Scope {
     match mode {
-        Mode::Normal => Scope::Normal,
+        Mode::Normal => match active_tab {
+            ActiveTab::Dashboard => Scope::Dashboard,
+            ActiveTab::Chat => Scope::Normal,
+        },
         Mode::Input => Scope::Input,
         Mode::Picker => Scope::Picker,
     }
@@ -305,9 +308,10 @@ mod tests {
         // Given all Mode variants.
         // When mapping each mode to a scope.
         // Then each mode maps to its corresponding scope.
-        assert_eq!(scope_for_mode(Mode::Normal), Scope::Normal);
-        assert_eq!(scope_for_mode(Mode::Input), Scope::Input);
-        assert_eq!(scope_for_mode(Mode::Picker), Scope::Picker);
+        assert_eq!(scope_for_mode(Mode::Normal, ActiveTab::Chat), Scope::Normal);
+        assert_eq!(scope_for_mode(Mode::Normal, ActiveTab::Dashboard), Scope::Dashboard);
+        assert_eq!(scope_for_mode(Mode::Input, ActiveTab::Chat), Scope::Input);
+        assert_eq!(scope_for_mode(Mode::Picker, ActiveTab::Chat), Scope::Picker);
     }
 
     #[test]

@@ -129,7 +129,9 @@ fn run_main_loop(
 
         // Core processing: drain messages, process bus, forward events.
         let should_quit = app.core.tick().should_quit;
-        let scope = scope_for_mode(app.core.state.read().mode);
+        let state_read = app.core.state.read();
+        let scope = scope_for_mode(state_read.mode, state_read.active_tab);
+        drop(state_read);
         app.which_key.set_scope(scope);
 
         // Sync tab manager active tab from AppState.active_tab.

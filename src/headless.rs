@@ -100,7 +100,9 @@ impl HeadlessApp {
 
         for keys in lines {
             for key in keys {
-                let scope = nullslop_tui::app::scope_for_mode(self.core.state.read().mode);
+                let state_read = self.core.state.read();
+                let scope = nullslop_tui::app::scope_for_mode(state_read.mode, state_read.active_tab);
+                drop(state_read);
                 which_key.set_scope(scope);
 
                 if let Some(cmd) = which_key.handle_key(key) {

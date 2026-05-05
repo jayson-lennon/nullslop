@@ -43,8 +43,6 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
             b
             // General — app control
             .bind("q", Command::Quit, KeyCategory::General)
-            .bind("j", Command::DashboardSelectDown, KeyCategory::General)
-            .bind("k", Command::DashboardSelectUp, KeyCategory::General)
             .bind("<c-c>", Command::Quit, KeyCategory::General)
             .bind("?", Command::ToggleWhichKey, KeyCategory::General)
             // Input — enter input mode
@@ -65,6 +63,22 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
             .bind("G", Command::ScrollToBottom, KeyCategory::Navigation)
             .bind("gmp", Command::SetMode { payload: SetMode { mode: Mode::Picker } }, KeyCategory::Model)
             .bind("gmr", Command::RefreshModels, KeyCategory::Model);
+        })
+        // Dashboard scope: actor list navigation
+        .scope(Scope::Dashboard, |b| {
+            b
+            // General — app control
+            .bind("q", Command::Quit, KeyCategory::General)
+            .bind("<c-c>", Command::Quit, KeyCategory::General)
+            .bind("?", Command::ToggleWhichKey, KeyCategory::General)
+            // Navigation — actor list
+            .bind("j", Command::DashboardSelectDown, KeyCategory::Navigation)
+            .bind("k", Command::DashboardSelectUp, KeyCategory::Navigation)
+            .bind("gg", Command::DashboardSelectFirst, KeyCategory::Navigation)
+            .bind("G", Command::DashboardSelectLast, KeyCategory::Navigation)
+            // Tab switching
+            .bind("<tab>", Command::SwitchTab { payload: SwitchTab { direction: TabDirection::Next } }, KeyCategory::Navigation)
+            .bind("<s-tab>", Command::SwitchTab { payload: SwitchTab { direction: TabDirection::Prev } }, KeyCategory::Navigation);
         })
         // Input scope: typing into the input buffer
         .scope(Scope::Input, |b| {
@@ -470,6 +484,98 @@ mod tests {
             "General category should contain 'g' prefix"
         );
         assert_eq!(g_binding.unwrap().description, "general");
+    }
+
+    #[test]
+    fn dashboard_j_produces_dashboard_select_down() {
+        // Given the keymap.
+        let keymap = init();
+
+        // When looking up 'j' in Dashboard scope.
+        let j_key = KeyEvent {
+            key: Key::Char('j'),
+            modifiers: Modifiers::none(),
+        };
+        let node = keymap.get_node_at_path(&[j_key]);
+
+        // Then it's a leaf with DashboardSelectDown for Dashboard scope.
+        assert!(node.is_some());
+        if let Some(ratatui_which_key::KeyNode::Leaf(entries)) = node {
+            let entry = entries.iter().find(|e| e.scope == Scope::Dashboard);
+            assert!(entry.is_some());
+            assert!(matches!(entry.unwrap().action, Command::DashboardSelectDown));
+        } else {
+            panic!("Expected leaf node for 'j' in Dashboard scope");
+        }
+    }
+
+    #[test]
+    fn dashboard_k_produces_dashboard_select_up() {
+        // Given the keymap.
+        let keymap = init();
+
+        // When looking up 'k' in Dashboard scope.
+        let k_key = KeyEvent {
+            key: Key::Char('k'),
+            modifiers: Modifiers::none(),
+        };
+        let node = keymap.get_node_at_path(&[k_key]);
+
+        // Then it's a leaf with DashboardSelectUp for Dashboard scope.
+        assert!(node.is_some());
+        if let Some(ratatui_which_key::KeyNode::Leaf(entries)) = node {
+            let entry = entries.iter().find(|e| e.scope == Scope::Dashboard);
+            assert!(entry.is_some());
+            assert!(matches!(entry.unwrap().action, Command::DashboardSelectUp));
+        } else {
+            panic!("Expected leaf node for 'k' in Dashboard scope");
+        }
+    }
+
+    #[test]
+    fn dashboard_gg_produces_dashboard_select_first() {
+        // Given the keymap.
+        let keymap = init();
+
+        // When looking up 'gg' in Dashboard scope.
+        let g_key = KeyEvent {
+            key: Key::Char('g'),
+            modifiers: Modifiers::none(),
+        };
+        let node = keymap.get_node_at_path(&[g_key.clone(), g_key]);
+
+        // Then it's a leaf with DashboardSelectFirst for Dashboard scope.
+        assert!(node.is_some());
+        if let Some(ratatui_which_key::KeyNode::Leaf(entries)) = node {
+            let entry = entries.iter().find(|e| e.scope == Scope::Dashboard);
+            assert!(entry.is_some());
+            assert!(matches!(entry.unwrap().action, Command::DashboardSelectFirst));
+        } else {
+            panic!("Expected leaf node for 'gg' in Dashboard scope");
+        }
+    }
+
+    #[test]
+    fn dashboard_uppercase_g_produces_dashboard_select_last() {
+        // Given the keymap.
+        let keymap = init();
+
+        // When looking up 'G' in Dashboard scope.
+        let g_key = KeyEvent {
+            key: Key::Char('G'),
+            modifiers: Modifiers::none(),
+        };
+        let node = keymap.get_node_at_path(&[g_key]);
+
+        // Then it's a leaf with DashboardSelectLast for Dashboard scope.
+        assert!(node.is_some());
+        if let Some(ratatui_which_key::KeyNode::Leaf(entries)) = node {
+            let entry = entries.iter().find(|e| e.scope == Scope::Dashboard);
+            assert!(entry.is_some());
+            assert!(matches!(entry.unwrap().action, Command::DashboardSelectLast));
+        } else {
+            panic!("Expected leaf node for 'G' in Dashboard scope");
+        }
     }
 
     #[test]

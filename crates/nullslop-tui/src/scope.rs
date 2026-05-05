@@ -10,6 +10,8 @@
 pub enum Scope {
     /// Normal mode — navigation and commands.
     Normal,
+    /// Dashboard mode — actor list navigation.
+    Dashboard,
     /// Picker mode — filtering and selecting a provider.
     Picker,
     /// Input mode — typing into the input buffer.
@@ -30,10 +32,11 @@ mod tests {
 
     #[test]
     fn picker_is_between_normal_and_input() {
-        // Given the three scopes.
+        // Given the four scopes.
         // When comparing.
-        // Then Normal < Picker < Input (derived from declaration order).
-        assert!(Scope::Normal < Scope::Picker);
+        // Then Normal < Dashboard < Picker < Input (derived from declaration order).
+        assert!(Scope::Normal < Scope::Dashboard);
+        assert!(Scope::Dashboard < Scope::Picker);
         assert!(Scope::Picker < Scope::Input);
     }
 }

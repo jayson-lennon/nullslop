@@ -48,7 +48,7 @@ use nullslop_protocol::provider_picker::{
     PickerBackspace, PickerConfirm, PickerMoveCursorLeft, PickerMoveCursorRight, PickerMoveDown,
     PickerMoveUp,
 };
-use nullslop_protocol::system::{DashboardSelectDown, DashboardSelectUp, EditInput, MouseScrollDown, MouseScrollUp, Quit, ScrollDown, ScrollLineDown, ScrollLineUp, ScrollToBottom, ScrollToTop, ScrollUp, ToggleWhichKey};
+use nullslop_protocol::system::{DashboardSelectDown, DashboardSelectFirst, DashboardSelectLast, DashboardSelectUp, EditInput, MouseScrollDown, MouseScrollUp, Quit, ScrollDown, ScrollLineDown, ScrollLineUp, ScrollToBottom, ScrollToTop, ScrollUp, ToggleWhichKey};
 use nullslop_protocol::{ActorName, Command, CommandAction, Event};
 
 use crate::handler::{CommandHandler, EventHandler, HandlerContext};
@@ -549,6 +549,14 @@ impl<S, Sv> Bus<S, Sv> {
             }
             Command::DashboardSelectUp => {
                 let cmd = DashboardSelectUp;
+                self.dispatch_command_to_handlers(&cmd, state, services, &mut out);
+            }
+            Command::DashboardSelectFirst => {
+                let cmd = DashboardSelectFirst;
+                self.dispatch_command_to_handlers(&cmd, state, services, &mut out);
+            }
+            Command::DashboardSelectLast => {
+                let cmd = DashboardSelectLast;
                 self.dispatch_command_to_handlers(&cmd, state, services, &mut out);
             }
         }

@@ -339,7 +339,9 @@ fn run_headless_script(world: &mut TuiWorld, content: &str) {
 
     for keys in lines {
         for key in keys {
-            let scope = nullslop_tui::app::scope_for_mode(world.app.core.state.read().mode);
+            let state_read = world.app.core.state.read();
+            let scope = nullslop_tui::app::scope_for_mode(state_read.mode, state_read.active_tab);
+            drop(state_read);
             world.app.which_key.set_scope(scope);
             if let Some(cmd) = world.app.which_key.handle_key(key) {
                 world.route_command(cmd);

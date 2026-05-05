@@ -6,8 +6,8 @@
 use crate::AppState;
 use nullslop_component_core::{HandlerContext, define_handler};
 use nullslop_protocol::actor::{ActorStarted, ActorStarting};
-use nullslop_protocol::system::{DashboardSelectDown, DashboardSelectUp};
-use nullslop_protocol::{ActiveTab, CommandAction};
+use nullslop_protocol::system::{DashboardSelectDown, DashboardSelectFirst, DashboardSelectLast, DashboardSelectUp};
+use nullslop_protocol::CommandAction;
 use nullslop_services::Services;
 
 define_handler! {
@@ -15,6 +15,8 @@ define_handler! {
 
     commands {
         DashboardSelectDown: on_select_down,
+        DashboardSelectFirst: on_select_first,
+        DashboardSelectLast: on_select_last,
         DashboardSelectUp: on_select_up,
     }
 
@@ -36,22 +38,26 @@ impl DashboardHandler {
     }
 
     /// Moves the dashboard selection down one entry.
-    ///
-    /// No-op when the Dashboard tab is not active.
     fn on_select_down(_cmd: &DashboardSelectDown, ctx: &mut HandlerContext<'_, AppState, Services>) -> CommandAction {
-        if ctx.state.active_tab == ActiveTab::Dashboard {
-            ctx.state.dashboard.select_next();
-        }
+        ctx.state.dashboard.select_next();
         CommandAction::Continue
     }
 
     /// Moves the dashboard selection up one entry.
-    ///
-    /// No-op when the Dashboard tab is not active.
     fn on_select_up(_cmd: &DashboardSelectUp, ctx: &mut HandlerContext<'_, AppState, Services>) -> CommandAction {
-        if ctx.state.active_tab == ActiveTab::Dashboard {
-            ctx.state.dashboard.select_prev();
-        }
+        ctx.state.dashboard.select_prev();
+        CommandAction::Continue
+    }
+
+    /// Moves the dashboard selection to the first entry.
+    fn on_select_first(_cmd: &DashboardSelectFirst, ctx: &mut HandlerContext<'_, AppState, Services>) -> CommandAction {
+        ctx.state.dashboard.select_first();
+        CommandAction::Continue
+    }
+
+    /// Moves the dashboard selection to the last entry.
+    fn on_select_last(_cmd: &DashboardSelectLast, ctx: &mut HandlerContext<'_, AppState, Services>) -> CommandAction {
+        ctx.state.dashboard.select_last();
         CommandAction::Continue
     }
 }
@@ -156,15 +162,12 @@ mod tests {
     }
 
     #[test]
-    fn select_down_moves_selection_on_dashboard_tab() {
-        // Given a bus with DashboardHandler registered, on the Dashboard tab.
+    fn select_down_moves_selection() {
+        // Given a bus with DashboardHandler registered.
         let mut bus: Bus<AppState, Services> = Bus::new();
         DashboardHandler.register(&mut bus);
         let services = test_utils::test_services();
-        let mut state = AppState {
-            active_tab: nullslop_protocol::ActiveTab::Dashboard,
-            ..Default::default()
-        };
+        let mut state = AppState::default();
         state.dashboard.mark_starting("echo", None);
         state.dashboard.mark_starting("llm", None);
 
@@ -177,15 +180,12 @@ mod tests {
     }
 
     #[test]
-    fn select_up_clamps_at_zero_on_dashboard_tab() {
-        // Given a bus with DashboardHandler registered, on the Dashboard tab at index 0.
+    fn select_up_clamps_at_zero() {
+        // Given a bus with DashboardHandler registered at index 0.
         let mut bus: Bus<AppState, Services> = Bus::new();
         DashboardHandler.register(&mut bus);
         let services = test_utils::test_services();
-        let mut state = AppState {
-            active_tab: nullslop_protocol::ActiveTab::Dashboard,
-            ..Default::default()
-        };
+        let mut state = AppState::default();
         state.dashboard.mark_starting("echo", None);
         state.dashboard.mark_starting("llm", None);
 
@@ -198,20 +198,43 @@ mod tests {
     }
 
     #[test]
-    fn select_is_noop_on_chat_tab() {
-        // Given a bus with DashboardHandler registered, on the Chat tab.
+    fn select_first_moves_to_index_zero() {
+        // Given a bus with DashboardHandler registered.
         let mut bus: Bus<AppState, Services> = Bus::new();
         DashboardHandler.register(&mut bus);
         let services = test_utils::test_services();
         let mut state = AppState::default();
         state.dashboard.mark_starting("echo", None);
         state.dashboard.mark_starting("llm", None);
+        state.dashboard.mark_starting("ctx", None);
+        state.dashboard.select_next();
+        state.dashboard.select_next();
+        assert_eq!(state.dashboard.selected_index(), 2);
 
-        // When processing a DashboardSelectDown command.
-        bus.submit_command(Command::DashboardSelectDown);
+        // When processing a DashboardSelectFirst command.
+        bus.submit_command(Command::DashboardSelectFirst);
         bus.process_commands(&mut state, &services);
 
-        // Then the selected index stays at 0.
+        // Then the selected index is 0.
         assert_eq!(state.dashboard.selected_index(), 0);
+    }
+
+    #[test]
+    fn select_last_moves_to_last_index() {
+        // Given a bus with DashboardHandler registered.
+        let mut bus: Bus<AppState, Services> = Bus::new();
+        DashboardHandler.register(&mut bus);
+        let services = test_utils::test_services();
+        let mut state = AppState::default();
+        state.dashboard.mark_starting("echo", None);
+        state.dashboard.mark_starting("llm", None);
+        state.dashboard.mark_starting("ctx", None);
+
+        // When processing a DashboardSelectLast command.
+        bus.submit_command(Command::DashboardSelectLast);
+        bus.process_commands(&mut state, &services);
+
+        // Then the selected index is 2.
+        assert_eq!(state.dashboard.selected_index(), 2);
     }
 }

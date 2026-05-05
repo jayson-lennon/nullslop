@@ -293,6 +293,12 @@ pub enum Command {
     /// Move the dashboard selection up one entry.
     #[serde(rename = "dashboard_select_up")]
     DashboardSelectUp,
+    /// Move the dashboard selection to the first entry.
+    #[serde(rename = "dashboard_select_first")]
+    DashboardSelectFirst,
+    /// Move the dashboard selection to the last entry.
+    #[serde(rename = "dashboard_select_last")]
+    DashboardSelectLast,
     /// Insert a character into the picker filter.
     #[serde(rename = "picker_insert_char")]
     PickerInsertChar {
@@ -382,7 +388,7 @@ impl Command {
             Self::ToolCallReceived { .. } => Some(ToolCallReceived::NAME),
             Self::ToolCallStreaming { .. } => Some(ToolCallStreaming::NAME),
             Self::PushToolResult { .. } => Some(PushToolResult::NAME),
-            Self::DashboardSelectDown | Self::DashboardSelectUp => None,
+            Self::DashboardSelectDown | Self::DashboardSelectUp | Self::DashboardSelectFirst | Self::DashboardSelectLast => None,
         }
     }
 }
@@ -492,6 +498,8 @@ impl std::fmt::Display for Command {
             }
             Command::DashboardSelectDown => write!(f, "dashboard select down"),
             Command::DashboardSelectUp => write!(f, "dashboard select up"),
+            Command::DashboardSelectFirst => write!(f, "dashboard select first"),
+            Command::DashboardSelectLast => write!(f, "dashboard select last"),
         }
     }
 }
@@ -586,6 +594,8 @@ mod tests {
     #[case::push_tool_result(Command::PushToolResult { payload: PushToolResult { session_id: SessionId::new(), result: crate::ToolResult { tool_call_id: "call_1".into(), name: "echo".into(), content: "hi".into(), success: true } } })]
     #[case::dashboard_select_down(Command::DashboardSelectDown)]
     #[case::dashboard_select_up(Command::DashboardSelectUp)]
+    #[case::dashboard_select_first(Command::DashboardSelectFirst)]
+    #[case::dashboard_select_last(Command::DashboardSelectLast)]
     fn command_roundtrip_all_variants(#[case] cmd: Command) {
         // Given a command variant.
         let json = serde_json::to_string(&cmd).expect("serialize");

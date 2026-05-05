@@ -77,3 +77,13 @@ pub struct DashboardSelectDown;
 #[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
 #[cmd("system")]
 pub struct DashboardSelectUp;
+
+/// Move the dashboard selection to the first entry.
+#[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
+#[cmd("system")]
+pub struct DashboardSelectFirst;
+
+/// Move the dashboard selection to the last entry.
+#[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
+#[cmd("system")]
+pub struct DashboardSelectLast;
