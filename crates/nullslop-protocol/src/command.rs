@@ -287,6 +287,12 @@ pub enum Command {
         #[serde(flatten)]
         payload: PushToolResult,
     },
+    /// Move the dashboard selection down one entry.
+    #[serde(rename = "dashboard_select_down")]
+    DashboardSelectDown,
+    /// Move the dashboard selection up one entry.
+    #[serde(rename = "dashboard_select_up")]
+    DashboardSelectUp,
     /// Insert a character into the picker filter.
     #[serde(rename = "picker_insert_char")]
     PickerInsertChar {
@@ -376,6 +382,7 @@ impl Command {
             Self::ToolCallReceived { .. } => Some(ToolCallReceived::NAME),
             Self::ToolCallStreaming { .. } => Some(ToolCallStreaming::NAME),
             Self::PushToolResult { .. } => Some(PushToolResult::NAME),
+            Self::DashboardSelectDown | Self::DashboardSelectUp => None,
         }
     }
 }
@@ -491,6 +498,8 @@ impl std::fmt::Display for Command {
                     payload.result.name, payload.result.tool_call_id
                 )
             }
+            Command::DashboardSelectDown => write!(f, "dashboard select down"),
+            Command::DashboardSelectUp => write!(f, "dashboard select up"),
         }
     }
 }
@@ -583,6 +592,8 @@ mod tests {
     #[case::tool_call_received(Command::ToolCallReceived { payload: ToolCallReceived { session_id: SessionId::new(), tool_call: crate::ToolCall { id: "call_1".into(), name: "echo".into(), arguments: "{}".into() } } })]
     #[case::tool_call_streaming(Command::ToolCallStreaming { payload: ToolCallStreaming { session_id: SessionId::new(), index: 0, partial_json: "{\"a\":".into() } })]
     #[case::push_tool_result(Command::PushToolResult { payload: PushToolResult { session_id: SessionId::new(), result: crate::ToolResult { tool_call_id: "call_1".into(), name: "echo".into(), content: "hi".into(), success: true } } })]
+    #[case::dashboard_select_down(Command::DashboardSelectDown)]
+    #[case::dashboard_select_up(Command::DashboardSelectUp)]
     fn command_roundtrip_all_variants(#[case] cmd: Command) {
         // Given a command variant.
         let json = serde_json::to_string(&cmd).expect("serialize");

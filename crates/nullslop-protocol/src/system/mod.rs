@@ -3,5 +3,5 @@
 mod command;
 mod event;
 
-pub use command::{EditInput, MouseScrollDown, MouseScrollUp, Quit, ScrollDown, ScrollLineDown, ScrollLineUp, ScrollToBottom, ScrollToTop, ScrollUp, SetMode, ToggleWhichKey};
+pub use command::{DashboardSelectDown, DashboardSelectUp, EditInput, MouseScrollDown, MouseScrollUp, Quit, ScrollDown, ScrollLineDown, ScrollLineUp, ScrollToBottom, ScrollToTop, ScrollUp, SetMode, ToggleWhichKey};
 pub use event::{KeyDown, KeyUp, ModeChanged};

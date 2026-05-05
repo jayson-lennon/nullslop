@@ -1,8 +1,9 @@
 //! Renders the dashboard view — a list of actors with their startup status.
 //!
-//! Each actor is displayed as a card with its name and status on one line,
-//! and a light gray description indented below. "Starting" appears yellow,
-//! "Running" appears green.
+//! Each actor is displayed with a 2-cell left border. The selected entry shows
+//! a solid yellow full block (`██`) in the border; unselected entries show spaces.
+//! The view scrolls when actors overflow the viewport, keeping the selected
+//! entry visible.
 
 use crate::AppState;
 use crate::dashboard::state::ActorStatus;
@@ -11,7 +12,12 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
+use ratatui::widgets::{Block, Borders, Paragraph};
+
+/// Solid yellow full block used as the selection indicator.
+const SELECTED_INDICATOR: &str = "\u{2588}\u{2588}";
+/// Two spaces used as the unselected border.
+const UNSELECTED_BORDER: &str = "  ";
 
 /// Display element for the actor dashboard.
 #[derive(Debug)]
@@ -23,7 +29,10 @@ impl UiElement<AppState> for DashboardElement {
     }
 
     fn render(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppState) {
-        let lines: Vec<Line> = if state.dashboard.actors().is_empty() {
+        let actors = state.dashboard.actors();
+        let selected_index = state.dashboard.selected_index();
+
+        let lines: Vec<Line> = if actors.is_empty() {
             vec![Line::from(Span::styled(
                 "No actors registered.",
                 Style::default().fg(Color::DarkGray),
@@ -31,33 +40,49 @@ impl UiElement<AppState> for DashboardElement {
         } else {
             let mut lines = Vec::new();
 
-            for (i, entry) in state.dashboard.actors().iter().enumerate() {
+            for (i, entry) in actors.iter().enumerate() {
+                let is_selected = i == selected_index;
+                let border_span = if is_selected {
+                    Span::styled(SELECTED_INDICATOR, Style::default().fg(Color::Yellow))
+                } else {
+                    Span::raw(UNSELECTED_BORDER)
+                };
+
                 let (label, color) = match entry.status {
                     ActorStatus::Starting => ("Starting", Color::Yellow),
                     ActorStatus::Running => ("Running", Color::Green),
                 };
 
-                // Name line: padded name ... status
+                // Name line: border + padded name ... status
                 lines.push(Line::from(vec![
+                    border_span,
                     Span::styled(
                         format!(" {}", entry.name),
                         Style::default().bold(),
                     ),
-                    // Fill with spaces to push status right — use raw spaces
+                    // Fill with spaces to push status right
                     Span::raw(fill_to_status(&entry.name, area.width)),
                     Span::styled(label, Style::default().fg(color)),
                 ]));
 
                 // Description line (if present).
                 if let Some(desc) = &entry.description {
-                    lines.push(Line::from(Span::styled(
-                        format!("   {}", desc),
-                        Style::default().fg(Color::DarkGray),
-                    )));
+                    let desc_border = if is_selected {
+                        Span::styled(SELECTED_INDICATOR, Style::default().fg(Color::Yellow))
+                    } else {
+                        Span::raw(UNSELECTED_BORDER)
+                    };
+                    lines.push(Line::from(vec![
+                        desc_border,
+                        Span::styled(
+                            format!("   {}", desc),
+                            Style::default().fg(Color::DarkGray),
+                        ),
+                    ]));
                 }
 
                 // Blank line between actors (not after the last one).
-                if i < state.dashboard.actors().len() - 1 {
+                if i < actors.len() - 1 {
                     lines.push(Line::from(""));
                 }
             }
@@ -65,18 +90,25 @@ impl UiElement<AppState> for DashboardElement {
             lines
         };
 
+        // Calculate total visual lines for scroll clamping.
+        let total_lines = lines.len() as u16;
+        let max_offset = total_lines.saturating_sub(area.height);
+        let scroll_offset = state.dashboard.scroll_offset().min(max_offset);
+
         let widget = Paragraph::new(lines)
             .block(Block::default().borders(Borders::NONE))
-            .wrap(Wrap { trim: true });
+            .scroll((scroll_offset, 0));
         frame.render_widget(widget, area);
     }
 }
 
 /// Returns spaces to pad between the name and the right-aligned status.
 /// The status label takes up to ~8 chars ("Starting"), so we leave room.
+/// The 2-cell left border is accounted for in the calculation.
 fn fill_to_status(name: &str, area_width: u16) -> String {
     let status_width: usize = 8; // "Starting" is the longest status
-    let name_len = name.len() + 1; // +1 for leading space
+    let border_width: usize = 2; // "██" or "  "
+    let name_len = name.len() + 1 + border_width; // +1 for leading space, +2 for border
     let available = area_width as usize;
     let padding = available.saturating_sub(name_len).saturating_sub(status_width);
     " ".repeat(padding.max(1))
@@ -217,5 +249,103 @@ mod tests {
         assert!(rows[1].contains("Echoes messages back"));
         assert!(rows[3].contains("llm"));
         assert!(rows[4].contains("LLM streaming"));
+    }
+
+    #[test]
+    fn render_selected_entry_shows_yellow_block() {
+        // Given two actors with the first selected (default index 0).
+        let mut element = DashboardElement;
+        let state = {
+            let mut s = AppState::default();
+            s.dashboard.mark_starting("echo", Some("Echoes messages back".to_string()));
+            s.dashboard.mark_starting("llm", Some("LLM streaming".to_string()));
+            s
+        };
+
+        // When rendering.
+        let backend = TestBackend::new(40, 10);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 40, 10);
+        terminal
+            .draw(|frame| {
+                element.render(frame, area, &state);
+            })
+            .unwrap();
+
+        // Then the first entry has a yellow full block at columns 0-1.
+        let buffer = terminal.backend().buffer();
+        let cell0 = buffer.cell((0, 0)).expect("cell 0,0");
+        let cell1 = buffer.cell((1, 0)).expect("cell 1,0");
+        assert_eq!(cell0.symbol(), "\u{2588}");
+        assert_eq!(cell0.fg, Color::Yellow);
+        assert_eq!(cell1.symbol(), "\u{2588}");
+        assert_eq!(cell1.fg, Color::Yellow);
+
+        // And the description line also has the yellow block.
+        let desc_cell0 = buffer.cell((0, 1)).expect("cell 0,1");
+        assert_eq!(desc_cell0.symbol(), "\u{2588}");
+        assert_eq!(desc_cell0.fg, Color::Yellow);
+    }
+
+    #[test]
+    fn render_unselected_entry_shows_spaces() {
+        // Given two actors with the first selected (default index 0).
+        let mut element = DashboardElement;
+        let state = {
+            let mut s = AppState::default();
+            s.dashboard.mark_starting("echo", Some("Echoes messages back".to_string()));
+            s.dashboard.mark_starting("llm", Some("LLM streaming".to_string()));
+            s
+        };
+
+        // When rendering.
+        let backend = TestBackend::new(40, 10);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 40, 10);
+        terminal
+            .draw(|frame| {
+                element.render(frame, area, &state);
+            })
+            .unwrap();
+
+        // Then the second entry (row 3) has spaces at columns 0-1.
+        let buffer = terminal.backend().buffer();
+        let cell0 = buffer.cell((0, 3)).expect("cell 0,3");
+        let cell1 = buffer.cell((1, 3)).expect("cell 1,3");
+        assert_eq!(cell0.symbol(), " ");
+        assert_eq!(cell1.symbol(), " ");
+    }
+
+    #[test]
+    fn render_selection_moves_with_next() {
+        // Given two actors with the second selected.
+        let mut element = DashboardElement;
+        let state = {
+            let mut s = AppState::default();
+            s.dashboard.mark_starting("echo", Some("Echoes messages back".to_string()));
+            s.dashboard.mark_starting("llm", Some("LLM streaming".to_string()));
+            s.dashboard.select_next();
+            s
+        };
+
+        // When rendering.
+        let backend = TestBackend::new(40, 10);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let area = Rect::new(0, 0, 40, 10);
+        terminal
+            .draw(|frame| {
+                element.render(frame, area, &state);
+            })
+            .unwrap();
+
+        // Then the first entry has spaces (unselected).
+        let buffer = terminal.backend().buffer();
+        let first_cell = buffer.cell((0, 0)).expect("cell 0,0");
+        assert_eq!(first_cell.symbol(), " ");
+
+        // And the second entry (row 3) has the yellow block (selected).
+        let second_cell = buffer.cell((0, 3)).expect("cell 0,3");
+        assert_eq!(second_cell.symbol(), "\u{2588}");
+        assert_eq!(second_cell.fg, Color::Yellow);
     }
 }

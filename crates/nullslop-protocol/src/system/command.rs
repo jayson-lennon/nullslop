@@ -67,3 +67,13 @@ pub struct ScrollToTop;
 #[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
 #[cmd("system")]
 pub struct ScrollToBottom;
+
+/// Move the dashboard selection down one entry.
+#[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
+#[cmd("system")]
+pub struct DashboardSelectDown;
+
+/// Move the dashboard selection up one entry.
+#[derive(Debug, Clone, Serialize, Deserialize, CommandMsg)]
+#[cmd("system")]
+pub struct DashboardSelectUp;

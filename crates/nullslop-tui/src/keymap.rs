@@ -45,6 +45,8 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
             b
             // General — app control
             .bind("q", Command::Quit, KeyCategory::General)
+            .bind("j", Command::DashboardSelectDown, KeyCategory::General)
+            .bind("k", Command::DashboardSelectUp, KeyCategory::General)
             .bind("<c-c>", Command::Quit, KeyCategory::General)
             .bind("?", Command::ToggleWhichKey, KeyCategory::General)
             // Mode — mode transitions
