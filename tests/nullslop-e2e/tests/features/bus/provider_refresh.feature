@@ -7,12 +7,10 @@ Feature: Provider Refresh
     Then the chat history should contain 1 entry
     And chat history entry 1 should be a System message with text "Refreshing model list..."
 
-  Scenario: ModelsRefreshed updates cache from disk
+  Scenario: ModelsRefreshed sets last refreshed timestamp
     Given a fresh bus with all handlers
-    And a model cache file exists for provider "ollama" with models "llama3, mistral"
-    When I submit a ModelsRefreshed event for provider "ollama" with models "llama3, mistral"
-    Then the model cache should contain 1 provider
-    And the model cache entry for "ollama" should have 2 models
+    When I submit a ModelsRefreshed event with no results or errors
+    Then the last refreshed at timestamp should be set
 
   Scenario: ModelsRefreshed posts summary message
     Given a fresh bus with all handlers

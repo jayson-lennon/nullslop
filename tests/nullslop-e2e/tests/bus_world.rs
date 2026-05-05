@@ -617,15 +617,7 @@ fn when_refresh_models(world: &mut BusWorld) {
     world.submit_and_process(npr::Command::RefreshModels);
 }
 
-#[cucumber::given(expr = "a model cache file exists for provider {string} with models {string}")]
-fn given_model_cache_file(_world: &mut BusWorld, provider: String, models: String) {
-    let mut cache = nullslop_providers::ModelCache::new();
-    let model_list: Vec<String> = models.split(", ").map(|s| s.to_owned()).collect();
-    cache.entries.insert(provider, model_list);
-    let path = nullslop_providers::cache_path();
-    let _ = std::fs::remove_file(&path); // Clean up from previous runs.
-    cache.save(&path).expect("save cache");
-}
+
 
 #[cucumber::when(expr = "I submit a ModelsRefreshed event for provider {string} with models {string}")]
 fn when_models_refreshed_for_provider(world: &mut BusWorld, provider: String, models: String) {
@@ -675,27 +667,11 @@ fn when_models_refreshed_empty(world: &mut BusWorld) {
     });
 }
 
-#[cucumber::then(expr = "the model cache should contain {int} provider")]
-fn then_model_cache_provider_count(world: &mut BusWorld, count: u64) {
-    let cache = world
-        .state
-        .model_cache
-        .as_ref()
-        .expect("model cache should be loaded");
-    assert_eq!(cache.entries.len(), count as usize, "model cache provider count mismatch");
-}
-
-#[cucumber::then(expr = "the model cache entry for {string} should have {int} models")]
-fn then_model_cache_entry_models(world: &mut BusWorld, provider: String, count: u64) {
-    let cache = world
-        .state
-        .model_cache
-        .as_ref()
-        .expect("model cache should be loaded");
-    assert_eq!(
-        cache.entries[&provider].len(),
-        count as usize,
-        "model cache entry model count mismatch"
+#[cucumber::then(expr = "the last refreshed at timestamp should be set")]
+fn then_last_refreshed_at_is_set(world: &mut BusWorld) {
+    assert!(
+        world.state.last_refreshed_at.is_some(),
+        "expected last_refreshed_at to be set after ModelsRefreshed"
     );
 }
 
