@@ -1,5 +1,6 @@
 //! State for a single chat session — history, input box, and streaming progress.
 
+use std::cell::Cell;
 use std::collections::{HashMap, VecDeque};
 
 use crate::chat_input_box::ChatInputBoxState;
@@ -28,7 +29,16 @@ pub struct ChatSessionState {
     /// Maps stream tool call index to history index for in-progress tool calls.
     streaming_tool_call_indices: HashMap<usize, usize>,
     /// Number of lines to skip from the top when rendering (ratatui scroll offset).
-    scroll_offset: u16,
+    ///
+    /// `None` means "show the bottom of the conversation" (auto-scroll).
+    /// `Some(n)` means the user has manually scrolled to offset `n`.
+    scroll_offset: Option<u16>,
+    /// The maximum scroll offset computed during the last render.
+    ///
+    /// Used by scroll handlers to resolve the "at bottom" sentinel into
+    /// a concrete offset so `scroll_up` / `scroll_down` work correctly.
+    /// Uses `Cell` for interior mutability since the element receives `&self`.
+    last_max_offset: Cell<u16>,
 }
 
 impl ChatSessionState {
@@ -43,7 +53,8 @@ impl ChatSessionState {
             message_queue: VecDeque::new(),
             is_sending: false,
             streaming_tool_call_indices: HashMap::new(),
-            scroll_offset: 0,
+            scroll_offset: None,
+            last_max_offset: Cell::new(0),
         }
     }
 
@@ -285,25 +296,52 @@ impl ChatSessionState {
     }
 
     /// The current scroll offset (lines to skip from top).
-    pub fn scroll_offset(&self) -> u16 {
+    ///
+    /// Returns `None` when auto-scrolled to the bottom, or `Some(n)` when
+    /// the user has manually scrolled to a specific offset.
+    pub fn scroll_offset(&self) -> Option<u16> {
         self.scroll_offset
     }
 
+    /// Whether the conversation is scrolled to the bottom (auto-scroll position).
+    pub fn is_at_bottom(&self) -> bool {
+        self.scroll_offset.is_none()
+    }
+
     /// Scroll up (toward older messages) by the given number of lines.
+    ///
+    /// If currently at the bottom (auto-scroll), resolves to `last_max_offset` first
+    /// so the scroll is relative to the actual bottom position.
     pub fn scroll_up(&mut self, amount: u16) {
-        self.scroll_offset = self.scroll_offset.saturating_sub(amount);
+        let current = self.scroll_offset.unwrap_or(self.last_max_offset.get());
+        self.scroll_offset = Some(current.saturating_sub(amount));
     }
 
     /// Scroll down (toward newer messages) by the given number of lines.
     ///
-    /// Capped at `u16::MAX` — the element clamps during render.
+    /// If the resulting offset reaches or exceeds `last_max_offset`, resets to
+    /// auto-scroll (bottom).
     pub fn scroll_down(&mut self, amount: u16) {
-        self.scroll_offset = self.scroll_offset.saturating_add(amount);
+        let current = self.scroll_offset.unwrap_or(self.last_max_offset.get());
+        let next = current.saturating_add(amount);
+        if next >= self.last_max_offset.get() {
+            self.scroll_offset = None;
+        } else {
+            self.scroll_offset = Some(next);
+        }
     }
 
     /// Reset scroll to show the bottom of the conversation.
     pub fn reset_scroll(&mut self) {
-        self.scroll_offset = u16::MAX;
+        self.scroll_offset = None;
+    }
+
+    /// Update the cached maximum scroll offset from the renderer.
+    ///
+    /// Called by the chat log element during each render so that
+    /// scroll handlers can resolve the "at bottom" state into a concrete offset.
+    pub fn set_last_max_offset(&self, max_offset: u16) {
+        self.last_max_offset.set(max_offset);
     }
 }
 
@@ -428,70 +466,119 @@ mod tests {
     }
 
     #[test]
-    fn scroll_up_decrements_offset() {
-        // Given a session with a high scroll offset.
+    fn scroll_up_from_bottom_decrements_offset() {
+        // Given a session at the bottom with last_max_offset = 100.
         let mut session = ChatSessionState::new();
+        session.set_last_max_offset(100);
         session.reset_scroll();
-        assert_eq!(session.scroll_offset(), u16::MAX);
+        assert!(session.scroll_offset().is_none());
 
         // When scrolling up by 10.
         session.scroll_up(10);
 
-        // Then the offset decreased by 10.
-        assert_eq!(session.scroll_offset(), u16::MAX - 10);
+        // Then the offset is 90 (100 − 10).
+        assert_eq!(session.scroll_offset(), Some(90));
+    }
+
+    #[test]
+    fn scroll_up_from_known_offset_decrements() {
+        // Given a session with scroll_offset = 50 and last_max_offset = 100.
+        let mut session = ChatSessionState::new();
+        session.set_last_max_offset(100);
+        session.scroll_offset = Some(50);
+
+        // When scrolling up by 10.
+        session.scroll_up(10);
+
+        // Then the offset is 40.
+        assert_eq!(session.scroll_offset(), Some(40));
     }
 
     #[test]
     fn scroll_up_saturates_at_zero() {
-        // Given a session with scroll_offset = 5.
+        // Given a session with scroll_offset = 5 and last_max_offset = 100.
         let mut session = ChatSessionState::new();
-        session.scroll_down(5);
-        assert_eq!(session.scroll_offset(), 5);
+        session.set_last_max_offset(100);
+        session.scroll_offset = Some(5);
 
         // When scrolling up by 20.
         session.scroll_up(20);
 
         // Then the offset saturates at 0.
-        assert_eq!(session.scroll_offset(), 0);
+        assert_eq!(session.scroll_offset(), Some(0));
     }
 
     #[test]
     fn scroll_down_increments_offset() {
-        // Given a session with scroll_offset = 0.
+        // Given a session with scroll_offset = 0 and last_max_offset = 100.
         let mut session = ChatSessionState::new();
-        assert_eq!(session.scroll_offset(), 0);
+        session.set_last_max_offset(100);
+        session.scroll_offset = Some(0);
 
         // When scrolling down by 10.
         session.scroll_down(10);
 
         // Then the offset increased by 10.
-        assert_eq!(session.scroll_offset(), 10);
+        assert_eq!(session.scroll_offset(), Some(10));
     }
 
     #[test]
-    fn reset_scroll_sets_to_max() {
-        // Given a session with scroll_offset = 0.
+    fn scroll_down_past_bottom_resets_to_auto() {
+        // Given a session with scroll_offset = 95 and last_max_offset = 100.
         let mut session = ChatSessionState::new();
-        assert_eq!(session.scroll_offset(), 0);
+        session.set_last_max_offset(100);
+        session.scroll_offset = Some(95);
+
+        // When scrolling down by 10.
+        session.scroll_down(10);
+
+        // Then the offset resets to None (auto-scroll to bottom).
+        assert!(session.scroll_offset().is_none());
+    }
+
+    #[test]
+    fn reset_scroll_clears_offset() {
+        // Given a session with scroll_offset = 50.
+        let mut session = ChatSessionState::new();
+        session.scroll_offset = Some(50);
 
         // When resetting scroll.
         session.reset_scroll();
 
-        // Then the offset is u16::MAX.
-        assert_eq!(session.scroll_offset(), u16::MAX);
+        // Then the offset is None (at bottom).
+        assert!(session.scroll_offset().is_none());
     }
 
     #[test]
     fn push_entry_resets_scroll() {
-        // Given a session with scroll_offset = 0.
+        // Given a session with scroll_offset = 50.
         let mut session = ChatSessionState::new();
-        assert_eq!(session.scroll_offset(), 0);
+        session.scroll_offset = Some(50);
 
         // When pushing an entry.
         session.push_entry(ChatEntry::user("hello"));
 
-        // Then scroll_offset is u16::MAX (reset by push_entry).
-        assert_eq!(session.scroll_offset(), u16::MAX);
+        // Then scroll_offset is None (reset by push_entry).
+        assert!(session.scroll_offset().is_none());
+    }
+
+    #[test]
+    fn is_at_bottom_true_when_auto_scroll() {
+        // Given a new session (auto-scroll to bottom).
+        let session = ChatSessionState::new();
+
+        // Then is_at_bottom is true.
+        assert!(session.is_at_bottom());
+    }
+
+    #[test]
+    fn is_at_bottom_false_when_scrolled_up() {
+        // Given a session scrolled to offset 50.
+        let mut session = ChatSessionState::new();
+        session.scroll_offset = Some(50);
+
+        // Then is_at_bottom is false.
+        assert!(!session.is_at_bottom());
     }
 
     // --- Queue tests ---

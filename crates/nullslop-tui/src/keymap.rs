@@ -4,12 +4,14 @@
 //! Binds keys to [`Command`](nullslop_protocol::Command) variants. Parameterized on
 //! [`nullslop_protocol::KeyEvent`] so the keymap works in both TUI and headless modes.
 
+use crossterm::event::{self, MouseEventKind};
 use derive_more::Display;
 use nullslop_protocol::chat_input::{InsertChar, SubmitMessage};
 use nullslop_protocol::provider_picker::PickerInsertChar;
 use nullslop_protocol::system::SetMode;
 use nullslop_protocol::tab::SwitchTab;
 use nullslop_protocol::{Command, Key, KeyEvent, Mode, SessionId, TabDirection};
+use ratatui_which_key::CrosstermKeymapExt;
 use ratatui_which_key::Keymap;
 
 use crate::scope::Scope;
@@ -100,7 +102,13 @@ pub fn init() -> Keymap<KeyEvent, Scope, Command, KeyCategory> {
             });
         });
 
-    keymap
+    keymap.on_mouse(|mouse: event::MouseEvent, _scope: &Scope| {
+        match mouse.kind {
+            MouseEventKind::ScrollUp => Some(Command::MouseScrollUp),
+            MouseEventKind::ScrollDown => Some(Command::MouseScrollDown),
+            _ => None,
+        }
+    })
 }
 
 // No tests needed — keymap bindings are exercised end-to-end through the
