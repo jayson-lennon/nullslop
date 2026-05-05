@@ -64,7 +64,7 @@ pub fn entries_to_messages(entries: &[ChatEntry]) -> Vec<LlmMessage> {
                 });
             }
             // System and Actor entries are not sent to the LLM.
-            ChatEntryKind::System(_) | ChatEntryKind::Actor { .. } | ChatEntryKind::Error(_) => {}
+            ChatEntryKind::System(_) | ChatEntryKind::Actor { .. } => {}
         }
     }
 
@@ -307,23 +307,5 @@ mod tests {
         assert!(matches!(&messages[0], LlmMessage::User { .. }));
         assert!(matches!(&messages[1], LlmMessage::Assistant { .. }));
         assert!(matches!(&messages[2], LlmMessage::Tool { .. }));
-    }
-
-    #[test]
-    fn entries_to_messages_skips_error() {
-        // Given entries including an error entry.
-        let entries = vec![
-            ChatEntry::user("go"),
-            ChatEntry::error("something broke"),
-            ChatEntry::assistant("ok"),
-        ];
-
-        // When converting to messages.
-        let messages = entries_to_messages(&entries);
-
-        // Then the error entry is skipped.
-        assert_eq!(messages.len(), 2);
-        assert!(matches!(&messages[0], LlmMessage::User { content } if content == "go"));
-        assert!(matches!(&messages[1], LlmMessage::Assistant { .. }));
     }
 }

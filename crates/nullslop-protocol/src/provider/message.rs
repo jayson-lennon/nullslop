@@ -12,6 +12,11 @@ use crate::tool::ToolCall;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "role", rename_all = "snake_case")]
 pub enum LlmMessage {
+    /// A system-level instruction to the LLM.
+    System {
+        /// The system prompt content.
+        content: String,
+    },
     /// A message from the user.
     User {
         /// The text content of the message.

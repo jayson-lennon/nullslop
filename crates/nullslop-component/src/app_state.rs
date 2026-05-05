@@ -6,8 +6,9 @@
 
 use std::collections::HashMap;
 
-use nullslop_protocol::{ActiveTab, Mode, SessionId};
+use nullslop_protocol::{ActiveTab, Mode, PromptStrategyId, SessionId};
 use nullslop_providers::NO_PROVIDER_ID;
+use serde_json::Value as JsonValue;
 
 use crate::chat_input_box::ChatInputBoxState;
 use crate::chat_session::ChatSessionState;
@@ -51,6 +52,11 @@ pub struct AppState {
     /// When the model list was last refreshed (UTC).
     /// `None` if the model list has never been refreshed.
     pub last_refreshed_at: Option<jiff::Timestamp>,
+
+    /// Persisted strategy state blobs, keyed by (session_id, strategy_id).
+    /// Stored as `serde_json::Value` — the host doesn't interpret the blobs.
+    /// In-memory only; actual disk/DB persistence is a follow-up.
+    pub strategy_state: HashMap<(SessionId, PromptStrategyId), JsonValue>,
 }
 
 impl Default for AppState {
@@ -70,6 +76,7 @@ impl Default for AppState {
             picker: ProviderPickerState::new(),
             model_cache: None,
             last_refreshed_at: None,
+            strategy_state: HashMap::new(),
         }
     }
 }

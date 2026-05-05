@@ -5,9 +5,44 @@
 
 use serde::{Deserialize, Serialize};
 
+/// A unique identifier for a [`ChatEntry`].
+///
+/// Auto-generated as a UUID. Used by prompt assembly strategies
+/// to reference specific entries without positional coupling.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ChatEntryId(uuid::Uuid);
+
+impl ChatEntryId {
+    /// Generate a new unique ID.
+    #[must_use]
+    pub fn new() -> Self {
+        Self(uuid::Uuid::new_v4())
+    }
+
+    /// Returns the underlying UUID value.
+    #[must_use]
+    pub fn as_uuid(&self) -> &uuid::Uuid {
+        &self.0
+    }
+}
+
+impl Default for ChatEntryId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ChatEntryId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 /// A single entry in the chat history.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatEntry {
+    /// Unique identifier for this entry.
+    pub id: ChatEntryId,
     /// When this entry was created.
     pub timestamp: jiff::Timestamp,
     /// What kind of entry this is.
@@ -39,8 +74,6 @@ pub enum ChatEntryKind {
         /// The JSON arguments string.
         arguments: String,
     },
-    /// An error that should be prominently displayed to the user.
-    Error(String),
     /// The result of executing a tool call.
     ToolResult {
         /// The ID of the tool call this result is for.
@@ -62,6 +95,7 @@ impl ChatEntry {
         T: Into<String>,
     {
         Self {
+            id: ChatEntryId::new(),
             timestamp: jiff::Timestamp::now(),
             kind: ChatEntryKind::User(text.into()),
         }
@@ -74,6 +108,7 @@ impl ChatEntry {
         T: Into<String>,
     {
         Self {
+            id: ChatEntryId::new(),
             timestamp: jiff::Timestamp::now(),
             kind: ChatEntryKind::System(text.into()),
         }
@@ -86,6 +121,7 @@ impl ChatEntry {
         T: Into<String>,
     {
         Self {
+            id: ChatEntryId::new(),
             timestamp: jiff::Timestamp::now(),
             kind: ChatEntryKind::Assistant(text.into()),
         }
@@ -99,23 +135,12 @@ impl ChatEntry {
         T: Into<String>,
     {
         Self {
+            id: ChatEntryId::new(),
             timestamp: jiff::Timestamp::now(),
             kind: ChatEntryKind::Actor {
                 source: source.into(),
                 text: text.into(),
             },
-        }
-    }
-
-    /// Create a new error chat entry with the current timestamp.
-    #[must_use]
-    pub fn error<T>(text: T) -> Self
-    where
-        T: Into<String>,
-    {
-        Self {
-            timestamp: jiff::Timestamp::now(),
-            kind: ChatEntryKind::Error(text.into()),
         }
     }
 
@@ -127,6 +152,7 @@ impl ChatEntry {
         arguments: impl Into<String>,
     ) -> Self {
         Self {
+            id: ChatEntryId::new(),
             timestamp: jiff::Timestamp::now(),
             kind: ChatEntryKind::ToolCall {
                 id: id.into(),
@@ -145,6 +171,7 @@ impl ChatEntry {
         success: bool,
     ) -> Self {
         Self {
+            id: ChatEntryId::new(),
             timestamp: jiff::Timestamp::now(),
             kind: ChatEntryKind::ToolResult {
                 id: id.into(),
@@ -159,6 +186,39 @@ impl ChatEntry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn chat_entry_id_is_unique() {
+        // Given two generated IDs.
+        let id1 = ChatEntryId::new();
+        let id2 = ChatEntryId::new();
+
+        // Then they are not equal.
+        assert_ne!(id1, id2);
+    }
+
+    #[test]
+    fn chat_entry_id_is_valid_uuid() {
+        // Given a generated ID.
+        let id = ChatEntryId::new();
+
+        // Then the string representation is a valid UUID.
+        let s = id.to_string();
+        assert!(uuid::Uuid::parse_str(&s).is_ok());
+    }
+
+    #[test]
+    fn chat_entry_id_serialization_roundtrip() {
+        // Given a ChatEntryId.
+        let id = ChatEntryId::new();
+
+        // When serialized and deserialized.
+        let json = serde_json::to_string(&id).expect("serialize");
+        let back: ChatEntryId = serde_json::from_str(&json).expect("deserialize");
+
+        // Then it matches the original.
+        assert_eq!(back, id);
+    }
 
     #[test]
     fn user_entry_has_user_kind() {
@@ -208,6 +268,7 @@ mod tests {
         let back: ChatEntry = serde_json::from_str(&json).expect("deserialize");
 
         // Then it matches the original.
+        assert_eq!(back.id, entry.id);
         assert_eq!(back.kind, entry.kind);
         assert_eq!(back.timestamp, entry.timestamp);
     }
@@ -224,6 +285,7 @@ mod tests {
         let entry = ChatEntry::assistant("hello");
         let json = serde_json::to_string(&entry).expect("serialize");
         let back: ChatEntry = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back.id, entry.id);
         assert_eq!(back.kind, entry.kind);
         assert_eq!(back.timestamp, entry.timestamp);
     }
@@ -257,6 +319,7 @@ mod tests {
         let back: ChatEntry = serde_json::from_str(&json).expect("deserialize");
 
         // Then it matches the original.
+        assert_eq!(back.id, entry.id);
         assert_eq!(back.kind, entry.kind);
         assert_eq!(back.timestamp, entry.timestamp);
     }
@@ -314,6 +377,7 @@ mod tests {
         let back: ChatEntry = serde_json::from_str(&json).expect("deserialize");
 
         // Then it matches the original.
+        assert_eq!(back.id, entry.id);
         assert_eq!(back.kind, entry.kind);
         assert_eq!(back.timestamp, entry.timestamp);
     }
@@ -328,35 +392,7 @@ mod tests {
         let back: ChatEntry = serde_json::from_str(&json).expect("deserialize");
 
         // Then it matches the original.
-        assert_eq!(back.kind, entry.kind);
-        assert_eq!(back.timestamp, entry.timestamp);
-    }
-
-    #[test]
-    fn error_entry_has_error_kind() {
-        // Given text "something went wrong".
-        let text = "something went wrong";
-
-        // When creating an error entry.
-        let entry = ChatEntry::error(text);
-
-        // Then kind is Error("something went wrong").
-        assert_eq!(
-            entry.kind,
-            ChatEntryKind::Error("something went wrong".to_owned())
-        );
-    }
-
-    #[test]
-    fn error_entry_serialization_roundtrip() {
-        // Given an error ChatEntry.
-        let entry = ChatEntry::error("something broke");
-
-        // When serialized and deserialized.
-        let json = serde_json::to_string(&entry).expect("serialize");
-        let back: ChatEntry = serde_json::from_str(&json).expect("deserialize");
-
-        // Then it matches the original.
+        assert_eq!(back.id, entry.id);
         assert_eq!(back.kind, entry.kind);
         assert_eq!(back.timestamp, entry.timestamp);
     }

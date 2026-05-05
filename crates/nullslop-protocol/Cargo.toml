@@ -14,7 +14,7 @@ jiff = { workspace = true }
 derive_more = { workspace = true }
 ratatui-which-key = { workspace = true, optional = true }
 nullslop-protocol-derive = { workspace = true }
-uuid = { version = "1.23.1", features = ["v4"] }
+uuid = { version = "1.23.1", features = ["v4", "serde"] }
 
 [dev-dependencies]
 rstest = { workspace = true }

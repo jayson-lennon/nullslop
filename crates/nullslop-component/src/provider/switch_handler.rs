@@ -46,7 +46,7 @@ impl SwitchHandler {
             if let Some(entry) = registry.get(&id) {
                 if !registry.is_available(&id, &api_keys) {
                     if let Some(session) = ctx.state.sessions.get_mut(&ctx.state.active_session) {
-                        session.push_entry(npr::ChatEntry::error(format!(
+                        session.push_entry(npr::ChatEntry::system(format!(
                             "Provider '{}' is unavailable (API key not set).",
                             entry.name
                         )));
@@ -56,7 +56,7 @@ impl SwitchHandler {
 
                 let Ok(new_factory) = registry.create_factory(&id, &api_keys) else {
                     if let Some(session) = ctx.state.sessions.get_mut(&ctx.state.active_session) {
-                        session.push_entry(npr::ChatEntry::error(format!(
+                        session.push_entry(npr::ChatEntry::system(format!(
                             "Failed to create factory for provider '{}'.",
                             entry.name
                         )));
@@ -78,7 +78,7 @@ impl SwitchHandler {
                     Err(msg) => {
                         if let Some(session) = ctx.state.sessions.get_mut(&ctx.state.active_session)
                         {
-                            session.push_entry(npr::ChatEntry::error(msg));
+                            session.push_entry(npr::ChatEntry::system(msg));
                         }
                         return CommandAction::Continue;
                     }

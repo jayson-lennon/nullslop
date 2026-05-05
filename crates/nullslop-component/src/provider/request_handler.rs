@@ -10,9 +10,8 @@
 
 use crate::AppState;
 use npr::chat_input::{EnqueueUserMessage, SetChatInputText};
-use npr::provider::{
-    CancelStream, SendToLlmProvider, StreamCompleted, StreamCompletedReason, entries_to_messages,
-};
+use npr::context::AssemblePrompt;
+use npr::provider::{CancelStream, StreamCompleted, StreamCompletedReason};
 use nullslop_component_core::{HandlerContext, define_handler};
 use nullslop_protocol as npr;
 use nullslop_protocol::CommandAction;
@@ -41,18 +40,18 @@ impl MessageQueueHandler {
         let session = ctx.state.session_mut(&cmd.session_id);
 
         if session.is_idle() {
-            // Dispatch immediately: push to history, convert, send to LLM.
+            // Dispatch immediately: push to history, request prompt assembly.
             let entry = npr::ChatEntry::user(&cmd.text);
             session.push_entry(entry);
-            let history = session.history();
-            let messages = entries_to_messages(history);
-            session.begin_sending();
+            let history = session.history().to_vec();
+            session.begin_assembling();
 
-            ctx.out.submit_command(npr::Command::SendToLlmProvider {
-                payload: SendToLlmProvider {
+            ctx.out.submit_command(npr::Command::AssemblePrompt {
+                payload: AssemblePrompt {
                     session_id: cmd.session_id.clone(),
-                    messages,
-                    provider_id: None,
+                    history,
+                    tools: vec![],
+                    model_name: String::new(),
                 },
             });
         } else {
@@ -120,15 +119,16 @@ impl MessageQueueHandler {
             session.push_entry(npr::ChatEntry::user(text));
         }
 
-        let history = session.history();
-        let messages = entries_to_messages(history);
-        session.begin_sending();
+        // Request prompt assembly instead of converting directly.
+        let history = session.history().to_vec();
+        session.begin_assembling();
 
-        ctx.out.submit_command(npr::Command::SendToLlmProvider {
-            payload: SendToLlmProvider {
+        ctx.out.submit_command(npr::Command::AssemblePrompt {
+            payload: AssemblePrompt {
                 session_id: evt.session_id.clone(),
-                messages,
-                provider_id: None,
+                history,
+                tools: vec![],
+                model_name: String::new(),
             },
         });
     }

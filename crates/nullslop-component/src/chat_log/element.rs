@@ -10,13 +10,12 @@
 //! Text wraps within the available space.
 
 use crate::AppState;
-use ansi_to_tui::IntoText;
 use nullslop_component_ui::UiElement;
 use nullslop_protocol::ChatEntryKind;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span, Text};
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 
 /// Display element for the full conversation history.
@@ -33,7 +32,7 @@ impl UiElement<AppState> for ChatLogElement {
             .active_session()
             .history()
             .iter()
-            .flat_map(|entry| entry_to_lines(entry, area.width))
+            .flat_map(|entry| entry_to_lines(entry))
             .collect();
 
         // Calculate total wrapped lines.
@@ -77,7 +76,7 @@ impl UiElement<AppState> for ChatLogElement {
 /// Convert a chat entry into one or more visual lines, splitting on `\n`.
 ///
 /// The first line gets the entry-type prefix; continuation lines get indentation.
-fn entry_to_lines(entry: &nullslop_protocol::ChatEntry, width: u16) -> Vec<Line<'static>> {
+fn entry_to_lines(entry: &nullslop_protocol::ChatEntry) -> Vec<Line<'static>> {
     match &entry.kind {
         ChatEntryKind::User(text) => multiline_styled(
             text,
@@ -103,26 +102,24 @@ fn entry_to_lines(entry: &nullslop_protocol::ChatEntry, width: u16) -> Vec<Line<
                 Style::default().fg(Color::Magenta),
             )
         }
-        ChatEntryKind::Error(text) => error_block_lines(text, width),
         ChatEntryKind::ToolResult {
             id: _,
             name,
             content,
-            success: true,
+            success,
         } => {
+            let icon = if *success { "✅" } else { "❌" };
             multiline_styled(
-                format!("✅ {name}: {content}"),
+                format!("{icon} {name}: {content}"),
                 "  ",
                 "  ",
-                Style::default().fg(Color::Green),
+                if *success {
+                    Style::default().fg(Color::Green)
+                } else {
+                    Style::default().fg(Color::Red)
+                },
             )
         }
-        ChatEntryKind::ToolResult {
-            id: _,
-            name,
-            content,
-            success: false,
-        } => error_block_lines(&format!("{name}: {content}"), width),
     }
 }
 
@@ -146,49 +143,6 @@ where
         };
         lines.push(Line::from(Span::styled(content, style)));
     }
-    lines
-}
-
-/// The horizontal bar character used for error block borders.
-const BAR_CHAR: &str = "─";
-
-/// Display width of the top-bar label: `"──"` (2) + `" ERROR "` (7) = 9 columns.
-const TOP_LABEL_WIDTH: usize = 9;
-
-/// Build a bordered error block with the given message, filling the full
-/// render `width`.
-///
-/// Produces (for width 40):
-/// ```text
-/// ── ERROR ───────────────────────────── (dark red bars, bright red label)
-/// <message>                             (default text color)
-/// ────────────────────────────────────── (dark red)
-/// ```
-fn error_block_lines(text: &str, width: u16) -> Vec<Line<'static>> {
-    let dark_red = Style::default().fg(Color::Red);
-    let bright_red = Style::default().fg(Color::LightRed);
-
-    let w = width as usize;
-
-    // Top bar: "── ERROR " + dashes to fill the full width.
-    let remaining = w.saturating_sub(TOP_LABEL_WIDTH);
-    let top_bar = Line::from(vec![
-        Span::styled("──".to_owned(), dark_red),
-        Span::styled(" ERROR ".to_owned(), bright_red),
-        Span::styled(BAR_CHAR.repeat(remaining), dark_red),
-    ]);
-
-    // Bottom bar: all dashes.
-    let bottom_bar = Line::from(Span::styled(BAR_CHAR.repeat(w), dark_red));
-
-    // Message lines: convert ANSI escape codes into ratatui styles.
-    let parsed: Text<'static> = text
-        .as_bytes()
-        .into_text()
-        .unwrap_or_else(|_| Text::from(Line::from(Span::styled(text.to_owned(), Style::default()))));
-    let mut lines = vec![top_bar];
-    lines.extend(parsed.lines);
-    lines.push(bottom_bar);
     lines
 }
 
@@ -535,266 +489,5 @@ mod tests {
         let bottom_cell = buffer.cell((0, 9)).expect("cell should exist");
         assert_eq!(bottom_cell.symbol(), ">");
         assert!(bottom_cell.style().add_modifier.contains(Modifier::BOLD));
-    }
-
-    #[test]
-    fn render_error_entry() {
-        // Given a ChatLogElement with an error entry "something broke".
-        let mut element = ChatLogElement;
-        let state = {
-            let mut s = AppState::default();
-            s.active_session_mut()
-                .push_entry(ChatEntry::error("something broke"));
-            s
-        };
-
-        let backend = TestBackend::new(80, 10);
-        let mut terminal = Terminal::new(backend).unwrap();
-        let area = Rect::new(0, 0, 80, 10);
-
-        // When rendering.
-        terminal
-            .draw(|frame| {
-                element.render(frame, area, &state);
-            })
-            .unwrap();
-
-        // Then the top bar starts with dashes in dark red.
-        let buffer = terminal.backend().buffer().clone();
-        let top_bar_cell = buffer.cell((0, 7)).expect("cell should exist");
-        assert_eq!(top_bar_cell.symbol(), "─");
-        assert_eq!(top_bar_cell.style().fg, Some(Color::Red));
-
-        // And "ERROR" appears in bright red.
-        let e_cell = buffer.cell((3, 7)).expect("cell should exist");
-        assert_eq!(e_cell.symbol(), "E");
-        assert_eq!(e_cell.style().fg, Some(Color::LightRed));
-
-        // And the message line has default color.
-        let msg_cell = buffer.cell((0, 8)).expect("cell should exist");
-        assert_eq!(msg_cell.symbol(), "s");
-        assert!(msg_cell.style().fg != Some(Color::Red) && msg_cell.style().fg != Some(Color::LightRed));
-
-        // And the bottom bar has dashes in dark red.
-        let bottom_bar_cell = buffer.cell((0, 9)).expect("cell should exist");
-        assert_eq!(bottom_bar_cell.symbol(), "─");
-        assert_eq!(bottom_bar_cell.style().fg, Some(Color::Red));
-    }
-
-    #[test]
-    fn render_failed_tool_result() {
-        // Given a ChatLogElement with a failed tool result.
-        let mut element = ChatLogElement;
-        let state = {
-            let mut s = AppState::default();
-            s.active_session_mut()
-                .push_entry(ChatEntry::tool_result("call_1", "echo", "timeout", false));
-            s
-        };
-
-        let backend = TestBackend::new(80, 10);
-        let mut terminal = Terminal::new(backend).unwrap();
-        let area = Rect::new(0, 0, 80, 10);
-
-        // When rendering.
-        terminal
-            .draw(|frame| {
-                element.render(frame, area, &state);
-            })
-            .unwrap();
-
-        // Then the top bar starts with dashes in dark red (error block treatment).
-        let buffer = terminal.backend().buffer().clone();
-        let top_bar_cell = buffer.cell((0, 7)).expect("cell should exist");
-        assert_eq!(top_bar_cell.symbol(), "─");
-        assert_eq!(top_bar_cell.style().fg, Some(Color::Red));
-
-        // And "ERROR" appears in bright red.
-        let e_cell = buffer.cell((3, 7)).expect("cell should exist");
-        assert_eq!(e_cell.symbol(), "E");
-        assert_eq!(e_cell.style().fg, Some(Color::LightRed));
-
-        // And the message contains tool name and content in default color.
-        let msg_cell = buffer.cell((0, 8)).expect("cell should exist");
-        assert_eq!(msg_cell.symbol(), "e");
-        assert!(msg_cell.style().fg != Some(Color::Red) && msg_cell.style().fg != Some(Color::LightRed));
-
-        // And the bottom bar has dashes in dark red.
-        let bottom_bar_cell = buffer.cell((0, 9)).expect("cell should exist");
-        assert_eq!(bottom_bar_cell.symbol(), "─");
-        assert_eq!(bottom_bar_cell.style().fg, Some(Color::Red));
-    }
-
-    #[test]
-    fn render_error_entry_bars_fill_full_width() {
-        // Given a ChatLogElement with an error entry in a 40-column terminal.
-        let mut element = ChatLogElement;
-        let state = {
-            let mut s = AppState::default();
-            s.active_session_mut()
-                .push_entry(ChatEntry::error("something broke"));
-            s
-        };
-
-        let backend = TestBackend::new(40, 10);
-        let mut terminal = Terminal::new(backend).unwrap();
-        let area = Rect::new(0, 0, 40, 10);
-
-        // When rendering.
-        terminal
-            .draw(|frame| {
-                element.render(frame, area, &state);
-            })
-            .unwrap();
-
-        let buffer = terminal.backend().buffer().clone();
-
-        // Then the top bar's last cell (column 39) is a dark red dash.
-        let top_right = buffer.cell((39, 7)).expect("cell should exist");
-        assert_eq!(top_right.symbol(), "─");
-        assert_eq!(top_right.style().fg, Some(Color::Red));
-
-        // And the bottom bar's last cell (column 39) is a dark red dash.
-        let bottom_right = buffer.cell((39, 9)).expect("cell should exist");
-        assert_eq!(bottom_right.symbol(), "─");
-        assert_eq!(bottom_right.style().fg, Some(Color::Red));
-    }
-
-    #[test]
-    fn render_error_entry_in_narrow_terminal() {
-        // Given a ChatLogElement with an error entry in a 20-column terminal.
-        let mut element = ChatLogElement;
-        let state = {
-            let mut s = AppState::default();
-            s.active_session_mut()
-                .push_entry(ChatEntry::error("err"));
-            s
-        };
-
-        let backend = TestBackend::new(20, 10);
-        let mut terminal = Terminal::new(backend).unwrap();
-        let area = Rect::new(0, 0, 20, 10);
-
-        // When rendering.
-        terminal
-            .draw(|frame| {
-                element.render(frame, area, &state);
-            })
-            .unwrap();
-
-        // Then it renders without panic and the top bar starts with dashes.
-        let buffer = terminal.backend().buffer().clone();
-        let top_start = buffer.cell((0, 7)).expect("cell should exist");
-        assert_eq!(top_start.symbol(), "─");
-
-        // And the bottom bar fills the full width.
-        let bottom_right = buffer.cell((19, 9)).expect("cell should exist");
-        assert_eq!(bottom_right.symbol(), "─");
-        assert_eq!(bottom_right.style().fg, Some(Color::Red));
-    }
-
-    #[test]
-    fn render_error_entry_with_ansi_codes() {
-        // Given a ChatLogElement with an error entry containing ANSI bold codes.
-        let mut element = ChatLogElement;
-        let state = {
-            let mut s = AppState::default();
-            s.active_session_mut().push_entry(ChatEntry::error(
-                "\x1b[1mLLM provider error\x1b[22m",
-            ));
-            s
-        };
-
-        let backend = TestBackend::new(80, 10);
-        let mut terminal = Terminal::new(backend).unwrap();
-        let area = Rect::new(0, 0, 80, 10);
-
-        // When rendering.
-        terminal
-            .draw(|frame| {
-                element.render(frame, area, &state);
-            })
-            .unwrap();
-
-        let buffer = terminal.backend().buffer().clone();
-
-        // Then the message line does NOT contain raw escape sequences.
-        // The first char of the message text should be "L", not "[".
-        let msg_cell = buffer.cell((0, 8)).expect("cell should exist");
-        assert_eq!(msg_cell.symbol(), "L");
-
-        // And the "LLM provider error" text is bold (ANSI bold converted to modifier).
-        let bold_cell = buffer.cell((1, 8)).expect("cell should exist");
-        assert_eq!(bold_cell.symbol(), "L");
-        assert!(
-            bold_cell.style().add_modifier.contains(Modifier::BOLD),
-            "expected bold modifier on ANSI-bold text"
-        );
-    }
-
-    #[test]
-    fn render_error_entry_plain_text_unchanged() {
-        // Given a ChatLogElement with a plain-text error entry (no ANSI codes).
-        let mut element = ChatLogElement;
-        let state = {
-            let mut s = AppState::default();
-            s.active_session_mut()
-                .push_entry(ChatEntry::error("plain error message"));
-            s
-        };
-
-        let backend = TestBackend::new(80, 10);
-        let mut terminal = Terminal::new(backend).unwrap();
-        let area = Rect::new(0, 0, 80, 10);
-
-        // When rendering.
-        terminal
-            .draw(|frame| {
-                element.render(frame, area, &state);
-            })
-            .unwrap();
-
-        // Then the message text is rendered with default style.
-        let buffer = terminal.backend().buffer().clone();
-        let msg_cell = buffer.cell((0, 8)).expect("cell should exist");
-        assert_eq!(msg_cell.symbol(), "p");
-        assert!(
-            msg_cell.style().add_modifier.is_empty(),
-            "expected no modifiers on plain text"
-        );
-    }
-
-    #[test]
-    fn render_successful_tool_result_stays_green() {
-        // Given a ChatLogElement with a successful tool result.
-        let mut element = ChatLogElement;
-        let state = {
-            let mut s = AppState::default();
-            s.active_session_mut()
-                .push_entry(ChatEntry::tool_result("call_1", "echo", "hi", true));
-            s
-        };
-
-        let backend = TestBackend::new(80, 10);
-        let mut terminal = Terminal::new(backend).unwrap();
-        let area = Rect::new(0, 0, 80, 10);
-
-        // When rendering.
-        terminal
-            .draw(|frame| {
-                element.render(frame, area, &state);
-            })
-            .unwrap();
-
-        // Then it renders with green style (not error block).
-        // The "echo" text appears somewhere in the bottom row with green foreground.
-        let buffer = terminal.backend().buffer().clone();
-        // Find a cell with green color to confirm non-error rendering.
-        let found_green = (0..80).any(|x| {
-            buffer
-                .cell((x, 9))
-                .map_or(false, |c| c.style().fg == Some(Color::Green))
-        });
-        assert!(found_green, "expected green text for successful tool result");
     }
 }

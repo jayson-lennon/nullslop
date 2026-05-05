@@ -1,0 +1,20 @@
+[package]
+name = "nullslop-context"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+nullslop-protocol = { workspace = true }
+async-trait = { workspace = true }
+wherror = { workspace = true }
+error-stack = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+derive_more = { workspace = true }
+
+[dev-dependencies]
+rstest = { workspace = true }
+tokio = { workspace = true }
+
+[lints]
+workspace = true

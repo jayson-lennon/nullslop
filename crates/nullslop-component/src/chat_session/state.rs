@@ -25,6 +25,10 @@ pub struct ChatSessionState {
     message_queue: VecDeque<String>,
     /// Whether a message has been dispatched to the LLM but no tokens have arrived yet.
     is_sending: bool,
+    /// Whether a prompt assembly request is in progress.
+    is_assembling: bool,
+    /// The active prompt strategy for this session.
+    active_strategy: nullslop_protocol::PromptStrategyId,
     /// Maps stream tool call index to history index for in-progress tool calls.
     streaming_tool_call_indices: HashMap<usize, usize>,
     /// Number of lines to skip from the top when rendering (ratatui scroll offset).
@@ -42,6 +46,8 @@ impl ChatSessionState {
             is_streaming: false,
             message_queue: VecDeque::new(),
             is_sending: false,
+            is_assembling: false,
+            active_strategy: nullslop_protocol::PromptStrategyId::passthrough(),
             streaming_tool_call_indices: HashMap::new(),
             scroll_offset: 0,
         }
@@ -246,6 +252,42 @@ impl ChatSessionState {
         std::mem::take(&mut self.message_queue)
     }
 
+    // --- Assembling ---
+
+    /// Mark the session as having a prompt assembly in progress.
+    ///
+    /// # Panics
+    ///
+    /// Panics if already sending, streaming, or assembling.
+    pub fn begin_assembling(&mut self) {
+        assert!(
+            !self.is_sending && !self.is_streaming && !self.is_assembling,
+            "begin_assembling called while already busy"
+        );
+        self.is_assembling = true;
+    }
+
+    /// Clear the assembling flag (called when prompt assembly completes).
+    pub fn finish_assembling(&mut self) {
+        assert!(self.is_assembling, "finish_assembling called while not assembling");
+        self.is_assembling = false;
+    }
+
+    /// Whether a prompt assembly is in progress.
+    pub fn is_assembling(&self) -> bool {
+        self.is_assembling
+    }
+
+    /// Switch the active prompt strategy for this session.
+    pub fn switch_strategy(&mut self, strategy_id: nullslop_protocol::PromptStrategyId) {
+        self.active_strategy = strategy_id;
+    }
+
+    /// The currently active prompt strategy.
+    pub fn active_strategy(&self) -> &nullslop_protocol::PromptStrategyId {
+        &self.active_strategy
+    }
+
     // --- Sending ---
 
     /// Mark the session as having dispatched a message to the LLM.
@@ -279,9 +321,9 @@ impl ChatSessionState {
 
     // --- Combined status ---
 
-    /// Whether the session is completely idle (not sending, not streaming).
+    /// Whether the session is completely idle (not sending, not streaming, not assembling).
     pub fn is_idle(&self) -> bool {
-        !self.is_sending && !self.is_streaming
+        !self.is_sending && !self.is_streaming && !self.is_assembling
     }
 
     /// The current scroll offset (lines to skip from top).
@@ -839,5 +881,28 @@ mod tests {
         // Then the tool call indices are cleared (entries remain in history).
         assert!(!session.is_streaming());
         assert_eq!(session.history().len(), 2); // assistant + tool call still there
+    }
+
+    // --- Strategy switching tests ---
+
+    #[test]
+    fn default_strategy_is_passthrough() {
+        // Given a new session.
+        let session = ChatSessionState::new();
+
+        // Then the default strategy is passthrough.
+        assert_eq!(session.active_strategy(), &nullslop_protocol::PromptStrategyId::passthrough());
+    }
+
+    #[test]
+    fn switch_strategy_updates_active_strategy() {
+        // Given a new session.
+        let mut session = ChatSessionState::new();
+
+        // When switching to sliding_window.
+        session.switch_strategy(nullslop_protocol::PromptStrategyId::sliding_window());
+
+        // Then the active strategy is updated.
+        assert_eq!(session.active_strategy(), &nullslop_protocol::PromptStrategyId::sliding_window());
     }
 }

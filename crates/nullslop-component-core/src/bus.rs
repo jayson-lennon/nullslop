@@ -432,6 +432,15 @@ impl<S, Sv> Bus<S, Sv> {
             Command::SendToLlmProvider { payload } => {
                 self.dispatch_command_to_handlers(&payload, state, services, &mut out);
             }
+            Command::AssemblePrompt { payload } => {
+                self.dispatch_command_to_handlers(&payload, state, services, &mut out);
+            }
+            Command::SwitchPromptStrategy { payload } => {
+                self.dispatch_command_to_handlers(&payload, state, services, &mut out);
+            }
+            Command::RestoreStrategyState { payload } => {
+                self.dispatch_command_to_handlers(&payload, state, services, &mut out);
+            }
             Command::StreamToken { payload } => {
                 self.dispatch_command_to_handlers(&payload, state, services, &mut out);
             }
@@ -582,6 +591,15 @@ impl<S, Sv> Bus<S, Sv> {
                 self.dispatch_event_to_handlers(&payload, state, services, &mut out);
             }
             Event::ToolsRegistered { payload } => {
+                self.dispatch_event_to_handlers(&payload, state, services, &mut out);
+            }
+            Event::PromptAssembled { payload } => {
+                self.dispatch_event_to_handlers(&payload, state, services, &mut out);
+            }
+            Event::PromptStrategySwitched { payload } => {
+                self.dispatch_event_to_handlers(&payload, state, services, &mut out);
+            }
+            Event::StrategyStateUpdated { payload } => {
                 self.dispatch_event_to_handlers(&payload, state, services, &mut out);
             }
         }

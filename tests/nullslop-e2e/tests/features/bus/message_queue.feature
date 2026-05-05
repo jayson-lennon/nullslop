@@ -1,15 +1,15 @@
 Feature: Message Queue
   Handler-level scenarios for message queue lifecycle: enqueue, dispatch, stream completion, and cancel.
 
-  Scenario: Enqueue when idle dispatches immediately
+  Scenario: Enqueue when idle requests prompt assembly
     Given a fresh bus with all handlers
     And the active provider is "test"
     And the session is idle
     When I submit EnqueueUserMessage with text "hello"
     Then the chat history should contain 1 entry
     And chat history entry 1 should be a User message with text "hello"
-    And the session should be sending
-    And a SendToLlmProvider command should have been submitted
+    And the session should be assembling
+    And an AssemblePrompt command should have been submitted
 
   Scenario: Enqueue when busy queues message
     Given a fresh bus with all handlers
@@ -19,7 +19,7 @@ Feature: Message Queue
     And the message queue should contain 1 message
     And message queue entry 1 should be "queued msg"
 
-  Scenario: Stream completed dispatches next from queue
+  Scenario: Stream completed requests assembly from queue
     Given a fresh bus with all handlers
     And the active provider is "test"
     And the session is sending
@@ -28,8 +28,8 @@ Feature: Message Queue
     Then the chat history should contain 1 entry
     And chat history entry 1 should be a User message with text "next msg"
     And the message queue should be empty
-    And the session should be sending
-    And a SendToLlmProvider command should have been submitted
+    And the session should be assembling
+    And an AssemblePrompt command should have been submitted
 
   Scenario: Stream completed canceled does not dispatch
     Given a fresh bus with all handlers
@@ -61,8 +61,7 @@ Feature: Message Queue
     And chat history entry 2 should be a User message with text "msg 2"
     And chat history entry 3 should be a User message with text "msg 3"
     And the message queue should be empty
-    And the session should be sending
-    And exactly 1 SendToLlmProvider command should have been submitted
+    And exactly 1 AssemblePrompt command should have been submitted
 
   Scenario: Stream completed with empty queue does not dispatch
     Given a fresh bus with all handlers
@@ -78,11 +77,11 @@ Feature: Message Queue
     When I submit SetChatInputText with "restored text"
     Then the input buffer should be "restored text"
 
-  Scenario: Enqueue with no provider dispatches to LLM
+  Scenario: Enqueue with no provider requests prompt assembly
     Given a fresh bus with all handlers
     And the session is idle
     When I submit EnqueueUserMessage with text "hello"
     Then the chat history should contain 1 entry
     And chat history entry 1 should be a User message with text "hello"
-    And the session should be sending
-    And a SendToLlmProvider command should have been submitted
+    And the session should be assembling
+    And an AssemblePrompt command should have been submitted

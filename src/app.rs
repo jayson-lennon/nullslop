@@ -16,6 +16,8 @@ use nullslop_core::{ActorMessageSink, AppCore, AppMsg, State};
 use nullslop_echo::EchoActor;
 use nullslop_llm::LlmActor;
 use nullslop_llm_discover::DiscoverActor;
+use nullslop_context_actor::PromptAssemblyActor;
+use nullslop_context::{DefaultStrategyFactory, StrategyFactory};
 use nullslop_tool_orchestrator::ToolOrchestratorActor;
 use nullslop_protocol::Event;
 use nullslop_protocol::actor::{ActorStarted, ActorStarting};
@@ -278,6 +280,24 @@ fn create_core_with_actor_host(
         handle,
     );
 
+    // Create prompt assembly actor.
+    let (ctx_tx, ctx_rx) =
+        kanal::unbounded::<ActorEnvelope<nullslop_context_actor::ContextDirectMsg>>();
+    let ctx_ref = ActorRef::new(ctx_tx);
+    let mut prompt_ctx = ActorContext::new("nullslop-context-actor", sink.clone());
+    prompt_ctx.set_data::<Box<dyn StrategyFactory>>(
+        Box::new(DefaultStrategyFactory),
+    );
+    let prompt_actor = PromptAssemblyActor::activate(&mut prompt_ctx);
+    let prompt_result = spawn_actor(
+        "nullslop-context-actor",
+        prompt_actor,
+        &ctx_ref,
+        ctx_rx,
+        prompt_ctx,
+        handle,
+    );
+
     // Emit lifecycle events.
     let _ = sink.send_event(Event::ActorStarting {
         payload: ActorStarting {
@@ -319,9 +339,19 @@ fn create_core_with_actor_host(
             name: "nullslop-tool-orchestrator".to_string(),
         },
     });
+    let _ = sink.send_event(Event::ActorStarting {
+        payload: ActorStarting {
+            name: "nullslop-context-actor".to_string(),
+        },
+    });
+    let _ = sink.send_event(Event::ActorStarted {
+        payload: ActorStarted {
+            name: "nullslop-context-actor".to_string(),
+        },
+    });
 
     let host = InMemoryActorHost::from_actors_with_handle(
-        vec![echo_result, llm_result, discover_result, orch_result],
+        vec![echo_result, llm_result, discover_result, orch_result, prompt_result],
         handle.clone(),
     );
     let host_arc: Arc<dyn nullslop_actor_host::ActorHost> = Arc::new(host);

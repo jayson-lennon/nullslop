@@ -32,13 +32,6 @@
 # legal
 !LICENSE
 
-# vendored crates
-!vendor/
-!vendor/**/
-!vendor/**/*.rs
-!vendor/**/Cargo.toml
-!vendor/**/Cargo.lock
-
 # agents
 !AGENTS.md
 !ARCHITECTURE.md

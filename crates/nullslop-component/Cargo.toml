@@ -14,7 +14,7 @@ throbber-widgets-tui = { workspace = true }
 tracing = { workspace = true }
 unicode-segmentation = { workspace = true }
 jiff = { workspace = true }
-ansi-to-tui = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 rstest = { workspace = true }

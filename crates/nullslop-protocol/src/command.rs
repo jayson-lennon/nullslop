@@ -26,6 +26,9 @@ use crate::chat_input::{
     MoveCursorWordRight, PushChatEntry, SetChatInputText, SubmitMessage,
 };
 use crate::chat_input::{MoveCursorLeft, MoveCursorRight};
+use crate::context::AssemblePrompt;
+use crate::context::RestoreStrategyState;
+use crate::context::SwitchPromptStrategy;
 use crate::provider::{
     CancelStream, ProviderSwitch, RefreshModels, SendMessage, SendToLlmProvider, StreamToken,
 };
@@ -151,6 +154,27 @@ pub enum Command {
         /// The stream token.
         #[serde(flatten)]
         payload: StreamToken,
+    },
+    /// Request prompt assembly from the context actor.
+    #[serde(rename = "assemble_prompt")]
+    AssemblePrompt {
+        /// The assembly request.
+        #[serde(flatten)]
+        payload: AssemblePrompt,
+    },
+    /// Switch the prompt assembly strategy for a session.
+    #[serde(rename = "switch_prompt_strategy")]
+    SwitchPromptStrategy {
+        /// The switch request.
+        #[serde(flatten)]
+        payload: SwitchPromptStrategy,
+    },
+    /// Restore a strategy's persisted state for a session.
+    #[serde(rename = "restore_strategy_state")]
+    RestoreStrategyState {
+        /// The state to restore.
+        #[serde(flatten)]
+        payload: RestoreStrategyState,
     },
     /// Push a chat entry into the conversation history.
     #[serde(rename = "push_chat_entry")]
@@ -304,6 +328,9 @@ impl Command {
             Self::SendMessage { .. } => Some(SendMessage::NAME),
             Self::CancelStream { .. } => Some(CancelStream::NAME),
             Self::SendToLlmProvider { .. } => Some(SendToLlmProvider::NAME),
+            Self::AssemblePrompt { .. } => Some(AssemblePrompt::NAME),
+            Self::SwitchPromptStrategy { .. } => Some(SwitchPromptStrategy::NAME),
+            Self::RestoreStrategyState { .. } => Some(RestoreStrategyState::NAME),
             Self::StreamToken { .. } => Some(StreamToken::NAME),
             Self::PushChatEntry { .. } => Some(PushChatEntry::NAME),
             Self::EnqueueUserMessage { .. } => Some(EnqueueUserMessage::NAME),
@@ -354,6 +381,9 @@ impl std::fmt::Display for Command {
             Command::SendMessage { .. } => write!(f, "send message"),
             Command::CancelStream { .. } => write!(f, "cancel stream"),
             Command::SendToLlmProvider { .. } => write!(f, "send to LLM provider"),
+            Command::AssemblePrompt { .. } => write!(f, "assemble prompt"),
+            Command::SwitchPromptStrategy { .. } => write!(f, "switch prompt strategy"),
+            Command::RestoreStrategyState { .. } => write!(f, "restore strategy state"),
             Command::StreamToken { payload } => {
                 write!(
                     f,
@@ -482,6 +512,9 @@ mod tests {
     #[case::send_message(Command::SendMessage { payload: SendMessage { session_id: SessionId::new(), text: "hi".into() } })]
     #[case::cancel_stream(Command::CancelStream { payload: CancelStream { session_id: SessionId::new() } })]
     #[case::send_to_llm_provider(Command::SendToLlmProvider { payload: SendToLlmProvider { session_id: SessionId::new(), messages: vec![], provider_id: None } })]
+    #[case::assemble_prompt(Command::AssemblePrompt { payload: AssemblePrompt { session_id: SessionId::new(), history: vec![], tools: vec![], model_name: "test".to_owned() } })]
+    #[case::switch_prompt_strategy(Command::SwitchPromptStrategy { payload: SwitchPromptStrategy { session_id: SessionId::new(), strategy_id: crate::PromptStrategyId::sliding_window() } })]
+    #[case::restore_strategy_state(Command::RestoreStrategyState { payload: RestoreStrategyState { session_id: SessionId::new(), strategy_id: crate::PromptStrategyId::compaction(), blob: serde_json::json!({}) } })]
     #[case::stream_token(Command::StreamToken { payload: StreamToken { session_id: SessionId::new(), index: 0, token: "hello".into() } })]
     #[case::push_chat_entry(Command::PushChatEntry { payload: PushChatEntry { session_id: SessionId::new(), entry: crate::ChatEntry::user("hi") } })]
     #[case::proceed_with_shutdown(Command::ProceedWithShutdown { payload: ProceedWithShutdown { completed: vec!["ext-a".into()], timed_out: vec!["ext-b".into()] } })]

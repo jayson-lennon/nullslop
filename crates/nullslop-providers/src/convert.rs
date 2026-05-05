@@ -14,6 +14,7 @@ use crate::StreamEvent;
 /// Convert protocol messages to llm crate messages.
 ///
 /// Maps each [`LlmMessage`] variant to the appropriate [`ChatMessage`]:
+/// - `System` → system message
 /// - `User` → user text message
 /// - `Assistant` with tool_calls → assistant tool-use message
 /// - `Assistant` without tool_calls → assistant text message
@@ -75,6 +76,13 @@ pub(crate) fn stream_chunk_to_event(chunk: StreamChunk) -> StreamEvent {
 /// Convert a single protocol message to an llm crate message.
 fn message_to_llm(msg: &LlmMessage) -> ChatMessage {
     match msg {
+        LlmMessage::System { content } => {
+            // The llm crate doesn't have a System ChatRole, so we convert to
+            // a User message. The prompt assembly layer is responsible for
+            // placing system prompts correctly. When a proper system message
+            // API is available, this can be updated.
+            ChatMessage::user().content(content).build()
+        }
         LlmMessage::User { content } => ChatMessage::user().content(content).build(),
         LlmMessage::Assistant {
             content,

@@ -47,12 +47,12 @@ Feature: Chat Input Box
     And no commands should be pending
     And the input buffer should be ""
 
-  Scenario: Submit message emits SendToLlmProvider
+  Scenario: Submit message requests prompt assembly
     Given a fresh bus with all handlers
     And the active provider is "test"
     And the input buffer contains "hello"
     When I submit SubmitMessage
-    Then a SendToLlmProvider command should have been submitted
+    Then an AssemblePrompt command should have been submitted
 
   Scenario: Clear empties buffer
     Given a fresh bus with all handlers

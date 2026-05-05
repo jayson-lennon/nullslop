@@ -471,6 +471,18 @@ fn then_send_to_llm_submitted(world: &mut BusWorld) {
     assert!(found, "expected SendToLlmProvider command");
 }
 
+#[cucumber::then(expr = "an AssemblePrompt command should have been submitted")]
+fn then_assemble_prompt_submitted(world: &mut BusWorld) {
+    let found = world.has_processed_command(|c| matches!(c, npr::Command::AssemblePrompt { .. }));
+    assert!(found, "expected AssemblePrompt command");
+}
+
+#[cucumber::then(expr = "exactly {int} AssemblePrompt command should have been submitted")]
+fn then_exactly_n_assemble_prompt(world: &mut BusWorld, count: u64) {
+    let n = world.count_processed_commands(|c| matches!(c, npr::Command::AssemblePrompt { .. }));
+    assert_eq!(n, count as usize, "expected {count} AssemblePrompt commands, got {n}");
+}
+
 #[cucumber::then(expr = "no SendToLlmProvider command should have been submitted")]
 fn then_no_send_to_llm_submitted(world: &mut BusWorld) {
     let found = world.has_processed_command(|c| matches!(c, npr::Command::SendToLlmProvider { .. }));
@@ -497,6 +509,11 @@ fn then_no_pending_commands(world: &mut BusWorld) {
 #[cucumber::then(expr = "the session should be sending")]
 fn then_session_sending(world: &mut BusWorld) {
     assert!(world.state.active_session().is_sending(), "expected session to be sending");
+}
+
+#[cucumber::then(expr = "the session should be assembling")]
+fn then_session_assembling(world: &mut BusWorld) {
+    assert!(world.state.active_session().is_assembling(), "expected session to be assembling");
 }
 
 #[cucumber::then(expr = "the session should be idle")]
@@ -859,4 +876,66 @@ fn parse_mode(name: &str) -> npr::Mode {
         "picker" => npr::Mode::Picker,
         _ => panic!("unknown mode: {name}"),
     }
+}
+
+// ---------------------------------------------------------------------------
+// Step definitions — Strategy Switching (Phase 3)
+// ---------------------------------------------------------------------------
+
+#[cucumber::when(expr = "I submit SwitchPromptStrategy with strategy {string}")]
+fn when_switch_prompt_strategy(world: &mut BusWorld, strategy: String) {
+    let session_id = world.state.active_session.clone();
+    let strategy_id = match strategy.as_str() {
+        "passthrough" => npr::PromptStrategyId::passthrough(),
+        "sliding_window" => npr::PromptStrategyId::sliding_window(),
+        _ => npr::PromptStrategyId::new(strategy),
+    };
+    world.submit_and_process(npr::Command::SwitchPromptStrategy {
+        payload: npr::SwitchPromptStrategy {
+            session_id,
+            strategy_id,
+        },
+    });
+}
+
+#[cucumber::when(expr = "I submit a PromptStrategySwitched event with strategy {string}")]
+fn when_submit_strategy_switched_event(world: &mut BusWorld, strategy: String) {
+    let session_id = world.state.active_session.clone();
+    let strategy_id = match strategy.as_str() {
+        "passthrough" => npr::PromptStrategyId::passthrough(),
+        "sliding_window" => npr::PromptStrategyId::sliding_window(),
+        _ => npr::PromptStrategyId::new(strategy),
+    };
+    world.submit_event_and_process(npr::Event::PromptStrategySwitched {
+        payload: npr::PromptStrategySwitched {
+            session_id,
+            strategy_id,
+        },
+    });
+}
+
+#[cucumber::then(expr = "the active strategy should be {string}")]
+fn then_active_strategy_is(world: &mut BusWorld, expected: String) {
+    let strategy = world.state.active_session().active_strategy();
+    assert_eq!(strategy.to_string(), expected, "active strategy mismatch");
+}
+
+#[cucumber::then(expr = "a PromptStrategySwitched event should have been submitted")]
+fn then_prompt_strategy_switched_event(world: &mut BusWorld) {
+    let found = world
+        .bus
+        .drain_processed_events()
+        .iter()
+        .any(|e| matches!(e.event, npr::Event::PromptStrategySwitched { .. }));
+    assert!(found, "expected PromptStrategySwitched event");
+}
+
+#[cucumber::then(expr = "no PromptStrategySwitched event should have been submitted")]
+fn then_no_prompt_strategy_switched_event(world: &mut BusWorld) {
+    let found = world
+        .bus
+        .drain_processed_events()
+        .iter()
+        .any(|e| matches!(e.event, npr::Event::PromptStrategySwitched { .. }));
+    assert!(!found, "did not expect PromptStrategySwitched event");
 }

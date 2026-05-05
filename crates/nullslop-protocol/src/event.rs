@@ -21,6 +21,9 @@ pub use crate::custom::EventMsg;
 // Internal imports for enum definition, type_name(), and tests.
 use crate::actor::{ActorShutdownCompleted, ActorStarted, ActorStarting};
 use crate::chat_input::ChatEntrySubmitted;
+use crate::context::PromptAssembled;
+use crate::context::PromptStrategySwitched;
+use crate::context::StrategyStateUpdated;
 use crate::provider::{ModelsRefreshed, ProviderSwitched, StreamCompleted};
 use crate::system::{KeyDown, KeyUp, ModeChanged};
 use crate::tool::{ToolBatchCompleted, ToolExecutionCompleted, ToolsRegistered};
@@ -127,6 +130,27 @@ pub enum Event {
         #[serde(flatten)]
         payload: ToolsRegistered,
     },
+    /// A prompt has been assembled and is ready to send.
+    #[serde(rename = "prompt_assembled")]
+    PromptAssembled {
+        /// The assembled prompt payload.
+        #[serde(flatten)]
+        payload: PromptAssembled,
+    },
+    /// A session's prompt assembly strategy has been switched.
+    #[serde(rename = "prompt_strategy_switched")]
+    PromptStrategySwitched {
+        /// The strategy switch payload.
+        #[serde(flatten)]
+        payload: PromptStrategySwitched,
+    },
+    /// A strategy's session state has changed and should be persisted.
+    #[serde(rename = "strategy_state_updated")]
+    StrategyStateUpdated {
+        /// The state update payload.
+        #[serde(flatten)]
+        payload: StrategyStateUpdated,
+    },
 }
 
 impl Event {
@@ -147,6 +171,9 @@ impl Event {
             Self::ToolBatchCompleted { .. } => Some(ToolBatchCompleted::TYPE_NAME),
             Self::ToolExecutionCompleted { .. } => Some(ToolExecutionCompleted::TYPE_NAME),
             Self::ToolsRegistered { .. } => Some(ToolsRegistered::TYPE_NAME),
+            Self::PromptAssembled { .. } => Some(PromptAssembled::TYPE_NAME),
+            Self::PromptStrategySwitched { .. } => Some(PromptStrategySwitched::TYPE_NAME),
+            Self::StrategyStateUpdated { .. } => Some(StrategyStateUpdated::TYPE_NAME),
         }
     }
 }
@@ -198,6 +225,9 @@ mod tests {
     #[case::tool_batch_completed(Event::ToolBatchCompleted { payload: ToolBatchCompleted { session_id: SessionId::new(), results: vec![crate::ToolResult { tool_call_id: "call_1".into(), name: "echo".into(), content: "hi".into(), success: true }] } })]
     #[case::tool_execution_completed(Event::ToolExecutionCompleted { payload: ToolExecutionCompleted { session_id: SessionId::new(), result: crate::ToolResult { tool_call_id: "call_1".into(), name: "echo".into(), content: "hi".into(), success: true } } })]
     #[case::tools_registered(Event::ToolsRegistered { payload: ToolsRegistered { provider: "echo-actor".into(), definitions: vec![crate::ToolDefinition { name: "echo".into(), description: "echoes".into(), parameters: serde_json::json!({}) }] } })]
+    #[case::prompt_assembled(Event::PromptAssembled { payload: PromptAssembled { session_id: SessionId::new(), system_prompt: None, messages: vec![] } })]
+    #[case::prompt_strategy_switched(Event::PromptStrategySwitched { payload: PromptStrategySwitched { session_id: SessionId::new(), strategy_id: crate::PromptStrategyId::sliding_window() } })]
+    #[case::strategy_state_updated(Event::StrategyStateUpdated { payload: StrategyStateUpdated { session_id: SessionId::new(), strategy_id: crate::PromptStrategyId::compaction(), blob: serde_json::json!({"compaction_count": 0}) } })]
     fn event_roundtrip_all_variants(#[case] event: Event) {
         // Given an event variant.
         let json = serde_json::to_string(&event).expect("serialize");
@@ -320,5 +350,14 @@ mod tests {
             "tool::ToolExecutionCompleted"
         );
         assert_eq!(ToolsRegistered::TYPE_NAME, "tool::ToolsRegistered");
+
+        // Then PromptAssembled has the correct TYPE_NAME.
+        assert_eq!(PromptAssembled::TYPE_NAME, "context::PromptAssembled");
+
+        // Then PromptStrategySwitched has the correct TYPE_NAME.
+        assert_eq!(PromptStrategySwitched::TYPE_NAME, "context::PromptStrategySwitched");
+
+        // Then StrategyStateUpdated has the correct TYPE_NAME.
+        assert_eq!(StrategyStateUpdated::TYPE_NAME, "context::StrategyStateUpdated");
     }
 }

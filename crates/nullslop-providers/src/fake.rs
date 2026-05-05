@@ -44,8 +44,6 @@ pub struct FakeLlmServiceFactory {
     tool_loop_first_tool_calls: Vec<ToolCall>,
     /// Text tokens to use on subsequent calls of a tool loop.
     tool_loop_subsequent_tokens: Vec<String>,
-    /// Whether the service should yield a stream error instead of events.
-    stream_error: bool,
 }
 
 impl FakeLlmServiceFactory {
@@ -58,7 +56,6 @@ impl FakeLlmServiceFactory {
             tool_loop_call_count: None,
             tool_loop_first_tool_calls: vec![],
             tool_loop_subsequent_tokens: vec![],
-            stream_error: false,
         }
     }
 
@@ -75,7 +72,6 @@ impl FakeLlmServiceFactory {
             tool_loop_call_count: None,
             tool_loop_first_tool_calls: vec![],
             tool_loop_subsequent_tokens: vec![],
-            stream_error: false,
         }
     }
 
@@ -101,22 +97,6 @@ impl FakeLlmServiceFactory {
             tool_loop_call_count: Some(Arc::new(AtomicUsize::new(0))),
             tool_loop_first_tool_calls: first_tool_calls,
             tool_loop_subsequent_tokens: subsequent_tokens,
-            stream_error: false,
-        }
-    }
-
-    /// Create a factory whose services yield a stream error.
-    ///
-    /// Use this to test mid-stream error handling in consumers.
-    #[must_use]
-    pub fn with_stream_error() -> Self {
-        Self {
-            tokens: vec![],
-            tool_calls: vec![],
-            tool_loop_call_count: None,
-            tool_loop_first_tool_calls: vec![],
-            tool_loop_subsequent_tokens: vec![],
-            stream_error: true,
         }
     }
 
@@ -140,7 +120,6 @@ impl LlmServiceFactory for FakeLlmServiceFactory {
             tool_loop_call_count: self.tool_loop_call_count.clone(),
             tool_loop_first_tool_calls: self.tool_loop_first_tool_calls.clone(),
             tool_loop_subsequent_tokens: self.tool_loop_subsequent_tokens.clone(),
-            stream_error: self.stream_error,
         }))
     }
 
@@ -161,8 +140,6 @@ struct FakeLlmService {
     tool_loop_first_tool_calls: Vec<ToolCall>,
     /// Text tokens for subsequent calls of a tool loop.
     tool_loop_subsequent_tokens: Vec<String>,
-    /// Whether to yield a stream error instead of events.
-    stream_error: bool,
 }
 
 impl FakeLlmService {
@@ -247,13 +224,6 @@ impl LlmService for FakeLlmService {
         messages: Vec<LlmMessage>,
         _tools: Vec<nullslop_protocol::tool::ToolDefinition>,
     ) -> Result<ToolStream, Report<LlmServiceError>> {
-        // If configured to error, yield a single error item.
-        if self.stream_error {
-            return Ok(Box::pin(stream::iter(vec![Err(Report::new(
-                LlmServiceError::Provider,
-            ))])));
-        }
-
         // Check for multi-turn tool loop trigger.
         if let Some(ref counter) = self.tool_loop_call_count {
             if Self::is_tool_loop_trigger(&messages) {

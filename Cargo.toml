@@ -24,6 +24,8 @@ nullslop-actor = { workspace = true }
 nullslop-echo = { workspace = true }
 nullslop-llm = { workspace = true }
 nullslop-llm-discover = { workspace = true }
+nullslop-context-actor = { workspace = true }
+nullslop-context = { workspace = true }
 nullslop-tool-orchestrator = { workspace = true }
 tokio = { workspace = true }
 kanal = { workspace = true }
@@ -41,6 +43,7 @@ dotenvy = { workspace = true }
 [workspace.dependencies]
 # Internal
 nullslop-protocol = { path = "crates/nullslop-protocol" }
+nullslop-context = { path = "crates/nullslop-context" }
 nullslop-core = { path = "crates/nullslop-core" }
 nullslop-tui = { path = "crates/nullslop-tui" }
 nullslop-component-core = { path = "crates/nullslop-component-core" }
@@ -51,6 +54,7 @@ nullslop-services = { path = "crates/nullslop-services" }
 nullslop-echo = { path = "actors/nullslop-echo" }
 nullslop-llm = { path = "actors/nullslop-llm" }
 nullslop-llm-discover = { path = "actors/nullslop-llm-discover" }
+nullslop-context-actor = { path = "actors/nullslop-context-actor" }
 nullslop-tool-orchestrator = { path = "actors/nullslop-tool-orchestrator" }
 nullslop-actor = { path = "crates/nullslop-actor" }
 nullslop-actor-host = { path = "crates/nullslop-actor-host" }
@@ -76,7 +80,6 @@ crossterm = { version = "0.29", features = ["event-stream"] }
 ratatui-which-key = "0.8.0"
 ratatui-tabs = "0.2.0"
 ratatui-spatial-splits = "0.1.1"
-ansi-to-tui = "8"
 throbber-widgets-tui = "0.11"
 
 # State
@@ -96,7 +99,7 @@ clap = { version = "4", features = ["derive"] }
 clap-verbosity-flag = "3"
 
 # LLM
-llm = { path = "vendor/llm", default-features = false, features = [
+llm = { version = "1.3", default-features = false, features = [
     "default-tls",
     "openrouter",
     "openai",
