@@ -3,8 +3,8 @@
 use error_stack::{Report, ResultExt};
 use futures::StreamExt;
 use llm::builder::{LLMBackend, LLMBuilder};
-use nullslop_protocol::tool::ToolDefinition;
 use nullslop_protocol::LlmMessage;
+use nullslop_protocol::tool::ToolDefinition;
 
 use crate::service::{ChatStream, LlmService, LlmServiceError, LlmServiceFactory, ToolStream};
 

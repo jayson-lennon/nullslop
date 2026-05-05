@@ -60,6 +60,7 @@ nullslop-actor = { path = "crates/nullslop-actor" }
 nullslop-actor-host = { path = "crates/nullslop-actor-host" }
 nullslop-providers = { path = "crates/nullslop-providers" }
 nullslop-protocol-derive = { path = "crates/nullslop-protocol-derive" }
+nullslop-selection-widget = { path = "crates/nullslop-selection-widget" }
 
 # Error handling
 wherror = "2.3.1"
@@ -121,6 +122,7 @@ dirs = "6"
 toml = "0.8"
 dotenvy = "0.15"
 unicode-segmentation = "1"
+fuzzy-matcher = "0.3"
 async-trait = "0.1"
 dialoguer = "0.12"
 arboard = "3"

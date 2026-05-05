@@ -58,15 +58,13 @@ impl TuiWorld {
     /// Sends a keystroke to the app and ticks the core.
     fn press_key(&mut self, code: KeyCode, modifiers: KeyModifiers) {
         let event = crossterm::event::Event::Key(KeyEvent::new(code, modifiers));
-        self.app
-            .handle_msg(nullslop_tui::msg::Msg::Input(event));
+        self.app.handle_msg(nullslop_tui::msg::Msg::Input(event));
         self.app.core.tick();
     }
 
     /// Routes a command through the app's message pipeline and ticks the core.
     fn route_command(&mut self, cmd: nullslop_protocol::Command) {
-        self.app
-            .handle_msg(nullslop_tui::msg::Msg::Command(cmd));
+        self.app.handle_msg(nullslop_tui::msg::Msg::Command(cmd));
         self.app.core.tick();
     }
 }
@@ -168,7 +166,9 @@ fn when_user_presses_key_with_mod(world: &mut TuiWorld, key: String, modifier: S
 }
 
 /// Routes a PushChatEntry command with an actor-sourced message.
-#[cucumber::when(expr = "the app routes the PushChatEntry command with an actor message from {string} with text {string}")]
+#[cucumber::when(
+    expr = "the app routes the PushChatEntry command with an actor message from {string} with text {string}"
+)]
 fn when_routes_push_chat_entry(world: &mut TuiWorld, source: String, text: String) {
     world.route_command(nullslop_protocol::Command::PushChatEntry {
         payload: nullslop_protocol::chat_input::PushChatEntry {
@@ -191,14 +191,20 @@ fn when_routes_toggle_which_key(world: &mut TuiWorld) {
 fn then_mode_should_be(world: &mut TuiWorld, mode: String) {
     let expected = parse_mode(&mode);
     let actual = world.app.core.state.read().mode;
-    assert_eq!(actual, expected, "expected mode {expected:?}, got {actual:?}");
+    assert_eq!(
+        actual, expected,
+        "expected mode {expected:?}, got {actual:?}"
+    );
 }
 
 /// Asserts the application has requested to quit.
 #[cucumber::then(expr = "the app should quit")]
 fn then_app_should_quit(world: &mut TuiWorld) {
     let should_quit = world.app.core.state.read().should_quit;
-    assert!(should_quit, "expected app to quit, but should_quit is false");
+    assert!(
+        should_quit,
+        "expected app to quit, but should_quit is false"
+    );
 }
 
 /// Asserts the active chat input buffer is empty.
@@ -212,7 +218,10 @@ fn then_input_buffer_empty(world: &mut TuiWorld) {
         .active_chat_input()
         .text()
         .to_owned();
-    assert!(text.is_empty(), "expected empty input buffer, got: {text:?}");
+    assert!(
+        text.is_empty(),
+        "expected empty input buffer, got: {text:?}"
+    );
 }
 
 /// Asserts the active chat input buffer matches the expected text.
@@ -236,8 +245,7 @@ fn then_input_buffer_should_be(world: &mut TuiWorld, expected: String) {
 fn then_chat_history_count(world: &mut TuiWorld, count: u64) {
     let actual = world.app.core.state.read().active_session().history().len();
     assert_eq!(
-        actual,
-        count as usize,
+        actual, count as usize,
         "expected {count} history entries, got {actual}"
     );
 }
@@ -255,7 +263,9 @@ fn then_history_entry_is_user(world: &mut TuiWorld, index: u64, text: String) {
 }
 
 /// Asserts that a specific history entry is an actor message from the given source.
-#[cucumber::then(expr = "the chat history entry {int} should be an actor message from {string} with text {string}")]
+#[cucumber::then(
+    expr = "the chat history entry {int} should be an actor message from {string} with text {string}"
+)]
 fn then_history_entry_is_actor(world: &mut TuiWorld, index: u64, source: String, text: String) {
     let guard = world.app.core.state.read();
     let entry = &guard.active_session().history()[(index - 1) as usize];
@@ -269,7 +279,10 @@ fn then_history_entry_is_actor(world: &mut TuiWorld, index: u64, source: String,
 /// Asserts the which-key popup is active.
 #[cucumber::then(expr = "which-key should be active")]
 fn then_which_key_active(world: &mut TuiWorld) {
-    assert!(world.app.which_key.active, "expected which-key to be active");
+    assert!(
+        world.app.which_key.active,
+        "expected which-key to be active"
+    );
 }
 
 /// Asserts the which-key popup is inactive.
@@ -339,5 +352,8 @@ fn run_headless_script(world: &mut TuiWorld, content: &str) {
 #[cucumber::then(expr = "the app should not quit")]
 fn then_app_should_not_quit(world: &mut TuiWorld) {
     let should_quit = world.app.core.state.read().should_quit;
-    assert!(!should_quit, "expected app to not quit, but should_quit is true");
+    assert!(
+        !should_quit,
+        "expected app to not quit, but should_quit is true"
+    );
 }

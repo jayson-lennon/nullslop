@@ -1,0 +1,12 @@
+[package]
+name = "nullslop-selection-widget"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ratatui = { workspace = true }
+unicode-segmentation = { workspace = true }
+fuzzy-matcher = { workspace = true }
+
+[lints]
+workspace = true

@@ -12,16 +12,15 @@
 
 use async_trait::async_trait;
 use error_stack::Report;
-use nullslop_protocol::{entries_to_messages, ChatEntry};
+use nullslop_protocol::{ChatEntry, entries_to_messages};
 
-use crate::strategy::token_estimator::{estimate_entry_tokens, TokenEstimator};
+use crate::strategy::token_estimator::{TokenEstimator, estimate_entry_tokens};
 use crate::strategy::types::{
     AssembledPrompt, AssemblyContext, PromptAssembly, PromptAssemblyError,
 };
 
 /// System prompt set when context was compacted (stub: trimmed).
-const COMPACTION_SYSTEM_PROMPT: &str =
-    "Context was compacted to fit within the token budget. Earlier conversation history was summarized.";
+const COMPACTION_SYSTEM_PROMPT: &str = "Context was compacted to fit within the token budget. Earlier conversation history was summarized.";
 
 /// A compaction strategy stub that trims context when it exceeds a token threshold.
 ///
@@ -99,12 +98,7 @@ impl PromptAssembly for CompactionStrategy {
             .map(|&i| &context.history[i])
             .collect();
 
-        let messages = entries_to_messages(
-            &included
-                .into_iter()
-                .cloned()
-                .collect::<Vec<_>>(),
-        );
+        let messages = entries_to_messages(&included.into_iter().cloned().collect::<Vec<_>>());
 
         Ok(AssembledPrompt {
             system_prompt: Some(COMPACTION_SYSTEM_PROMPT.to_owned()),
@@ -124,7 +118,10 @@ mod tests {
     use super::*;
     use crate::strategy::token_estimator::CharRatioEstimator;
 
-    fn test_context<'a>(history: &'a [ChatEntry], session_id: &'a SessionId) -> AssemblyContext<'a> {
+    fn test_context<'a>(
+        history: &'a [ChatEntry],
+        session_id: &'a SessionId,
+    ) -> AssemblyContext<'a> {
         AssemblyContext {
             history,
             tools: &[],
@@ -160,9 +157,7 @@ mod tests {
     #[tokio::test]
     async fn trims_entries_when_over_threshold() {
         // Given entries that exceed the threshold.
-        let history: Vec<ChatEntry> = (0..10)
-            .map(|_| ChatEntry::user(&"a".repeat(400)))
-            .collect();
+        let history: Vec<ChatEntry> = (0..10).map(|_| ChatEntry::user(&"a".repeat(400))).collect();
         let strategy = make_strategy(100);
         let session_id = SessionId::new();
         let context = test_context(&history, &session_id);
@@ -175,7 +170,9 @@ mod tests {
         assert!(result.system_prompt.is_some());
         assert_eq!(
             result.system_prompt.as_deref(),
-            Some("Context was compacted to fit within the token budget. Earlier conversation history was summarized.")
+            Some(
+                "Context was compacted to fit within the token budget. Earlier conversation history was summarized."
+            )
         );
     }
 
@@ -234,7 +231,9 @@ mod tests {
         );
         assert_eq!(
             result.system_prompt.as_deref(),
-            Some("Context was compacted to fit within the token budget. Earlier conversation history was summarized.")
+            Some(
+                "Context was compacted to fit within the token budget. Earlier conversation history was summarized."
+            )
         );
     }
 

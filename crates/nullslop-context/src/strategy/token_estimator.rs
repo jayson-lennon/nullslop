@@ -25,15 +25,13 @@ pub trait TokenEstimator: Send + Sync {
 /// System and Actor entries contribute 0 tokens since they are not sent to the LLM.
 pub fn estimate_entry_tokens(estimator: &dyn TokenEstimator, entry: &ChatEntry) -> usize {
     match &entry.kind {
-        ChatEntryKind::User(text) | ChatEntryKind::Assistant(text) => {
-            estimator.estimate(text)
-        }
+        ChatEntryKind::User(text) | ChatEntryKind::Assistant(text) => estimator.estimate(text),
         ChatEntryKind::ToolCall {
             name, arguments, ..
         } => estimator.estimate(name) + estimator.estimate(arguments),
-        ChatEntryKind::ToolResult {
-            name, content, ..
-        } => estimator.estimate(name) + estimator.estimate(content),
+        ChatEntryKind::ToolResult { name, content, .. } => {
+            estimator.estimate(name) + estimator.estimate(content)
+        }
         // System and Actor entries are not sent to the LLM.
         ChatEntryKind::System(_) | ChatEntryKind::Actor { .. } => 0,
     }
@@ -130,7 +128,10 @@ mod tests {
         let tokens = estimate_entry_tokens(&estimator, &entry);
 
         // Then it estimates name + arguments combined.
-        assert_eq!(tokens, estimator.estimate("echo") + estimator.estimate(r#"{"input":"hi"}"#));
+        assert_eq!(
+            tokens,
+            estimator.estimate("echo") + estimator.estimate(r#"{"input":"hi"}"#)
+        );
     }
 
     #[test]

@@ -7,9 +7,9 @@
 
 use async_trait::async_trait;
 use error_stack::Report;
-use nullslop_protocol::{entries_to_messages, ChatEntry};
+use nullslop_protocol::{ChatEntry, entries_to_messages};
 
-use crate::strategy::token_estimator::{estimate_entry_tokens, TokenEstimator};
+use crate::strategy::token_estimator::{TokenEstimator, estimate_entry_tokens};
 use crate::strategy::types::{
     AssembledPrompt, AssemblyContext, PromptAssembly, PromptAssemblyError,
 };
@@ -80,12 +80,7 @@ impl PromptAssembly for TokenBudgetStrategy {
             .collect();
 
         let trimmed = included.len() < context.history.len();
-        let messages = entries_to_messages(
-            &included
-                .into_iter()
-                .cloned()
-                .collect::<Vec<_>>(),
-        );
+        let messages = entries_to_messages(&included.into_iter().cloned().collect::<Vec<_>>());
 
         Ok(AssembledPrompt {
             system_prompt: if trimmed {
@@ -109,7 +104,10 @@ mod tests {
     use super::*;
     use crate::strategy::token_estimator::CharRatioEstimator;
 
-    fn test_context<'a>(history: &'a [ChatEntry], session_id: &'a SessionId) -> AssemblyContext<'a> {
+    fn test_context<'a>(
+        history: &'a [ChatEntry],
+        session_id: &'a SessionId,
+    ) -> AssemblyContext<'a> {
         AssemblyContext {
             history,
             tools: &[],
@@ -219,10 +217,7 @@ mod tests {
     #[tokio::test]
     async fn no_system_prompt_when_nothing_trimmed() {
         // Given entries that fit within the budget.
-        let history = vec![
-            ChatEntry::user("hi"),
-            ChatEntry::assistant("hello"),
-        ];
+        let history = vec![ChatEntry::user("hi"), ChatEntry::assistant("hello")];
         let strategy = make_strategy(8192);
         let session_id = SessionId::new();
         let context = test_context(&history, &session_id);

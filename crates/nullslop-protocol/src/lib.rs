@@ -22,6 +22,7 @@ pub mod custom;
 pub mod event;
 pub mod key;
 pub mod mode;
+pub mod picker_kind;
 pub mod provider;
 pub mod provider_picker;
 pub mod session;
@@ -35,14 +36,17 @@ pub use actor::{ActorShutdownCompleted, ActorStarted, ActorStarting};
 pub use actor_name::ActorName;
 pub use chat::{ChatEntry, ChatEntryId, ChatEntryKind};
 pub use command::Command;
-pub use context::{AssemblePrompt, PromptAssembled, PromptStrategyId, SwitchPromptStrategy, PromptStrategySwitched};
+pub use context::{
+    AssemblePrompt, PromptAssembled, PromptStrategyId, PromptStrategySwitched, SwitchPromptStrategy,
+};
 pub use custom::{CommandMsg, CommandName, EventMsg, EventTypeName};
 pub use event::Event;
 pub use key::{Key, KeyEvent, Modifiers};
 pub use mode::Mode;
 pub use nullslop_protocol_derive::{CommandMsg, EventMsg};
-pub use provider::entries_to_messages;
+pub use picker_kind::PickerKind;
 pub use provider::LlmMessage;
+pub use provider::entries_to_messages;
 pub use provider_picker::{
     PickerBackspace, PickerConfirm, PickerInsertChar, PickerMoveDown, PickerMoveUp,
 };
@@ -52,5 +56,5 @@ pub use tab::TabDirection;
 pub use tool::{
     ExecuteTool, ExecuteToolBatch, PushToolResult, RegisterTools, ToolBatchCompleted, ToolCall,
     ToolCallReceived, ToolCallStreaming, ToolDefinition, ToolExecutionCompleted, ToolResult,
-    ToolsRegistered, ToolUseStarted,
+    ToolUseStarted, ToolsRegistered,
 };

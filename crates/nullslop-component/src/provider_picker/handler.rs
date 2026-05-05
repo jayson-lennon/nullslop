@@ -1,11 +1,13 @@
-//! Picker handler — processes provider picker commands.
+//! Picker handler — processes picker commands dispatched by [`PickerKind`].
 //!
-//! Handles filter input, selection movement, and confirmation.
-//! On confirmation, submits a `ProviderSwitch` command and closes the picker.
+//! All 7 `Picker*` commands are shared across every picker type. Each handler
+//! method dispatches on [`AppState::active_picker_kind`] to route to the
+//! correct [`SelectionState`] field.
 
 use crate::AppState;
-use crate::provider_picker::entries::{filtered_entries, sorted_entries};
+use crate::provider_picker::entries::{load_provider_entries, sorted_entries};
 use npr::CommandAction;
+use npr::PickerKind;
 use npr::provider::ProviderSwitch;
 use npr::provider_picker::{
     PickerBackspace, PickerConfirm, PickerInsertChar, PickerMoveCursorLeft, PickerMoveCursorRight,
@@ -33,56 +35,98 @@ define_handler! {
 }
 
 impl PickerHandler {
-    /// Inserts a character into the picker filter.
+    /// Inserts a character into the active picker's filter.
     fn on_insert_char(
         cmd: &PickerInsertChar,
         ctx: &mut HandlerContext<'_, AppState, Services>,
     ) -> CommandAction {
-        ctx.state.picker.insert_char(cmd.ch);
+        match ctx.state.active_picker_kind {
+            Some(PickerKind::Provider) => ctx.state.provider_picker.insert_char(cmd.ch),
+            None => {}
+        }
         CommandAction::Continue
     }
 
-    /// Deletes the last character from the picker filter.
+    /// Deletes the last character from the active picker's filter.
     fn on_backspace(
         _cmd: &PickerBackspace,
         ctx: &mut HandlerContext<'_, AppState, Services>,
     ) -> CommandAction {
-        ctx.state.picker.backspace();
+        match ctx.state.active_picker_kind {
+            Some(PickerKind::Provider) => ctx.state.provider_picker.backspace(),
+            None => {}
+        }
         CommandAction::Continue
     }
 
-    /// Confirms the current picker selection.
-    ///
-    /// Submits `ProviderSwitch` if the selected entry is available,
-    /// then closes the picker by setting mode to Normal.
+    /// Confirms the active picker selection, dispatching to kind-specific logic.
     fn on_confirm(
         _cmd: &PickerConfirm,
         ctx: &mut HandlerContext<'_, AppState, Services>,
     ) -> CommandAction {
-        let services = ctx.services;
-        let registry = services.provider_registry().read();
-        let api_keys = services.api_keys().read();
-        let unsorted = filtered_entries(
-            &registry,
-            &api_keys,
-            &ctx.state.picker.filter,
-            ctx.state.model_cache.as_ref(),
-        );
-        let entries = sorted_entries(
-            &unsorted,
-            &ctx.state.picker.filter,
-            &ctx.state.active_provider,
-        );
-
-        let Some(entry) = entries.get(ctx.state.picker.selection) else {
-            return CommandAction::Continue;
-        };
-
-        if !entry.is_available {
-            // Unavailable provider selected — do nothing.
-            return CommandAction::Continue;
+        match ctx.state.active_picker_kind {
+            Some(PickerKind::Provider) => Self::confirm_provider(ctx),
+            None => {}
         }
+        CommandAction::Continue
+    }
 
+    /// Moves the active picker selection up.
+    fn on_move_up(
+        _cmd: &PickerMoveUp,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
+    ) -> CommandAction {
+        match ctx.state.active_picker_kind {
+            Some(PickerKind::Provider) => ctx.state.provider_picker.move_up(PICKER_MAX_VISIBLE),
+            None => {}
+        }
+        CommandAction::Continue
+    }
+
+    /// Moves the active picker selection down.
+    fn on_move_down(
+        _cmd: &PickerMoveDown,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
+    ) -> CommandAction {
+        match ctx.state.active_picker_kind {
+            Some(PickerKind::Provider) => ctx.state.provider_picker.move_down(PICKER_MAX_VISIBLE),
+            None => {}
+        }
+        CommandAction::Continue
+    }
+
+    /// Moves the active picker filter cursor left.
+    fn on_move_cursor_left(
+        _cmd: &PickerMoveCursorLeft,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
+    ) -> CommandAction {
+        match ctx.state.active_picker_kind {
+            Some(PickerKind::Provider) => ctx.state.provider_picker.move_cursor_left(),
+            None => {}
+        }
+        CommandAction::Continue
+    }
+
+    /// Moves the active picker filter cursor right.
+    fn on_move_cursor_right(
+        _cmd: &PickerMoveCursorRight,
+        ctx: &mut HandlerContext<'_, AppState, Services>,
+    ) -> CommandAction {
+        match ctx.state.active_picker_kind {
+            Some(PickerKind::Provider) => ctx.state.provider_picker.move_cursor_right(),
+            None => {}
+        }
+        CommandAction::Continue
+    }
+
+    /// Provider-specific confirm: switches provider and closes the picker.
+    fn confirm_provider(ctx: &mut HandlerContext<'_, AppState, Services>) {
+        let Some(entry) = ctx.state.provider_picker.selected_item() else {
+            return;
+        };
+        if !entry.is_available {
+            return;
+        }
         let provider_id = entry.provider_id.clone();
 
         // Submit provider switch.
@@ -96,46 +140,6 @@ impl PickerHandler {
                 mode: npr::Mode::Normal,
             },
         });
-
-        CommandAction::Continue
-    }
-
-    /// Moves the picker selection up.
-    fn on_move_up(
-        _cmd: &PickerMoveUp,
-        ctx: &mut HandlerContext<'_, AppState, Services>,
-    ) -> CommandAction {
-        let count = picker_entry_count(ctx.services, &*ctx.state);
-        ctx.state.picker.move_up(count, PICKER_MAX_VISIBLE);
-        CommandAction::Continue
-    }
-
-    /// Moves the picker selection down.
-    fn on_move_down(
-        _cmd: &PickerMoveDown,
-        ctx: &mut HandlerContext<'_, AppState, Services>,
-    ) -> CommandAction {
-        let count = picker_entry_count(ctx.services, &*ctx.state);
-        ctx.state.picker.move_down(count, PICKER_MAX_VISIBLE);
-        CommandAction::Continue
-    }
-
-    /// Moves the picker filter cursor left.
-    fn on_move_cursor_left(
-        _cmd: &PickerMoveCursorLeft,
-        ctx: &mut HandlerContext<'_, AppState, Services>,
-    ) -> CommandAction {
-        ctx.state.picker.move_cursor_left();
-        CommandAction::Continue
-    }
-
-    /// Moves the picker filter cursor right.
-    fn on_move_cursor_right(
-        _cmd: &PickerMoveCursorRight,
-        ctx: &mut HandlerContext<'_, AppState, Services>,
-    ) -> CommandAction {
-        ctx.state.picker.move_cursor_right();
-        CommandAction::Continue
     }
 }
 
@@ -144,17 +148,16 @@ impl PickerHandler {
 /// terminal height. This value is a generous upper bound so the handler's scroll
 /// offset tracking stays reasonable.
 const PICKER_MAX_VISIBLE: usize = 100;
-/// Counts the number of picker entries matching the current filter.
-fn picker_entry_count(services: &Services, state: &AppState) -> usize {
+
+/// Loads provider entries into the picker state, ready for display.
+///
+/// Reads from the provider registry and model cache, applies available-first
+/// sorting and active-provider promotion, then stores the entries via
+/// [`SelectionState::set_items`].
+pub fn load_provider_picker_items(services: &Services, state: &mut AppState) {
     let registry = services.provider_registry().read();
     let api_keys = services.api_keys().read();
-    filtered_entries(
-        &registry,
-        &api_keys,
-        &state.picker.filter,
-        state.model_cache.as_ref(),
-    )
-    .len()
+    let all = load_provider_entries(&registry, &api_keys, state.model_cache.as_ref());
+    let entries = sorted_entries(&all, "", &state.active_provider);
+    state.provider_picker.set_items(entries);
 }
-
-

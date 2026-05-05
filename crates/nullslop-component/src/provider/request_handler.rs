@@ -133,6 +133,3 @@ impl MessageQueueHandler {
         });
     }
 }
-
-
-

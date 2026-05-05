@@ -133,4 +133,3 @@ impl ChatLogHandler {
         CommandAction::Continue
     }
 }
-

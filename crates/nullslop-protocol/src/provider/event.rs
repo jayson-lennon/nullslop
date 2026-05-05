@@ -2,9 +2,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::tool::ToolCall;
 use crate::EventMsg;
 use crate::SessionId;
+use crate::tool::ToolCall;
 
 /// Why the stream completed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

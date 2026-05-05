@@ -6,14 +6,14 @@
 
 use std::collections::HashMap;
 
-use nullslop_protocol::{ActiveTab, Mode, PromptStrategyId, SessionId};
+use nullslop_protocol::{ActiveTab, Mode, PickerKind, PromptStrategyId, SessionId};
 use nullslop_providers::NO_PROVIDER_ID;
 use serde_json::Value as JsonValue;
 
 use crate::chat_input_box::ChatInputBoxState;
 use crate::chat_session::ChatSessionState;
 use crate::dashboard::DashboardState;
-use crate::provider_picker::ProviderPickerState;
+use crate::provider_picker::entries::PickerEntry;
 use crate::shutdown_tracker::ShutdownTrackerState;
 
 /// A snapshot of everything the application is doing right now.
@@ -43,8 +43,11 @@ pub struct AppState {
     /// The currently active provider. Always set — starts as [`NO_PROVIDER_ID`].
     pub active_provider: String,
 
-    /// Provider picker state (filter text, selection index).
-    pub picker: ProviderPickerState,
+    /// Which picker is currently active. `None` when not in picker mode.
+    pub active_picker_kind: Option<PickerKind>,
+
+    /// Provider picker state (items, filter text, selection index).
+    pub provider_picker: nullslop_selection_widget::SelectionState<PickerEntry>,
 
     /// Last known model cache from discovery.
     pub model_cache: Option<nullslop_providers::ModelCache>,
@@ -73,7 +76,8 @@ impl Default for AppState {
             active_tab: ActiveTab::Chat,
             should_quit: false,
             active_provider: NO_PROVIDER_ID.to_owned(),
-            picker: ProviderPickerState::new(),
+            active_picker_kind: None,
+            provider_picker: nullslop_selection_widget::SelectionState::new(),
             model_cache: None,
             last_refreshed_at: None,
             strategy_state: HashMap::new(),

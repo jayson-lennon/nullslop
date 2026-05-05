@@ -940,6 +940,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fuzzy-matcher"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54614a3312934d066701a80f20f15fa3b56d67ac7722b39eea5b4c9dd1d66c94"
+dependencies = [
+ "thread_local",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1856,12 +1865,14 @@ dependencies = [
 name = "nullslop-component"
 version = "0.1.0"
 dependencies = [
+ "humantime",
  "jiff",
  "nullslop-actor-host",
  "nullslop-component-core",
  "nullslop-component-ui",
  "nullslop-protocol",
  "nullslop-providers",
+ "nullslop-selection-widget",
  "nullslop-services",
  "ratatui",
  "rstest",
@@ -2049,6 +2060,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nullslop-selection-widget"
+version = "0.1.0"
+dependencies = [
+ "fuzzy-matcher",
+ "ratatui",
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "nullslop-services"
 version = "0.1.0"
 dependencies = [
@@ -2087,8 +2107,6 @@ dependencies = [
  "dialoguer",
  "error-stack",
  "futures",
- "humantime",
- "jiff",
  "kanal",
  "nullslop-actor-host",
  "nullslop-component",
@@ -2097,6 +2115,7 @@ dependencies = [
  "nullslop-core",
  "nullslop-protocol",
  "nullslop-providers",
+ "nullslop-selection-widget",
  "nullslop-services",
  "parking_lot",
  "ratatui",

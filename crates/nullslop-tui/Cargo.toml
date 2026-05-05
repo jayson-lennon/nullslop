@@ -27,8 +27,7 @@ unicode-segmentation = { workspace = true }
 dialoguer = { workspace = true }
 arboard = { workspace = true }
 tracing = { workspace = true }
-jiff = { workspace = true }
-humantime = { workspace = true }
+nullslop-selection-widget = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 

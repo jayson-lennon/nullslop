@@ -129,11 +129,7 @@ impl LlmActor {
     fn handle_command(&mut self, command: &Command, ctx: &ActorContext) {
         match command {
             Command::SendToLlmProvider { payload } => {
-                self.start_stream(
-                    payload.session_id.clone(),
-                    payload.messages.clone(),
-                    ctx,
-                );
+                self.start_stream(payload.session_id.clone(), payload.messages.clone(), ctx);
             }
             Command::CancelStream { payload } => {
                 self.cancel_stream(&payload.session_id, ctx);
@@ -211,7 +207,10 @@ impl LlmActor {
                 }
             };
 
-            let stream = match service.chat_stream_with_tools(messages_for_stream, tools).await {
+            let stream = match service
+                .chat_stream_with_tools(messages_for_stream, tools)
+                .await
+            {
                 Ok(s) => s,
                 Err(e) => {
                     tracing::error!(err = ?e, "failed to start LLM stream");
@@ -253,11 +252,7 @@ impl LlmActor {
                             });
                             token_index += 1;
                         }
-                        StreamEvent::ToolUseStart {
-                            index,
-                            id,
-                            name,
-                        } => {
+                        StreamEvent::ToolUseStart { index, id, name } => {
                             let _ = sink.send_command(Command::ToolUseStarted {
                                 payload: ToolUseStarted {
                                     session_id: sid.clone(),
@@ -435,8 +430,7 @@ impl LlmActor {
     /// Caches tool definitions from a [`ToolsRegistered`] event.
     fn handle_tools_registered(&mut self, definitions: &[ToolDefinition]) {
         for def in definitions {
-            self.tool_definitions
-                .insert(def.name.clone(), def.clone());
+            self.tool_definitions.insert(def.name.clone(), def.clone());
         }
     }
 
@@ -470,9 +464,9 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use nullslop_actor::MessageSink;
-    use nullslop_providers::FakeLlmServiceFactory;
-    use nullslop_protocol::tool::{ToolDefinition, ToolsRegistered};
     use nullslop_protocol::EventMsg;
+    use nullslop_protocol::tool::{ToolDefinition, ToolsRegistered};
+    use nullslop_providers::FakeLlmServiceFactory;
 
     /// A message sink that records commands and events for test assertions.
     struct RecordingSink {
@@ -535,10 +529,8 @@ mod tests {
         ctx: &mut ActorContext,
         tokens: Vec<String>,
     ) -> LlmActor {
-        let factory =
-            FakeLlmServiceFactory::new(tokens);
-        let factory_service =
-            nullslop_providers::LlmServiceFactoryService::new(Arc::new(factory));
+        let factory = FakeLlmServiceFactory::new(tokens);
+        let factory_service = nullslop_providers::LlmServiceFactoryService::new(Arc::new(factory));
         ctx.set_data(factory_service);
         LlmActor::activate(ctx)
     }
@@ -550,12 +542,8 @@ mod tests {
         tokens: Vec<String>,
         tool_calls: Vec<ToolCall>,
     ) -> LlmActor {
-        let factory = FakeLlmServiceFactory::with_tool_calls(
-            tokens,
-            tool_calls,
-        );
-        let factory_service =
-            nullslop_providers::LlmServiceFactoryService::new(Arc::new(factory));
+        let factory = FakeLlmServiceFactory::with_tool_calls(tokens, tool_calls);
+        let factory_service = nullslop_providers::LlmServiceFactoryService::new(Arc::new(factory));
         ctx.set_data(factory_service);
         LlmActor::activate(ctx)
     }
@@ -607,10 +595,11 @@ mod tests {
         // Given an actor with text tokens.
         let sink = Arc::new(RecordingSink::new());
         let mut ctx = test_context(&sink);
-        let mut actor = actor_with_tokens(&sink, &mut ctx, vec![
-            "Hello".to_owned(),
-            " world".to_owned(),
-        ]);
+        let mut actor = actor_with_tokens(
+            &sink,
+            &mut ctx,
+            vec!["Hello".to_owned(), " world".to_owned()],
+        );
         sink.clear();
 
         let session_id = SessionId::new();
@@ -710,10 +699,7 @@ mod tests {
             has_tool_call_streaming,
             "expected ToolCallStreaming command"
         );
-        assert!(
-            has_tool_call_received,
-            "expected ToolCallReceived command"
-        );
+        assert!(has_tool_call_received, "expected ToolCallReceived command");
 
         // And an ExecuteToolBatch command was emitted.
         let has_execute_batch = commands.iter().any(|c| {
@@ -754,8 +740,7 @@ mod tests {
             vec!["Let me check".to_owned()],
             vec![tool_call.clone()],
         );
-        let factory_service =
-            nullslop_providers::LlmServiceFactoryService::new(Arc::new(factory));
+        let factory_service = nullslop_providers::LlmServiceFactoryService::new(Arc::new(factory));
         ctx.set_data(factory_service);
         let mut actor = LlmActor::activate(&mut ctx);
         sink.clear();
@@ -889,10 +874,7 @@ mod tests {
 
         // Then the tool definition is cached.
         assert!(actor.tool_definitions.contains_key("web_search"));
-        assert_eq!(
-            actor.tool_definitions.get("web_search"),
-            Some(&definition)
-        );
+        assert_eq!(actor.tool_definitions.get("web_search"), Some(&definition));
     }
 
     // --- Session state tests ---

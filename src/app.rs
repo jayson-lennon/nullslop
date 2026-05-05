@@ -12,13 +12,12 @@ use nullslop_actor_host::{ActorHostService, InMemoryActorHost, spawn_actor};
 use nullslop_cli::Cli;
 use nullslop_component::AppState;
 use nullslop_component_core::Bus;
+use nullslop_context::{DefaultStrategyFactory, StrategyFactory};
+use nullslop_context_actor::PromptAssemblyActor;
 use nullslop_core::{ActorMessageSink, AppCore, AppMsg, State};
 use nullslop_echo::EchoActor;
 use nullslop_llm::LlmActor;
 use nullslop_llm_discover::DiscoverActor;
-use nullslop_context_actor::PromptAssemblyActor;
-use nullslop_context::{DefaultStrategyFactory, StrategyFactory};
-use nullslop_tool_orchestrator::ToolOrchestratorActor;
 use nullslop_protocol::Event;
 use nullslop_protocol::actor::{ActorStarted, ActorStarting};
 use nullslop_providers::ApiKeys;
@@ -33,6 +32,7 @@ use nullslop_providers::ProviderRegistry;
 use nullslop_providers::ProviderRegistryService;
 use nullslop_providers::cache_path;
 use nullslop_services::Services;
+use nullslop_tool_orchestrator::ToolOrchestratorActor;
 use tokio::runtime::Runtime;
 use wherror::Error;
 
@@ -377,7 +377,13 @@ fn create_core_with_actor_host(
     });
 
     let host = InMemoryActorHost::from_actors_with_handle(
-        vec![echo_result, llm_result, discover_result, orch_result, prompt_result],
+        vec![
+            echo_result,
+            llm_result,
+            discover_result,
+            orch_result,
+            prompt_result,
+        ],
         handle.clone(),
     );
     let host_arc: Arc<dyn nullslop_actor_host::ActorHost> = Arc::new(host);

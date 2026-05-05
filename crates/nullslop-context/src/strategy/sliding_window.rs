@@ -51,10 +51,13 @@ impl PromptAssembly for SlidingWindowStrategy {
 
 #[cfg(test)]
 mod tests {
-    use nullslop_protocol::{ChatEntry, SessionId};
     use super::*;
+    use nullslop_protocol::{ChatEntry, SessionId};
 
-    fn test_context<'a>(history: &'a [ChatEntry], session_id: &'a SessionId) -> AssemblyContext<'a> {
+    fn test_context<'a>(
+        history: &'a [ChatEntry],
+        session_id: &'a SessionId,
+    ) -> AssemblyContext<'a> {
         AssemblyContext {
             history,
             tools: &[],
@@ -94,10 +97,7 @@ mod tests {
     #[tokio::test]
     async fn sliding_window_returns_all_when_under_limit() {
         // Given 2 entries and a window of 5.
-        let history = vec![
-            ChatEntry::user("hello"),
-            ChatEntry::assistant("hi"),
-        ];
+        let history = vec![ChatEntry::user("hello"), ChatEntry::assistant("hi")];
         let strategy = SlidingWindowStrategy::new(5);
         let session_id = SessionId::new();
         let context = test_context(&history, &session_id);

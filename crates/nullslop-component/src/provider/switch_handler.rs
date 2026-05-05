@@ -153,4 +153,3 @@ impl SwitchHandler {
         Ok((factory, provider_name_owned))
     }
 }
-

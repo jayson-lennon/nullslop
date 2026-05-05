@@ -41,7 +41,10 @@ mod tests {
 
     use super::*;
 
-    fn test_context<'a>(history: &'a [ChatEntry], session_id: &'a SessionId) -> AssemblyContext<'a> {
+    fn test_context<'a>(
+        history: &'a [ChatEntry],
+        session_id: &'a SessionId,
+    ) -> AssemblyContext<'a> {
         AssemblyContext {
             history,
             tools: &[],

@@ -110,9 +110,9 @@ impl TestServices {
             .actor_host
             .unwrap_or_else(|| Arc::new(FakeActorHost::new()));
         let llm = self.llm_service.unwrap_or_else(|| {
-            LlmServiceFactoryService::new(Arc::new(
-                nullslop_providers::FakeLlmServiceFactory::new(vec![]),
-            ))
+            LlmServiceFactoryService::new(Arc::new(nullslop_providers::FakeLlmServiceFactory::new(
+                vec![],
+            )))
         });
         let registry = ProviderRegistryService::new(
             ProviderRegistry::from_config(self.providers).expect("test registry"),

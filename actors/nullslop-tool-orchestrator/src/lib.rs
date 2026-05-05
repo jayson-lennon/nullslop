@@ -94,8 +94,7 @@ impl Actor for ToolOrchestratorActor {
         };
 
         let builtins = builtin_tools();
-        let definitions: Vec<ToolDefinition> =
-            builtins.iter().map(|(d, _)| d.clone()).collect();
+        let definitions: Vec<ToolDefinition> = builtins.iter().map(|(d, _)| d.clone()).collect();
 
         for (def, execute_fn) in builtins {
             let name = def.name.clone();
@@ -121,11 +120,7 @@ impl Actor for ToolOrchestratorActor {
         actor
     }
 
-    async fn handle(
-        &mut self,
-        msg: ActorEnvelope<ToolOrchestratorDirectMsg>,
-        ctx: &ActorContext,
-    ) {
+    async fn handle(&mut self, msg: ActorEnvelope<ToolOrchestratorDirectMsg>, ctx: &ActorContext) {
         match msg {
             ActorEnvelope::Command(command) => self.handle_command(&command, ctx),
             ActorEnvelope::Event(event) => self.handle_event(&event, ctx),
@@ -237,12 +232,7 @@ impl ToolOrchestratorActor {
     }
 
     /// Dispatches a single tool call to the appropriate handler.
-    fn dispatch_tool_call(
-        &self,
-        session_id: SessionId,
-        tool_call: ToolCall,
-        ctx: &ActorContext,
-    ) {
+    fn dispatch_tool_call(&self, session_id: SessionId, tool_call: ToolCall, ctx: &ActorContext) {
         match self.tools.get(&tool_call.name) {
             Some(ToolRegistration::Builtin { execute, .. }) => {
                 let sink = ctx.sink();
@@ -251,10 +241,7 @@ impl ToolOrchestratorActor {
                 tokio::spawn(async move {
                     let result = execute_fn(tool_call).await;
                     if let Err(e) = sink.send_event(Event::ToolExecutionCompleted {
-                        payload: ToolExecutionCompleted {
-                            session_id,
-                            result,
-                        },
+                        payload: ToolExecutionCompleted { session_id, result },
                     }) {
                         tracing::warn!(
                             err = ?e,
@@ -288,10 +275,7 @@ impl ToolOrchestratorActor {
                 };
 
                 if let Err(e) = ctx.send_event(Event::ToolExecutionCompleted {
-                    payload: ToolExecutionCompleted {
-                        session_id,
-                        result,
-                    },
+                    payload: ToolExecutionCompleted { session_id, result },
                 }) {
                     tracing::warn!(
                         err = ?e,
@@ -458,7 +442,8 @@ fn execute_get_time(call: ToolCall) -> BoxedToolFuture {
 fn file_write_definition() -> ToolDefinition {
     ToolDefinition {
         name: "file_write".to_owned(),
-        description: "Writes content to a file on disk, creating parent directories as needed.".to_owned(),
+        description: "Writes content to a file on disk, creating parent directories as needed."
+            .to_owned(),
         parameters: serde_json::json!({
             "type": "object",
             "properties": {
@@ -684,7 +669,11 @@ mod tests {
                 _ => None,
             })
             .collect();
-        assert_eq!(tools_registered.len(), 1, "expected one ToolsRegistered event");
+        assert_eq!(
+            tools_registered.len(),
+            1,
+            "expected one ToolsRegistered event"
+        );
 
         let payload = &tools_registered[0];
         assert_eq!(payload.provider, "builtin");
@@ -727,7 +716,9 @@ mod tests {
         actor.handle_command(&cmd, &ctx);
 
         // Then the tool is stored in the registry.
-        let reg = actor.get_tool("web_search").expect("tool should be registered");
+        let reg = actor
+            .get_tool("web_search")
+            .expect("tool should be registered");
         match reg {
             ToolRegistration::Actor { provider, .. } => {
                 assert_eq!(provider, "web-actor");

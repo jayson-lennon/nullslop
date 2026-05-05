@@ -8,6 +8,7 @@
 
 mod strategy;
 
+pub use nullslop_protocol::PromptStrategyId;
 pub use strategy::compaction::CompactionStrategy;
 pub use strategy::compaction_data::CompactionSessionData;
 pub use strategy::factory::DefaultStrategyFactory;
@@ -16,7 +17,6 @@ pub use strategy::sliding_window::SlidingWindowStrategy;
 pub use strategy::token_budget::TokenBudgetStrategy;
 pub use strategy::token_estimator::{CharRatioEstimator, TokenEstimator};
 pub use strategy::types::{
-    AssembledPrompt, AssemblyContext, PromptAssembly, PromptAssemblyError,
-    StrategyFactory, StrategySessionData,
+    AssembledPrompt, AssemblyContext, PromptAssembly, PromptAssemblyError, StrategyFactory,
+    StrategySessionData,
 };
-pub use nullslop_protocol::PromptStrategyId;
