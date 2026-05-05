@@ -1,6 +1,6 @@
 //! Dashboard state — tracks actor names and their startup status.
 //!
-//! Each actor goes through a lifecycle: `Starting` → `Started`.
+//! Each actor goes through a lifecycle: `Starting` → `Running`.
 //! The dashboard state records the current status for display.
 
 use std::collections::HashMap;
@@ -11,7 +11,7 @@ pub enum ActorStatus {
     /// The actor is currently starting up.
     Starting,
     /// The actor has finished starting and is ready.
-    Started,
+    Running,
 }
 
 /// Tracks the startup status of all actors.
@@ -42,11 +42,11 @@ impl DashboardState {
         self.actors.insert(name.to_owned(), ActorStatus::Starting);
     }
 
-    /// Record that an actor has finished starting.
+    /// Record that an actor is now running.
     ///
     /// If the actor was not previously tracked (no `mark_starting` call),
-    /// it is added with `Started` status.
-    pub fn mark_started<S>(&mut self, name: S)
+    /// it is added with `Running` status.
+    pub fn mark_running<S>(&mut self, name: S)
     where
         S: AsRef<str>,
     {
@@ -54,7 +54,7 @@ impl DashboardState {
         if !self.actors.contains_key(name) {
             self.order.push(name.to_owned());
         }
-        self.actors.insert(name.to_owned(), ActorStatus::Started);
+        self.actors.insert(name.to_owned(), ActorStatus::Running);
     }
 
     /// Returns all tracked actors in insertion order with their status.

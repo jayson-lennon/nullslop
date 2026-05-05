@@ -1,7 +1,7 @@
 //! Dashboard component — displays registered actors and their status.
 //!
 //! Shows a list of all actors known to the application along with their
-//! startup lifecycle status ("Starting" or "Started"). The dashboard updates
+//! startup lifecycle status ("Starting" or "Running"). The dashboard updates
 //! in real-time as actors progress through the startup sequence.
 
 pub(crate) mod element;

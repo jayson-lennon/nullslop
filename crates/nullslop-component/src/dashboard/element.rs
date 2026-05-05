@@ -1,7 +1,7 @@
 //! Renders the dashboard view — a list of actors with their startup status.
 //!
 //! Each actor is displayed as a row with its name and status badge.
-//! "Starting" appears yellow, "Started" appears green.
+//! "Starting" appears yellow, "Running" appears green.
 
 use crate::AppState;
 use crate::dashboard::state::ActorStatus;
@@ -54,7 +54,7 @@ impl UiElement<AppState> for DashboardElement {
             for (name, status) in state.dashboard.actors() {
                 let (label, color) = match status {
                     ActorStatus::Starting => ("Starting", Color::Yellow),
-                    ActorStatus::Started => ("Started", Color::Green),
+                    ActorStatus::Running => ("Running", Color::Green),
                 };
                 let padded_name = format!(" {name:<max_name_len$} ");
                 lines.push(Line::from(vec![
@@ -150,13 +150,13 @@ mod tests {
     }
 
     #[test]
-    fn render_actor_with_started_status() {
-        // Given a DashboardElement with an actor in Started status.
+    fn render_actor_with_running_status() {
+        // Given a DashboardElement with an actor in Running status.
         let mut element = DashboardElement;
         let state = {
             let mut s = AppState::default();
             s.dashboard.mark_starting("actor-a");
-            s.dashboard.mark_started("actor-a");
+            s.dashboard.mark_running("actor-a");
             s
         };
 
@@ -165,6 +165,6 @@ mod tests {
 
         // Then the actor name and status appear.
         assert!(rows[1].contains("actor-a"));
-        assert!(rows[1].contains("Started"));
+        assert!(rows[1].contains("Running"));
     }
 }

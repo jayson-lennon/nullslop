@@ -25,9 +25,9 @@ impl DashboardHandler {
         ctx.state.dashboard.mark_starting(&evt.name);
     }
 
-    /// Records an actor as started in the dashboard state.
+    /// Records an actor as running in the dashboard state.
     fn on_actor_started(evt: &ActorStarted, ctx: &mut HandlerContext<'_, AppState, Services>) {
-        ctx.state.dashboard.mark_started(&evt.name);
+        ctx.state.dashboard.mark_running(&evt.name);
     }
 }
 
@@ -66,8 +66,8 @@ mod tests {
     }
 
     #[test]
-    fn actor_started_updates_to_started() {
-        // Given a bus with DashboardHandler registered and an actor that has started.
+    fn actor_started_updates_to_running() {
+        // Given a bus with DashboardHandler registered and an actor that is running.
         let mut bus: Bus<AppState, Services> = Bus::new();
         DashboardHandler.register(&mut bus);
         let services = test_utils::test_services();
@@ -82,9 +82,9 @@ mod tests {
         });
         bus.process_events(&mut state, &services);
 
-        // Then the actor is updated to Started status.
+        // Then the actor is updated to Running status.
         let actors = state.dashboard.actors();
-        assert_eq!(actors[0], ("actor-a", ActorStatus::Started));
+        assert_eq!(actors[0], ("actor-a", ActorStatus::Running));
     }
 
     #[test]
@@ -116,7 +116,7 @@ mod tests {
         // Then both are tracked in order with correct statuses.
         let actors = state.dashboard.actors();
         assert_eq!(actors.len(), 2);
-        assert_eq!(actors[0], ("alpha", ActorStatus::Started));
+        assert_eq!(actors[0], ("alpha", ActorStatus::Running));
         assert_eq!(actors[1], ("beta", ActorStatus::Starting));
     }
 }
