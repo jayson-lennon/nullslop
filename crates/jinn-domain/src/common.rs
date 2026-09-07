@@ -22,6 +22,7 @@ pub mod request_dump;
 pub mod root_supervisor;
 pub mod services;
 pub mod session_map;
+pub mod slices;
 pub mod state;
 pub mod system_resource;
 pub mod tcaps;

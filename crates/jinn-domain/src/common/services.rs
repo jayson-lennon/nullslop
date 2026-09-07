@@ -116,6 +116,20 @@ pub struct Services {
     /// `task` tool. Read by the stall watchdog to skip waiting parents.
     #[debug(skip)]
     pub task_spawns: crate::feat::tools_actor::task_registry::TaskSpawnRegistry,
+
+    /// Dynamic registry of per-slice render cells.
+    ///
+    /// `register` mints the one write handle for a slice; the renderer
+    /// and intent router hold read handles only. Shared by all clones.
+    #[debug(skip)]
+    pub slices: crate::common::slices::Slices,
+
+    /// Feature-registered keybind routes (intent → message).
+    ///
+    /// The intent handler consults this table before its own arms; rows
+    /// attach after startup wiring as features and plugins register.
+    #[debug(skip)]
+    pub key_routes: crate::common::slices::key_routes::KeyRoutes,
 }
 
 impl Services {
@@ -185,6 +199,8 @@ impl Services {
             interactive_term: Arc::new(std::sync::OnceLock::new()),
             request_dump: RequestDumpService::default(),
             task_spawns: crate::feat::tools_actor::task_registry::TaskSpawnRegistry::default(),
+            slices: crate::common::slices::Slices::new(),
+            key_routes: crate::common::slices::key_routes::KeyRoutes::new(),
         }
     }
 
@@ -234,6 +250,8 @@ impl Services {
             interactive_term: Arc::new(std::sync::OnceLock::new()),
             request_dump: RequestDumpService::default(),
             task_spawns: crate::feat::tools_actor::task_registry::TaskSpawnRegistry::default(),
+            slices: crate::common::slices::Slices::new(),
+            key_routes: crate::common::slices::key_routes::KeyRoutes::new(),
         }
     }
 }

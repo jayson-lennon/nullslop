@@ -200,6 +200,8 @@ impl ActorSystemBuilder {
             request_dump: jinn_domain::common::request_dump::RequestDumpService::new(dump_requests),
             task_spawns: jinn_domain::feat::tools_actor::task_registry::TaskSpawnRegistry::default(
             ),
+            slices: jinn_domain::common::slices::Slices::new(),
+            key_routes: jinn_domain::common::slices::key_routes::KeyRoutes::new(),
         };
 
         let actor_deps = ActorDeps {
