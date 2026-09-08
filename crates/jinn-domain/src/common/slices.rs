@@ -10,8 +10,8 @@ pub use jinn_slices::cell;
 pub use jinn_slices::slices;
 pub use jinn_slices::view;
 
-pub use jinn_slices::Slices;
 pub use jinn_slices::SliceView;
+pub use jinn_slices::Slices;
 pub use jinn_slices::SlotKey;
 pub use jinn_slices::SlotTaken;
 pub use jinn_slices::TypedCell;

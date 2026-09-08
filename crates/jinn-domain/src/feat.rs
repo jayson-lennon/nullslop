@@ -67,7 +67,10 @@ pub fn composition_routes() -> crate::common::slices::key_routes::KeyRoutes {
     // since only row *shape* matters for keymap tests.
     let slices = crate::common::slices::Slices::new();
     let cell = slices
-        .register(quake_bar::quake_bar_slot(), quake_bar::QuakeBarState::default())
+        .register(
+            quake_bar::quake_bar_slot(),
+            quake_bar::QuakeBarState::default(),
+        )
         .expect("detached quake cell");
     quake_bar::attach_quake_bar_rows(&routes, &cell);
     quake_bar::register_quake_input_hook(&routes, &cell);

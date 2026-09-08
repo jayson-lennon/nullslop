@@ -27,7 +27,10 @@ pub use protocol::{
 };
 pub use reply::{FinalReply, read_final_reply};
 pub use route::{RouteDecision, route_decision};
-pub use status_actor::{ConnectionState, DiscordStatusActor, DiscordStatusActorDeps, DiscordStatusUpdate, discord_connection_slot};
+pub use status_actor::{
+    ConnectionState, DiscordStatusActor, DiscordStatusActorDeps, DiscordStatusUpdate,
+    discord_connection_slot,
+};
 pub use thread_map::{DiscordThreadMap, DiscordThreadMapError, ThreadMapping};
 
 #[cfg(test)]

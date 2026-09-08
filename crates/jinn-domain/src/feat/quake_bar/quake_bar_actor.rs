@@ -105,9 +105,6 @@ mod tests {
         // Then the text appears in the command log.
         let guard = cell.read();
         assert_eq!(guard.log.len(), 1);
-        assert_eq!(
-            guard.log.visible_lines(5),
-            &["hello".to_owned()]
-        );
+        assert_eq!(guard.log.visible_lines(5), &["hello".to_owned()]);
     }
 }

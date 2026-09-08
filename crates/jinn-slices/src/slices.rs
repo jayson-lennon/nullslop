@@ -122,7 +122,8 @@ pub struct Slices {
 /// A slice-registered overlay geometry function: resolves the screen
 /// rect its overlay occupies for the given frame area, or `None` when
 /// the overlay shouldn't render.
-pub type OverlayFn = Arc<dyn Fn(&ratatui::layout::Rect) -> Option<ratatui::layout::Rect> + Send + Sync>;
+pub type OverlayFn =
+    Arc<dyn Fn(&ratatui::layout::Rect) -> Option<ratatui::layout::Rect> + Send + Sync>;
 
 /// An overlay function wrapped for `Debug` (closures are not `Debug`).
 #[derive(Clone)]
@@ -158,7 +159,11 @@ impl Slices {
     ///
     /// Returns [`SlotTaken`] if the key is already registered. The
     /// original cell is untouched and its handle remains valid.
-    pub fn register<T>(&self, key: SlotKey, initial: T) -> Result<crate::cell::TypedCell<T>, SlotTaken>
+    pub fn register<T>(
+        &self,
+        key: SlotKey,
+        initial: T,
+    ) -> Result<crate::cell::TypedCell<T>, SlotTaken>
     where
         T: Any + Send + Sync,
     {
@@ -188,7 +193,11 @@ impl Slices {
     {
         let cells = self.cells.read();
         let entry = cells.get(key)?;
-        let cell = entry.cell.clone().downcast::<crate::cell::TypedCell<T>>().ok()?;
+        let cell = entry
+            .cell
+            .clone()
+            .downcast::<crate::cell::TypedCell<T>>()
+            .ok()?;
         Some((*cell).clone())
     }
 

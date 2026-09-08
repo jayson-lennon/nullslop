@@ -372,8 +372,7 @@ pub enum Intent {
     /// Scroll the task list preview popup toward the bottom (newer tasks).
     TaskListPreviewScrollDown,
 
-    // ── Dashboard tab ──────────────────────────────────────────────
-    /// Switch between Chat and Dashboard tabs.
+    /// Switch between Chat and the registered dynamic tabs.
     SwitchTab,
 
     // ── Terminal overlay (interactive_term takeover) ──────────────

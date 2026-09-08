@@ -194,8 +194,8 @@ mod tests {
             .draw(|frame| {
                 let guard = app.core.state.read();
                 let slices = jinn_slices::Slices::new();
-        let views = jinn_domain::common::overlay_views::OverlayViews::new();
-        let ctx = RenderCtx::new(&guard, &slices, &views);
+                let views = jinn_domain::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(&guard, &slices, &views);
                 render_audit_popup(frame, chat_log_area, &ctx, &mut rects);
             })
             .unwrap();
@@ -298,8 +298,8 @@ mod tests {
             .draw(|frame| {
                 let guard = app.core.state.read();
                 let slices = jinn_slices::Slices::new();
-        let views = jinn_domain::common::overlay_views::OverlayViews::new();
-        let ctx = RenderCtx::new(&guard, &slices, &views);
+                let views = jinn_domain::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(&guard, &slices, &views);
                 render_audit_popup(frame, chat_log_area, &ctx, &mut rects);
             })
             .unwrap();

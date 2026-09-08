@@ -30,7 +30,6 @@ pub(crate) use intent::register_quake_input_hook;
 
 use kameo::actor::Spawn;
 
-
 /// Activates the quake bar slice: mints the cell, spawns the actor,
 /// attaches the route rows, registers the input hook, the overlay
 /// geometry, and the render view.

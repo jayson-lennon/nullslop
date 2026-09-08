@@ -116,11 +116,7 @@ impl Actor for DiscordStatusActor {
         // fold it into the connection cell, and republish it on the bus
         // so the DashboardActor can consume it.
         let deps = args.deps;
-        tokio::spawn(drain_status_channel(
-            args.status_rx,
-            deps,
-            args.cell,
-        ));
+        tokio::spawn(drain_status_channel(args.status_rx, deps, args.cell));
         Ok(Self)
     }
 }
@@ -196,10 +192,13 @@ mod tests {
         let harness = TestHarness::new().await;
         let slices = Slices::new();
         let connection = slices
-            .register(discord_connection_slot(), ConnectionState {
-                connected: false,
-                detail: None,
-            })
+            .register(
+                discord_connection_slot(),
+                ConnectionState {
+                    connected: false,
+                    detail: None,
+                },
+            )
             .expect("fresh registry");
         let (tx, _actor) = spawn_translator(&harness, connection).await;
         let cell = slices
@@ -238,10 +237,13 @@ mod tests {
         let harness = TestHarness::new().await;
         let slices = Slices::new();
         let connection = slices
-            .register(discord_connection_slot(), ConnectionState {
-                connected: false,
-                detail: None,
-            })
+            .register(
+                discord_connection_slot(),
+                ConnectionState {
+                    connected: false,
+                    detail: None,
+                },
+            )
             .expect("fresh registry");
         let (tx, _actor) = spawn_translator(&harness, connection.clone()).await;
 
@@ -267,10 +269,13 @@ mod tests {
         let harness = TestHarness::new().await;
         let slices = Slices::new();
         let connection = slices
-            .register(discord_connection_slot(), ConnectionState {
-                connected: false,
-                detail: None,
-            })
+            .register(
+                discord_connection_slot(),
+                ConnectionState {
+                    connected: false,
+                    detail: None,
+                },
+            )
             .expect("fresh registry");
         let (tx, _actor) = spawn_translator(&harness, connection.clone()).await;
 

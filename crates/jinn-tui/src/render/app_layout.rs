@@ -120,17 +120,19 @@ impl AppLayout {
         }
     }
 }
-/// Full-terminal dashboard layout: a 1-row tab bar on top, everything else is
-/// full-width content (no sidebar, border, minimap, input, or status bar).
-pub struct DashboardLayout {
+/// Full-terminal dynamic-tab layout: a 1-row tab bar on top, everything else
+/// is full-width content (no sidebar, border, minimap, input, or status bar).
+/// Used by any slice whose registered tab descriptor selects full-width
+/// framing; named after the dashboard, the first slice to use it.
+pub struct TabLayout {
     /// The tab bar area (1 row at the very top).
     pub tab_bar: Rect,
     /// The content area (everything below the tab bar, full terminal width).
     pub content: Rect,
 }
 
-impl DashboardLayout {
-    /// Computes the dashboard layout for the given terminal area.
+impl TabLayout {
+    /// Computes the full-width tab layout for the given terminal area.
     ///
     /// Structure:
     /// ```text
@@ -147,28 +149,27 @@ impl DashboardLayout {
 
 /// The active application layout, selected by the base focus scope.
 ///
-/// Chat mode uses the multi-column [`AppLayout`]; Dashboard mode uses the
-/// full-terminal [`DashboardLayout`]. Branching on this enum guarantees the
-/// dashboard path physically cannot render chat-only chrome (sidebar, status
-/// bar, input, border) — those fields simply do not exist on
-/// [`DashboardLayout`].
+/// Chat mode uses the multi-column [`AppLayout`]; a dynamic tab uses the
+/// full-terminal [`TabLayout`]. Branching on this enum guarantees the tab
+/// path physically cannot render chat-only chrome (sidebar, status bar,
+/// input, border) — those fields simply do not exist on [`TabLayout`].
 ///
 /// Named `AppFrameLayout` (not `Layout`) to avoid collision with ratatui's
 /// [`ratatui::layout::Layout`], which `AppLayout::new` and
-/// [`DashboardLayout::new`] call for `Layout::vertical` splits.
+/// [`TabLayout::new`] call for `Layout::vertical` splits.
 pub enum AppFrameLayout {
     /// Chat tab layout: main column + minimap + border + sidebar, with
     /// content, input, and status-bar sub-areas.
     Chat(AppLayout),
-    /// Dashboard tab layout: tab bar + full-width content only.
-    Dashboard(DashboardLayout),
+    /// Dynamic tab layout: tab bar + full-width content only.
+    Tab(TabLayout),
 }
 
 impl AppFrameLayout {
     /// Computes the layout for the given terminal area, branching on the
     /// base focus scope.
     ///
-    /// `input_lines` and `sidebar_width` are ignored in Dashboard mode.
+    /// `input_lines` and `sidebar_width` are ignored in tab mode.
     /// `max_input_height` likewise. The terminal is an overlay and does not
     /// participate in the frame layout.
     #[must_use]
@@ -180,7 +181,7 @@ impl AppFrameLayout {
         is_dashboard: bool,
     ) -> Self {
         if is_dashboard {
-            Self::Dashboard(DashboardLayout::new(area))
+            Self::Tab(TabLayout::new(area))
         } else {
             Self::Chat(AppLayout::new(
                 area,
@@ -240,12 +241,12 @@ mod tests {
     }
 
     #[rstest::rstest]
-    fn dashboard_layout_uses_full_width() {
+    fn tab_layout_uses_full_width() {
         // Given an 80x24 area.
         let area = Rect::new(0, 0, 80, 24);
 
-        // When computing the dashboard layout.
-        let layout = DashboardLayout::new(area);
+        // When computing the full-width tab layout.
+        let layout = TabLayout::new(area);
 
         // Then the tab bar is the top row, full width.
         assert_eq!(layout.tab_bar, Rect::new(0, 0, 80, 1));
@@ -268,11 +269,10 @@ mod tests {
         assert_eq!(frame_chat.sidebar, chat_direct.sidebar);
         assert_eq!(frame_chat.status_bar, chat_direct.status_bar);
 
-        // And the dashboard frame variant is full-width, not the chat layout.
-        let AppFrameLayout::Dashboard(dash) =
-            AppFrameLayout::new(area, 1, area.height / 2, 30, true)
+        // And the tab frame variant is full-width, not the chat layout.
+        let AppFrameLayout::Tab(dash) = AppFrameLayout::new(area, 1, area.height / 2, 30, true)
         else {
-            panic!("expected Dashboard layout for is_dashboard=true");
+            panic!("expected Tab layout for is_dashboard=true");
         };
         assert_eq!(dash.content.width, area.width);
         assert_eq!(dash.tab_bar, Rect::new(0, 0, 80, 1));

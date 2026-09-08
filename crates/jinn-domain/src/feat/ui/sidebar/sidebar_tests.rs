@@ -58,12 +58,8 @@ fn render_clears_area_with_sidebar_background() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             sidebar.render(frame, ratatui::layout::Rect::new(0, 0, 30, 10), &ctx);
         })
         .unwrap();
@@ -436,12 +432,8 @@ fn sessions_header_anchored_to_bottom() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             sidebar.render(frame, ratatui::layout::Rect::new(0, 0, width, height), &ctx);
         })
         .unwrap();
@@ -481,12 +473,8 @@ fn sessions_header_below_persona_when_sidebar_is_short() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             sidebar.render(frame, ratatui::layout::Rect::new(0, 0, width, height), &ctx);
         })
         .unwrap();
@@ -523,12 +511,8 @@ fn sessions_footer_highlights_s_in_accent_action() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             sidebar.render(frame, ratatui::layout::Rect::new(0, 0, width, height), &ctx);
         })
         .unwrap();

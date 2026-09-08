@@ -127,7 +127,12 @@ pub fn attach_quake_bar_rows(routes: &KeyRoutes, cell: &TypedCell<QuakeBarState>
 
     for (route_id, key, action, display) in [
         (route_ids::SCROLL_UP, "<pgup>", "scroll-up", "scroll up"),
-        (route_ids::SCROLL_DOWN, "<pgdn>", "scroll-down", "scroll down"),
+        (
+            route_ids::SCROLL_DOWN,
+            "<pgdn>",
+            "scroll-down",
+            "scroll down",
+        ),
     ] {
         let cell = cell.clone();
         routes.attach(RouteRow {
@@ -269,8 +274,8 @@ mod tests {
     use super::quake_scope;
     use super::register_quake_input_hook;
     use crate::common::slices::key_routes::KeyRoutes;
-    use crate::protocol::intent::Intent;
     use crate::protocol::ScopeSignal;
+    use crate::protocol::intent::Intent;
     use jinn_slices::Slices;
 
     use crate::feat::quake_bar::state::quake_bar_slot;
@@ -357,9 +362,7 @@ mod tests {
     fn input_hook_inserts_characters_into_the_cell() {
         // Given a wired quake slice.
         let (routes, cell) = wired();
-        let hook = routes
-            .input_hook(&quake_scope())
-            .expect("hook registered");
+        let hook = routes.input_hook(&quake_scope()).expect("hook registered");
 
         // When the hook intercepts insert-char intents.
         let _ = hook(&Intent::InsertChar { ch: 'x' });
@@ -374,9 +377,7 @@ mod tests {
     fn input_hook_declines_non_editing_intents() {
         // Given a wired quake slice.
         let (routes, _cell) = wired();
-        let hook = routes
-            .input_hook(&quake_scope())
-            .expect("hook registered");
+        let hook = routes.input_hook(&quake_scope()).expect("hook registered");
 
         // When the hook sees a non-editing intent.
         let result = hook(&Intent::Quit);

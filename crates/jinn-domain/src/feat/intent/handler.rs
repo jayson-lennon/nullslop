@@ -1956,7 +1956,10 @@ mod tests {
         // When switching tabs twice.
         IntentHandler::handle(&Intent::SwitchTab, &mut state, &slices, &empty_routes());
         // Then the base is the registered tab.
-        assert_eq!(state.frontend.scope_stack.base(), &FocusScope::Dynamic(tab.clone()));
+        assert_eq!(
+            state.frontend.scope_stack.base(),
+            &FocusScope::Dynamic(tab.clone())
+        );
 
         // When switching tabs again.
         IntentHandler::handle(&Intent::SwitchTab, &mut state, &slices, &empty_routes());

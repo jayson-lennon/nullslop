@@ -56,10 +56,7 @@ fn scopes_for_row<'a>(
     tabs: &'a [SliceScopeId],
     hooks: &'a [SliceScopeId],
 ) -> Vec<Scope> {
-    let terminal_scopes = [
-        Scope::TerminalView,
-        Scope::TerminalControl,
-    ];
+    let terminal_scopes = [Scope::TerminalView, Scope::TerminalControl];
     match row.site {
         BindSite::OwnScope => vec![Scope::Dynamic(row.scope.clone())],
         BindSite::GlobalToggle => {
@@ -194,7 +191,10 @@ pub fn bind_route_rows(
     for hook in hooks {
         keymap.scope(Scope::Dynamic(hook), |b| {
             b.catch_all(|key: KeyEvent| {
-                if let KeyEvent { key: Key::Char(c), .. } = &key {
+                if let KeyEvent {
+                    key: Key::Char(c), ..
+                } = &key
+                {
                     Some(Intent::InsertChar { ch: *c })
                 } else {
                     None
@@ -221,14 +221,14 @@ mod tests {
     use crate::scope::Scope;
     use jinn_domain::Intent;
     use jinn_domain::common::slices::key_routes::ActionFn;
-use jinn_domain::common::slices::key_routes::BindSite;
+    use jinn_domain::common::slices::key_routes::BindSite;
     use jinn_domain::common::slices::key_routes::KeyRoutes;
     use jinn_domain::common::slices::key_routes::RouteId;
     use jinn_domain::common::slices::key_routes::RouteOutcome;
     use jinn_domain::common::slices::key_routes::RouteRow;
     use jinn_domain::protocol::IntentResult;
     use jinn_slices::SliceScopeId;
-        use ratatui_which_key::Keymap;
+    use ratatui_which_key::Keymap;
 
     fn quake_open_row() -> RouteRow {
         RouteRow {
@@ -272,12 +272,10 @@ use jinn_domain::common::slices::key_routes::BindSite;
         // Then Normal scope carries the toggle as a dynamic intent...
         let bindings = keymap.bindings_for_scope(Scope::Normal);
         assert!(
-            bindings
+            bindings.iter().any(|group| group
+                .bindings
                 .iter()
-                .any(|group| group
-                    .bindings
-                    .iter()
-                    .any(|b| b.description.contains("quake bar"))),
+                .any(|b| b.description.contains("quake bar"))),
             "Normal scope should show the open binding"
         );
         // ...and the slice's own scope also carries it: with only this
@@ -300,12 +298,10 @@ use jinn_domain::common::slices::key_routes::BindSite;
         // Then Normal scope gained the <M-`> binding.
         let bindings = keymap.bindings_for_scope(Scope::Normal);
         assert!(
-            bindings
+            bindings.iter().any(|group| group
+                .bindings
                 .iter()
-                .any(|group| group
-                    .bindings
-                    .iter()
-                    .any(|b| b.description.contains("quake bar"))),
+                .any(|b| b.description.contains("quake bar"))),
             "Normal scope should show the quake toggle"
         );
     }

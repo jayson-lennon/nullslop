@@ -231,8 +231,8 @@ impl Viewport {
 
 #[cfg(test)]
 mod tests {
-    use super::Slices;
     use super::SliceView;
+    use super::Slices;
     use super::SlotKey;
     use super::ViewSlotErrorReason;
     use super::Viewport;

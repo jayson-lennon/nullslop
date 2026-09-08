@@ -72,12 +72,8 @@ fn render_provider_picker_shows_telescope_layout() {
         .draw(|frame| {
             let area = frame.area();
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             render_provider_picker(frame, area, &ctx);
         })
         .unwrap();
@@ -109,12 +105,8 @@ fn render_provider_picker_uses_dark_gray_border() {
         .draw(|frame| {
             let area = frame.area();
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             render_provider_picker(frame, area, &ctx);
         })
         .unwrap();
@@ -146,12 +138,8 @@ fn render_provider_picker_no_active_marker_for_active_model() {
         .draw(|frame| {
             let area = frame.area();
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             render_provider_picker(frame, area, &ctx);
         })
         .unwrap();

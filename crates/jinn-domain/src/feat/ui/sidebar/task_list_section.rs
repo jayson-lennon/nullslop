@@ -438,7 +438,10 @@ mod tests {
         let section = TaskListSection;
         let slices = jinn_slices::Slices::new();
         let overlay_views = crate::common::overlay_views::OverlayViews::new();
-        assert_eq!(section.content_height(&RenderCtx::new(&app, &slices, &overlay_views)), 0);
+        assert_eq!(
+            section.content_height(&RenderCtx::new(&app, &slices, &overlay_views)),
+            0
+        );
     }
 
     #[rstest::rstest]

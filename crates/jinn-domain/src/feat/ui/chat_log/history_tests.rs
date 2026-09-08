@@ -78,12 +78,8 @@ fn render_few_messages_bottom_aligned() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -125,12 +121,8 @@ fn selected_entry_gutter_col0_has_context_fg_and_col1_has_cursor_bg() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -178,12 +170,8 @@ fn unselected_not_ignored_entry_shows_context_color() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -217,12 +205,8 @@ fn unselected_ignored_entry_shows_gray() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -259,12 +243,8 @@ fn unselected_ignored_pinned_entry_shows_context_color() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -301,12 +281,8 @@ fn selected_entry_gutter_is_dark_gray_when_unfocused() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -341,12 +317,8 @@ fn selected_entry_gutter_is_dark_gray_when_input_focused() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -379,12 +351,8 @@ fn render_stores_viewport_state() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -414,12 +382,8 @@ fn render_pinned_entry_shows_pin_in_gutter() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -455,12 +419,8 @@ fn render_unpinned_entry_has_no_pin_icon() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -498,12 +458,8 @@ fn render_pinned_multi_line_entry_shows_exactly_one_pin() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -548,12 +504,8 @@ fn render_scroll_to_selected_keeps_entry_visible() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -590,12 +542,8 @@ fn render_thinking_entry_appears_above_assistant() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -629,12 +577,8 @@ fn render_pinned_selected_entry_gutter_has_focus_accent_bg() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -671,12 +615,8 @@ fn render_pinned_unselected_entry_gutter_has_default_bg() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -709,12 +649,8 @@ fn render_unpinned_selected_entry_gutter_col0_no_bg_col1_has_cursor_bg() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -756,12 +692,8 @@ fn render_pinned_selected_unfocused_entry_gutter_has_border_unfocused_bg() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -801,12 +733,8 @@ fn render_long_session_shows_last_entry_at_bottom() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -852,12 +780,8 @@ fn render_scroll_to_bottom_shows_full_last_entry() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -900,12 +824,8 @@ fn render_scroll_to_selected_middle_entry_adjusts_viewport() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -953,12 +873,8 @@ fn render_scroll_down_through_tall_entry_works() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -967,12 +883,8 @@ fn render_scroll_down_through_tall_entry_works() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1020,12 +932,8 @@ fn render_tall_entry_snaps_when_completely_below_viewport() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1035,12 +943,8 @@ fn render_tall_entry_snaps_when_completely_below_viewport() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1079,12 +983,8 @@ fn virtualization_populates_cache_after_render() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1116,12 +1016,8 @@ fn expand_collapse_invalidates_and_rerenders() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1144,12 +1040,8 @@ fn expand_collapse_invalidates_and_rerenders() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1185,12 +1077,8 @@ fn resize_clears_cache_and_rerenders() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1200,12 +1088,8 @@ fn resize_clears_cache_and_rerenders() {
     terminal2
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area2, &ctx);
         })
         .unwrap();
@@ -1248,12 +1132,8 @@ fn streaming_content_change_invalidates_cache() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1273,12 +1153,8 @@ fn streaming_content_change_invalidates_cache() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1321,12 +1197,8 @@ fn render_transient_entry_has_muted_text_color() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1367,12 +1239,8 @@ fn render_auto_scrolls_jumped_compaction_into_view() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1398,12 +1266,8 @@ fn render_auto_scrolls_jumped_compaction_into_view() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1452,12 +1316,8 @@ fn render_annotation_entry_collapsed_by_default_shows_hint() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1509,12 +1369,8 @@ fn render_annotation_entry_expanded_shows_source_title_and_url() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1597,12 +1453,8 @@ fn waiting_line_renders_for_pending_task_call_with_running_child() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1632,12 +1484,8 @@ fn waiting_line_absent_for_non_task_tool_call() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1674,12 +1522,8 @@ fn waiting_line_absent_when_task_call_has_paired_result() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1719,12 +1563,8 @@ fn waiting_line_absent_when_child_not_in_memory() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1752,12 +1592,8 @@ fn waiting_line_disappears_when_child_finishes_without_manual_invalidation() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1773,12 +1609,8 @@ fn waiting_line_disappears_when_child_finishes_without_manual_invalidation() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1825,12 +1657,8 @@ fn task_call_entry_renders_on_subagent_block() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1873,12 +1701,8 @@ fn non_task_call_entry_does_not_use_subagent_block() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1919,12 +1743,8 @@ fn completed_task_result_shows_finished_status_row() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let overlay_views = crate::common::overlay_views::OverlayViews::new();
-                let ctx = RenderCtx::new(
-                    &state,
-                    &slices,
-                    &overlay_views,
-                );
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let ctx = RenderCtx::new(&state, &slices, &overlay_views);
             element.render(frame, area, &ctx);
         })
         .unwrap();

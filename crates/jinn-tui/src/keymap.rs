@@ -98,8 +98,8 @@ fn add_picker_base(b: &mut ratatui_which_key::ScopeBuilder<KeyEvent, Scope, Inte
 /// scope. Globals pierce capture mode (globals beat catch-alls), which used
 /// to strand the terminal control flag on `User`; keeping this as a scope
 /// binding makes capture mode hermetic while preserving the toggle
-/// everywhere else. (The quake-bar open key is generated from the
-/// slice's route rows — see `keymap_gen`.)
+/// everywhere else. (Slice keys are generated from route rows — see
+/// `keymap_gen`.)
 fn add_terminal_toggles(
     b: &mut ratatui_which_key::ScopeBuilder<KeyEvent, Scope, Intent, KeyCategory>,
 ) {
@@ -121,8 +121,8 @@ pub fn init() -> Keymap<KeyEvent, Scope, Intent, KeyCategory> {
 
 /// Builds the full keymap including slice route rows, mirroring the
 /// runtime composition order (`init` + `bind_route_rows`). Tests that
-/// exercise slice keys (quake open/close, dashboard rows) must query
-/// this — `init` alone carries no slice bindings, by design.
+/// exercise slice keys must query this — `init` alone carries no
+/// slice bindings, by design.
 #[must_use]
 pub fn init_with_slices() -> Keymap<KeyEvent, Scope, Intent, KeyCategory> {
     let routes = jinn_domain::feat::composition_routes();
@@ -150,8 +150,9 @@ pub fn init_with_slices() -> Keymap<KeyEvent, Scope, Intent, KeyCategory> {
 /// degrade to no toggle binding (the caller validates config earlier).
 ///
 /// The terminal overlay toggle (`<M-t>`) and the quake-bar open key
-/// (`<M-\`>`) are deliberately **scope bindings, not globals**: in
-/// `TerminalControl` a toggle would leave the control flag stuck on `User`
+/// (`<M-\`>`, a slice row binding) are deliberately **scope bindings, not
+/// globals**: in `TerminalControl` a toggle would leave the control flag
+/// stuck on `User`
 /// (the agent locked out). Every other scope registers them locally,
 /// including `TerminalView` where `<M-t>` closes the overlay; only
 /// `TerminalControl` does not — capture mode is hermetic.
@@ -494,7 +495,7 @@ pub fn init_with_control_toggle(control_toggle: &str) -> Keymap<KeyEvent, Scope,
 
     // ArgInput scope - typing positional args for a lifecycle command.
     keymap.scope(Scope::ArgInput, |b| {
-        // Only the toggles here, not the quake opener: `<M-`>` is a shell
+        // Only the toggles here, not slice openers: `<M-`>` is a shell
         // character and this scope has an InsertChar guard — unlike other
         // scopes' catch-alls, an unresolved key would mutate arg text.
         b.bind("<M-t>", Intent::ToggleTerminalOverlay { session_id: None }, KeyCategory::General);
@@ -1120,7 +1121,10 @@ mod tests {
         use jinn_domain::{Key, KeyEvent, Modifiers};
 
         let keymap = init_with_slices();
-        let mut wk = WhichKeyInstance::new(keymap, Scope::Dynamic(jinn_domain::feat::quake_bar::quake_scope()));
+        let mut wk = WhichKeyInstance::new(
+            keymap,
+            Scope::Dynamic(jinn_domain::feat::quake_bar::quake_scope()),
+        );
 
         // When pressing ESC.
         let esc = KeyEvent {
@@ -1149,7 +1153,10 @@ mod tests {
         use jinn_domain::{Key, KeyEvent, Modifiers};
 
         let keymap = init_with_slices();
-        let mut wk = WhichKeyInstance::new(keymap, Scope::Dynamic(jinn_domain::feat::quake_bar::quake_scope()));
+        let mut wk = WhichKeyInstance::new(
+            keymap,
+            Scope::Dynamic(jinn_domain::feat::quake_bar::quake_scope()),
+        );
 
         // When pressing <M-`> (the scoped close binding, overriding the global opener).
         let meta_backtick = KeyEvent {
@@ -1179,7 +1186,10 @@ mod tests {
         use jinn_domain::{Key, KeyEvent, Modifiers};
 
         let keymap = init_with_slices();
-        let mut wk = WhichKeyInstance::new(keymap, Scope::Dynamic(jinn_domain::feat::quake_bar::quake_scope()));
+        let mut wk = WhichKeyInstance::new(
+            keymap,
+            Scope::Dynamic(jinn_domain::feat::quake_bar::quake_scope()),
+        );
 
         // When pressing a plain printable char.
         let key_x = KeyEvent {
@@ -1198,10 +1208,7 @@ mod tests {
         // the catch-all the keystroke never reaches the slice — the
         // hook only sees intents the keymap emits.
         assert!(
-            matches!(
-                intent,
-                Some(Intent::InsertChar { ch: 'x' })
-            ),
+            matches!(intent, Some(Intent::InsertChar { ch: 'x' })),
             "printable char must synthesize InsertChar for the slice input hook; got {intent:?}",
         );
     }
@@ -1214,7 +1221,10 @@ mod tests {
         use jinn_domain::{Key, KeyEvent, Modifiers};
 
         let keymap = init_with_slices();
-        let mut wk = WhichKeyInstance::new(keymap, Scope::Dynamic(jinn_domain::feat::quake_bar::quake_scope()));
+        let mut wk = WhichKeyInstance::new(
+            keymap,
+            Scope::Dynamic(jinn_domain::feat::quake_bar::quake_scope()),
+        );
 
         // When pressing PageUp.
         let pgup = KeyEvent {

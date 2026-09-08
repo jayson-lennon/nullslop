@@ -25,8 +25,8 @@ use crate::common::actor::protocol::event::{ActorShutdownCompleted, ActorStarted
 use crate::common::actor_deps::ActorDeps;
 use crate::common::slices::TypedCell;
 use crate::feat::browser_binary_scan::{BinaryFamily, BrowserBinaryVerified};
-use crate::feat::dashboard::nav::DashboardNav;
 use crate::feat::dashboard::DashboardState;
+use crate::feat::dashboard::nav::DashboardNav;
 use crate::feat::discord::DiscordStatusUpdate;
 
 /// Dashboard entry name for the web-fetch actor — the row whose Notes column

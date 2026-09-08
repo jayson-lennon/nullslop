@@ -369,12 +369,15 @@ async fn dashboard_content_fills_full_width() {
 }
 
 /// Writes into the dashboard slice cell through the app registry.
-fn write_dashboard(app: &crate::TuiApp, f: impl FnOnce(&mut jinn_domain::feat::dashboard::DashboardState)) {
-    let cell: jinn_domain::common::slices::TypedCell<jinn_domain::feat::dashboard::DashboardState> = app
-        .services
-        .slices
-        .reader(&jinn_domain::feat::dashboard::dashboard_slot())
-        .expect("test builder registers the dashboard slot");
+fn write_dashboard(
+    app: &crate::TuiApp,
+    f: impl FnOnce(&mut jinn_domain::feat::dashboard::DashboardState),
+) {
+    let cell: jinn_domain::common::slices::TypedCell<jinn_domain::feat::dashboard::DashboardState> =
+        app.services
+            .slices
+            .reader(&jinn_domain::feat::dashboard::dashboard_slot())
+            .expect("test builder registers the dashboard slot");
     cell.update(f);
 }
 

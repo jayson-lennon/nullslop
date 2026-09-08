@@ -346,7 +346,7 @@ fn draw_picker(state: &State) -> String {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-        let overlay_views = crate::common::overlay_views::OverlayViews::new();
+            let overlay_views = crate::common::overlay_views::OverlayViews::new();
             let ctx = crate::common::render_ctx::RenderCtx::new(&read, &slices, &overlay_views);
             render_skill_picker(frame, area, &ctx);
         })

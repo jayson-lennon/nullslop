@@ -24,10 +24,10 @@ pub mod nav;
 pub mod view;
 
 pub use dashboard_actor::{DashboardActor, DashboardActorDeps};
+use kameo::actor::Spawn;
 pub use key_routes::attach_dashboard_rows;
 pub use key_routes::dashboard_scope;
 pub use nav::DashboardNav;
-use kameo::actor::Spawn;
 use std::collections::HashMap;
 pub use view::DashboardView;
 
@@ -61,13 +61,11 @@ pub async fn activate(
     let deps = crate::common::actor_deps::ActorDeps {
         services: services.clone(),
     };
-    let actor = DashboardActor::supervise(
-        &services.root_supervisor,
-        DashboardActorDeps { deps, cell },
-    )
-    .restart_policy(kameo::supervision::RestartPolicy::Never)
-    .spawn()
-    .await;
+    let actor =
+        DashboardActor::supervise(&services.root_supervisor, DashboardActorDeps { deps, cell })
+            .restart_policy(kameo::supervision::RestartPolicy::Never)
+            .spawn()
+            .await;
     // Wait for subscriptions to be fully wired before any subsequent
     // actor spawns: otherwise bus events can be missed, leaving entries
     // stuck on "Starting".

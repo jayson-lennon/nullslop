@@ -12,7 +12,7 @@ pub mod terminal_tab;
 pub mod too_small;
 pub mod which_key;
 
-pub use app_layout::{AppFrameLayout, AppLayout, DashboardLayout, MIN_HEIGHT, MIN_WIDTH};
+pub use app_layout::{AppFrameLayout, AppLayout, MIN_HEIGHT, MIN_WIDTH, TabLayout};
 
 use jinn_domain::{
     AppUiRegistry, FocusScope, Mode, RenderCtx, feat::ui::picker_states::PickerExt,
@@ -62,9 +62,7 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
         sidebar_focused,
         &mut rects,
     );
-    if let Some(rect) =
-        render_active_overlay(frame, area, &ctx, active_scope)
-    {
+    if let Some(rect) = render_active_overlay(frame, area, &ctx, active_scope) {
         rects.push(rect);
     }
     // The which-key help popup paints last so it sits above every overlay
@@ -120,7 +118,7 @@ fn apply_pre_render_mutation(app: &mut TuiApp, area: Rect) {
     match &pre_layout {
         // The dashboard slice lives outside AppState; its scroll clamp is
         // the actor's concern (ratatui re-derives visibility per frame).
-        AppFrameLayout::Dashboard(_) => {}
+        AppFrameLayout::Tab(_) => {}
         AppFrameLayout::Chat(chat) => {
             let text_width = chat.main.width.saturating_sub(2) as usize;
             wstate.active_chat_input_mut().set_wrap_width(text_width);
@@ -187,9 +185,10 @@ fn refresh_mcp_inspector_snapshot(state: &mut jinn_domain::AppState) {
 }
 
 /// Renders the base layers for the active tab. In Chat mode: tab bar, border,
-/// sidebar, chat tab, session/task-list previews, and status bar. In Dashboard
-/// mode: tab bar and the full-width dashboard table only. The which-key popup
-/// renders separately, after overlays — see the `render` entry point.
+/// sidebar, chat tab, session/task-list previews, and status bar. In a
+/// full-width dynamic tab: tab bar and the registered slice view only. The
+/// which-key popup renders separately, after overlays — see the `render`
+/// entry point.
 #[expect(
     clippy::too_many_arguments,
     reason = "all inputs are single-use render pass params"
@@ -207,7 +206,7 @@ fn render_base_layers(
     rects: &mut Vec<Rect>,
 ) {
     match layout {
-        AppFrameLayout::Dashboard(dash) => {
+        AppFrameLayout::Tab(dash) => {
             tab_bar::render_tab_bar(frame, dash.tab_bar, ctx);
             // The active tab's slice view draws the content: the base
             // scope's slot resolves through the viewport. An unregistered

@@ -38,7 +38,7 @@ pub use cell::TypedCell;
 pub use slice_scope::DynamicIntent;
 pub use slice_scope::SliceScopeId;
 pub use slices::Slices;
-pub use slices::SlotTaken;
 pub use slices::SlotKey;
+pub use slices::SlotTaken;
 pub use view::SliceView;
 pub use view::ViewCx;

@@ -242,18 +242,17 @@ impl ActorSystemBuilder {
                 },
             )
             .expect("discord connection slot is registered exactly once at wiring");
-        let _discord_status =
-            jinn_domain::feat::discord::DiscordStatusActor::supervise(
-                &root,
-                jinn_domain::feat::discord::DiscordStatusActorDeps {
-                    deps: actor_deps.clone(),
-                    status_rx: discord_status_rx.to_async(),
-                    cell: connection_cell,
-                },
-            )
-            .restart_policy(kameo::supervision::RestartPolicy::Never)
-            .spawn()
-            .await;
+        let _discord_status = jinn_domain::feat::discord::DiscordStatusActor::supervise(
+            &root,
+            jinn_domain::feat::discord::DiscordStatusActorDeps {
+                deps: actor_deps.clone(),
+                status_rx: discord_status_rx.to_async(),
+                cell: connection_cell,
+            },
+        )
+        .restart_policy(kameo::supervision::RestartPolicy::Never)
+        .spawn()
+        .await;
         _discord_status.wait_for_startup().await;
 
         // Quake bar slice: activation mints the cell, spawns the actor
