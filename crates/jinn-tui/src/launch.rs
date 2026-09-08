@@ -196,8 +196,14 @@ pub async fn launch_for_test(core: AppCore, mut services: jinn_domain::Services)
     {
         // The kameo→trouper bridge must be subscribed before the slice
         // activations, mirroring the production wiring order — the
-        // dashboard's canvas actor consumes bus events through it.
+        // dashboard's canvas actor consumes bus events through it. The
+        // trouper→kameo half has no ordering constraint while it ships
+        // with zero routes, but spawns here for symmetry.
         jinn_domain::common::trouper_bridge::spawn_kameo_to_trouper(&services).await;
+        jinn_domain::common::trouper_bridge::spawn_trouper_to_kameo(
+            &services.trouper_system,
+            services.bus.clone(),
+        );
         let activated = jinn_domain::feat::dashboard::activate(&mut services);
         if let Err(error) = activated {
             panic!("dashboard slice activation failed: {error}");

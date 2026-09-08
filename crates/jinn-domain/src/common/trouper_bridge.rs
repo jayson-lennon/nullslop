@@ -24,14 +24,16 @@
 //! fire-and-forget, a warn log on unroutable sends, no retry.
 
 pub mod kameo_to_trouper;
+pub mod trouper_to_kameo;
 
 pub use kameo_to_trouper::{
     KameoToTrouperBridgeActor, KameoToTrouperBridgeDeps, spawn_kameo_to_trouper,
 };
+pub use trouper_to_kameo::{TrouperToKameoBridgeActor, spawn_trouper_to_kameo};
 
 use trouper::envelope::Event;
-use trouper::schema::{FieldTy, SchemaKind};
-use trouper::types::Topic;
+use trouper::schema::{FieldTy, Schema, SchemaKind};
+use trouper::types::{SchemaId, Topic};
 
 use crate::common::actor::protocol::event::{ActorShutdownCompleted, ActorStarted, ActorStarting};
 use crate::feat::browser_binary_scan::BrowserBinaryVerified;
@@ -85,6 +87,58 @@ macro_rules! impl_schema {
             }
         }
     };
+}
+// Re-exported for child modules' test route tables (the production
+// route tables live in this module and use the macro textually).
+#[cfg(test)]
+pub(crate) use impl_schema;
+
+/// The forward route table's schema ids — the messages registered
+/// kameo → trouper.
+///
+/// Kept as a literal list (not derived from the actor's `Message`
+/// impls) so the loop guard compares what a maintainer actually
+/// registered, not what the compiler inferred.
+pub(crate) fn forward_schema_ids() -> Vec<SchemaId> {
+    vec![
+        <SubmitQuakeBarCommand as Schema>::schema_id(),
+        <DashboardNav as Schema>::schema_id(),
+        <ActorStarting as Schema>::schema_id(),
+        <ActorStarted as Schema>::schema_id(),
+        <ActorShutdownCompleted as Schema>::schema_id(),
+        <BrowserBinaryVerified as Schema>::schema_id(),
+        <DiscordStatusUpdate as Schema>::schema_id(),
+    ]
+}
+
+/// Rejects a message type registered in both bridge directions.
+///
+/// A type registered kameo → trouper AND trouper → kameo loops forever
+/// (each bridge republishes what the other forwarded). Registration
+/// direction is a human choice made in the route tables, so this is the
+/// one way the mechanism can be misused — and it is checked whenever a
+/// bridge spawns in a debug build.
+///
+/// # Panics
+///
+/// Panics in debug builds when the two id lists intersect.
+pub(crate) fn assert_tables_are_disjoint(forward: &[SchemaId], reverse: &[SchemaId]) {
+    let overlap: Vec<&SchemaId> = forward
+        .iter()
+        .filter(|f| reverse.contains(f))
+        .collect();
+    debug_assert!(
+        overlap.is_empty(),
+        "bridge route tables are not disjoint: {:?} is registered in both bridge directions; \
+         remove it from one table or messages will loop between the fabrics",
+        overlap
+    );
+}
+
+/// Checks the shipped route tables against each other. Called from both
+/// spawn helpers.
+pub(crate) fn debug_assert_no_fabric_loops() {
+    assert_tables_are_disjoint(&forward_schema_ids(), &trouper_to_kameo::reverse_schema_ids());
 }
 
 impl_schema!(SubmitQuakeBarCommand, "SubmitQuakeBarCommand", SchemaKind::Command,

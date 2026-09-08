@@ -213,13 +213,21 @@ impl ActorSystemBuilder {
             services: services.clone(),
         };
 
-        // ── Kameo → trouper bridge ─────────────────────────────────────
-        // The one translation seam between the two fabrics: forwards the
-        // bus messages consumed by the ported canvas slice actors onto
-        // their canvas topics. Must be subscribed before the dashboard
-        // activates — the lifecycle announcements published afterwards
-        // are what the dashboard's rows fold.
+        // ── Trouper bridge ─────────────────────────────────────────────
+        // The translation seam between the two fabrics, in both
+        // directions: the kameo→trouper half forwards the bus messages
+        // consumed by the ported slice actors onto their topics; the
+        // trouper→kameo half (inert until a reverse route is
+        // registered) will republish trouper topic messages onto the
+        // bus for pre-port consumers. The kameo→trouper half must be
+        // subscribed before the dashboard activates — the lifecycle
+        // announcements published afterwards are what the dashboard's
+        // rows fold.
         jinn_domain::common::trouper_bridge::spawn_kameo_to_trouper(&services).await;
+        jinn_domain::common::trouper_bridge::spawn_trouper_to_kameo(
+            &services.trouper_system,
+            services.bus.clone(),
+        );
 
         // ── Dashboard slice ───────────────────────────────────────────
         // Activation mints the cell, spawns the canvas actor FIRST

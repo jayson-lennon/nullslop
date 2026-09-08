@@ -156,6 +156,7 @@ pub async fn spawn_kameo_to_trouper(
     .spawn()
     .await;
     actor.wait_for_startup().await;
+    crate::common::trouper_bridge::debug_assert_no_fabric_loops();
     actor
 }
 
