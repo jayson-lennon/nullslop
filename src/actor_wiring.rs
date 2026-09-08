@@ -202,6 +202,7 @@ impl ActorSystemBuilder {
             ),
             slices: jinn_domain::common::slices::Slices::new(),
             key_routes: jinn_domain::common::slices::key_routes::KeyRoutes::new(),
+            viewport: jinn_domain::common::slices::view::Viewport::new(),
         };
 
         let actor_deps = ActorDeps {
@@ -211,15 +212,21 @@ impl ActorSystemBuilder {
         // ── Dashboard actor ───────────────────────────────────────────
         // Always spawned FIRST — subscribes to lifecycle events before any
         // other actor fires them, so the dashboard captures every actor.
-        // It owns `frontend.dashboard` and is the single sink for all
-        // status sources (generic lifecycle, BrowserBinaryVerified,
-        // DiscordStatusUpdate republished by DiscordStatusActor).
+        // It owns the dashboard's slice cell (minted here, under
+        // `dashboard:status`): the one write handle lives in its deps;
+        // the renderer and intent router resolve read handles only.
+        let dashboard_cell = services
+            .slices
+            .register(
+                jinn_domain::feat::dashboard::dashboard_slot(),
+                jinn_domain::feat::dashboard::DashboardState::new(),
+            )
+            .expect("dashboard slot is registered exactly once at wiring");
         let _dashboard = jinn_domain::feat::dashboard::dashboard_actor::DashboardActor::supervise(
             &root,
             jinn_domain::feat::dashboard::dashboard_actor::DashboardActorDeps {
                 deps: actor_deps.clone(),
-                state: state.clone(),
-                cap: jinn_domain::common::tcaps::mint::mint_frontend_cap(),
+                cell: dashboard_cell,
             },
         )
         .restart_policy(kameo::supervision::RestartPolicy::Never)

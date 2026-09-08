@@ -1,119 +1,84 @@
-//! Dashboard tab rendering — full-width service list using ratatui `Table`.
+//! Dashboard tab rendering — resolves the dashboard slice through the
+//! [`Slices`] registry and draws it with [`DashboardView`].
 //!
-//! Four real columns via `Constraint` widths:
-//!   Name | Description | State | Notes
-//!
-//! Selection + scroll are driven by [`TableState`] synced from
-//! [`DashboardState`] (selected index + scroll offset).
+//! This module is now a thin adapter: the table-drawing logic lives in the
+//! dashboard feature's VIEW artifact ([`DashboardView`]), which renders
+//! from the slice payload directly. The AppState-based renderer was removed
+//! with the `frontend.dashboard` field.
 
 use jinn_domain::RenderCtx;
-use jinn_domain::feat::dashboard::ActorLifecycle;
-use jinn_domain::feat::theme::Theme;
+use jinn_domain::common::slices::SliceView;
+use jinn_domain::common::slices::Slices;
+use jinn_domain::common::slices::ViewCx;
+use jinn_domain::feat::dashboard::DashboardState;
+use jinn_domain::feat::dashboard::DashboardView;
+use jinn_domain::feat::dashboard::dashboard_slot;
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Rect};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Cell, HighlightSpacing, Paragraph, Row, Table, TableState};
+use ratatui::layout::Rect;
 
-/// Renders the full dashboard view into `area` (the content rect of the tab).
-/// Caller is responsible for clamping `scroll_offset` via
-/// [`DashboardState::clamp_scroll`] before rendering; this function only reads.
-pub fn render_dashboard(frame: &mut Frame<'_>, area: Rect, ctx: &RenderCtx) {
-    let state = ctx.state;
-    let dashboard = &state.frontend.dashboard;
-    let theme = &state.frontend.theme;
+/// Renders the full dashboard view into `area` (the content rect of the tab)
+/// by resolving the dashboard slice through the app's slice registry.
+pub fn render_dashboard(frame: &mut Frame<'_>, area: Rect, ctx: &RenderCtx, slices: &Slices) {
+    let theme = &ctx.state.frontend.theme;
+    let cx = ViewCx { theme };
 
-    let actors = dashboard.actors();
-    if actors.is_empty() {
-        render_empty(frame, area, theme);
-        return;
+    let cell = resolve_slice(slices);
+    let guard = cell.read();
+    let mut view = DashboardView::new();
+    view.render(frame, area, &cx, &guard);
+}
+
+/// Resolves the dashboard slice cell from the registry.
+///
+/// The slot is registered at startup before the first frame (the actor
+/// mint at spawn), so the fallback is unreachable in a wired app; a
+/// detached scratch cell keeps renders safe if a wiring regression lands.
+#[expect(
+    clippy::unreachable,
+    reason = "the Err arm is unreachable for a fresh registry; a hit means a bug in Slices"
+)]
+fn resolve_slice(
+    slices: &Slices,
+) -> jinn_domain::common::slices::TypedCell<jinn_domain::feat::dashboard::DashboardState> {
+    if let Some(cell) = slices.reader(&dashboard_slot()) {
+        return cell;
     }
-
-    let rows = build_rows(&actors, theme);
-    let widths = [
-        Constraint::Length(22),
-        Constraint::Min(10),
-        Constraint::Length(10),
-        Constraint::Min(10),
-    ];
-
-    let header = Row::new(vec![
-        Cell::from("Name"),
-        Cell::from("Description"),
-        Cell::from("State"),
-        Cell::from("Notes"),
-    ])
-    .style(Style::default().add_modifier(Modifier::BOLD));
-
-    let table = Table::new(rows, widths)
-        .header(header)
-        .column_spacing(2)
-        .row_highlight_style(Style::default().fg(theme.focus_accent))
-        .highlight_symbol("▸ ")
-        .highlight_spacing(HighlightSpacing::Always);
-
-    let mut table_state = TableState::default();
-    table_state.select(Some(dashboard.selected_index()));
-    *table_state.offset_mut() = usize::from(dashboard.scroll_offset());
-
-    frame.render_stateful_widget(table, area, &mut table_state);
-}
-
-/// Renders the empty-state placeholder.
-fn render_empty(frame: &mut Frame<'_>, area: Rect, theme: &Theme) {
-    let para = Paragraph::new(Line::from(Span::styled(
-        " No services registered.",
-        Style::default().fg(theme.muted_text),
-    )));
-    frame.render_widget(para, area);
-}
-
-/// Builds the table rows from dashboard entries, applying per-lifecycle colors.
-fn build_rows<'a>(
-    actors: &[&'a jinn_domain::feat::dashboard::DashboardEntry],
-    theme: &Theme,
-) -> Vec<Row<'a>> {
-    actors
-        .iter()
-        .map(|entry| {
-            let name_cell =
-                Cell::from(entry.name.as_str()).style(Style::default().fg(theme.primary_text));
-
-            let desc_cell = Cell::from(entry.description.as_deref().unwrap_or(""))
-                .style(Style::default().fg(theme.muted_text));
-
-            let (state_str, state_color) = lifecycle_display(entry.lifecycle, theme);
-            let state_cell = Cell::from(state_str).style(Style::default().fg(state_color));
-
-            let status_str = entry.status_message.as_deref().unwrap_or("");
-            let status_cell = Cell::from(status_str).style(Style::default().fg(theme.muted_text));
-
-            Row::new(vec![name_cell, desc_cell, state_cell, status_cell])
-        })
-        .collect()
-}
-
-/// Returns the display string and color for a lifecycle variant.
-fn lifecycle_display(lifecycle: ActorLifecycle, theme: &Theme) -> (&'static str, Color) {
-    match lifecycle {
-        ActorLifecycle::Starting => ("Starting", theme.warning),
-        ActorLifecycle::Running => ("Running", theme.success),
-        ActorLifecycle::Dead => ("Dead", theme.error_text),
+    let detached = jinn_domain::common::slices::Slices::new();
+    // A fresh registry cannot conflict; `Err` is unreachable.
+    match detached.register(dashboard_slot(), DashboardState::default()) {
+        Ok(cell) => cell,
+        Err(error) => unreachable!("fresh registry cannot conflict: {error}"),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::expect_used, clippy::indexing_slicing, reason = "test code")]
+    #![allow(
+        clippy::expect_used,
+        clippy::unreachable,
+        clippy::indexing_slicing,
+        reason = "test code"
+    )]
     use jinn_domain::feat::dashboard::DashboardState;
+    use jinn_domain::feat::dashboard::dashboard_slot;
     use jinn_testutil::setup_term;
 
     async fn build_app() -> crate::TuiApp {
         crate::TuiApp::test_builder().build().await
     }
 
+    /// Resolves the dashboard cell from the app's slice registry.
+    fn dashboard_cell(
+        app: &crate::TuiApp,
+    ) -> jinn_domain::common::slices::TypedCell<DashboardState> {
+        app.services
+            .slices
+            .reader(&dashboard_slot())
+            .expect("test builder registers the dashboard slot")
+    }
+
     fn write_dashboard(app: &crate::TuiApp, f: impl FnOnce(&mut DashboardState)) {
-        f(&mut app.core.state.write_test_no_cap().frontend.dashboard);
+        dashboard_cell(app).update(f);
     }
 
     /// Collects the entire terminal buffer into a single string for substring
@@ -187,7 +152,7 @@ mod tests {
     #[rstest::rstest]
     #[tokio::test]
     async fn renders_empty_placeholder_when_no_actors() {
-        // Given a dashboard with no actors.
+        // Given a dashboard cell with no actor rows.
         let mut app = build_app().await;
         app.core
             .state
@@ -195,6 +160,7 @@ mod tests {
             .frontend
             .scope_stack
             .swap_base(jinn_domain::FocusScope::Dashboard);
+        write_dashboard(&app, jinn_domain::feat::dashboard::DashboardState::clear);
         let (mut terminal, _area) = setup_term(80, 24);
 
         // When rendering.

@@ -48,13 +48,30 @@ use crate::IntentResult;
 /// (e.g., opening an external editor, toggling a popup).
 pub struct IntentHandler;
 
+/// Fallback for dashboard-selection intents when no route row serves them
+/// (empty route table, e.g. minimal test wiring). The handler itself writes
+/// nothing: navigation is owned by the dashboard actor via `DashboardNav`.
+fn unhandled_dashboard_select() -> IntentResult {
+    tracing::debug!("dashboard select intent arrived with no route row attached");
+    IntentResult::empty()
+}
+
 impl IntentHandler {
     /// Process an intent against the current application state.
     ///
     /// Clears TUI signals from the previous call, then processes the intent.
-    /// Mutates `state` directly for UI operations.
+    /// Mutates `state` directly for UI operations. Consults the feature
+    /// route table first: an intent bound in [`KeyRoutes`] produces its
+    /// message and never reaches the built-in arms. `slices` backs the
+    /// cross-feature reads (e.g. discord connectivity) that used to reach
+    /// into `frontend` directly.
     /// Returns commands and events for the actor system.
-    pub fn handle(intent: &Intent, state: &mut AppState) -> IntentResult {
+    pub fn handle(
+        intent: &Intent,
+        state: &mut AppState,
+        slices: &crate::common::slices::Slices,
+        routes: &crate::common::slices::key_routes::KeyRoutes,
+    ) -> IntentResult {
         state.frontend.tui_signals.clear();
         // Status hints are transient: any fresh intent dismisses the previous
         // one (the handler arms that raise one run after this line).
@@ -64,7 +81,7 @@ impl IntentHandler {
         let prev_active = state.session.active_session_id().clone();
 
         // Process the intent and get the result.
-        let mut result = Self::handle_inner(intent, state);
+        let mut result = Self::handle_inner(intent, state, slices, routes);
 
         if state.session.active_session_id() != &prev_active {
             result = result.with_message(crate::protocol::system::ActiveSessionChanged {
@@ -80,7 +97,18 @@ impl IntentHandler {
         clippy::too_many_lines,
         reason = "exhaustive match on all Intent variants"
     )]
-    fn handle_inner(intent: &Intent, state: &mut AppState) -> IntentResult {
+    fn handle_inner(
+        intent: &Intent,
+        state: &mut AppState,
+        slices: &crate::common::slices::Slices,
+        routes: &crate::common::slices::key_routes::KeyRoutes,
+    ) -> IntentResult {
+        // Feature-registered routes go first: a bound intent is delegated
+        // to its feature's message and never reaches the built-in arms.
+        if let Some(result) = routes.action_for(intent) {
+            return result;
+        }
+
         // Clear ignore sweep state when the user performs any action other than
         // pressing x. This ensures the sweep only continues during consecutive
         // x presses within 100ms.
@@ -407,7 +435,7 @@ impl IntentHandler {
             Intent::PickerConfirm => {
                 let (result, maybe_intent) = feat::picker::intent::handle_picker_confirm(state);
                 if let Some(intent) = maybe_intent {
-                    let redispatch = IntentHandler::handle(&intent, state);
+                    let redispatch = IntentHandler::handle(&intent, state, slices, routes);
                     result.merge(redispatch)
                 } else {
                     result
@@ -416,7 +444,7 @@ impl IntentHandler {
             Intent::CtrlClear => {
                 let (result, maybe_intent) = feat::global::intent::handle_ctrl_clear(state);
                 if let Some(intent) = maybe_intent {
-                    let redispatch = IntentHandler::handle(&intent, state);
+                    let redispatch = IntentHandler::handle(&intent, state, slices, routes);
                     result.merge(redispatch)
                 } else {
                     result
@@ -743,24 +771,17 @@ impl IntentHandler {
                 state.frontend.scope_stack.swap_base(new_base);
                 IntentResult::empty()
             }
-            Intent::DashboardSelectUp => {
-                state.frontend.dashboard.select_prev();
-                IntentResult::empty()
-            }
-            Intent::DashboardSelectDown => {
-                state.frontend.dashboard.select_next();
-                IntentResult::empty()
-            }
-            Intent::DashboardSelectFirst => {
-                state.frontend.dashboard.select_first();
-                IntentResult::empty()
-            }
-            Intent::DashboardSelectLast => {
-                state.frontend.dashboard.select_last();
-                IntentResult::empty()
-            }
+            // Dashboard navigation is feature-routed: the dashboard feature's
+            // rows in `KeyRoutes` map these intents to `DashboardNav`
+            // messages for the dashboard actor. This arm is the unbound
+            // fallback (empty table / test wiring) — the handler itself
+            // writes nothing.
+            Intent::DashboardSelectUp
+            | Intent::DashboardSelectDown
+            | Intent::DashboardSelectFirst
+            | Intent::DashboardSelectLast => unhandled_dashboard_select(),
             Intent::ToDiscordThread => {
-                feat::discord::to_thread_intent::handle_to_discord_thread(state)
+                feat::discord::to_thread_intent::handle_to_discord_thread(state, slices)
             }
 
             Intent::ToggleTerminalOverlay { session_id } => {
@@ -985,6 +1006,16 @@ mod tests {
         clippy::indexing_slicing,
         reason = "test code"
     )]
+
+    /// Empty slice registry + route table for handler tests that don't
+    /// exercise slices or route rows.
+    fn empty_slices() -> crate::common::slices::Slices {
+        crate::common::slices::Slices::new()
+    }
+
+    fn empty_routes() -> crate::common::slices::key_routes::KeyRoutes {
+        crate::common::slices::key_routes::KeyRoutes::new()
+    }
     use crate::common::app_state::{AppState, FocusScope, RenameSessionInputState};
     use crate::feat::intent::IntentHandler;
     use crate::feat::interactive_term::emulator::ScreenCells;
@@ -1002,6 +1033,8 @@ mod tests {
                 text: "hello".into(),
             },
             &mut state,
+            &empty_slices(),
+            &empty_routes(),
         );
 
         // Then the buffer is empty and no commands are emitted.
@@ -1024,6 +1057,8 @@ mod tests {
                 text: "hello\nworld".into(),
             },
             &mut state,
+            &empty_slices(),
+            &empty_routes(),
         );
 
         // Then the buffer has the pasted text.
@@ -1042,7 +1077,12 @@ mod tests {
         state.active_chat_input_mut().set_enabled(false);
 
         // When handling InsertChar.
-        let result = IntentHandler::handle(&Intent::InsertChar { ch: 'x' }, &mut state);
+        let result = IntentHandler::handle(
+            &Intent::InsertChar { ch: 'x' },
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then the buffer is empty (edit rejected) and no commands are emitted.
         assert!(state.active_chat_input().is_empty());
@@ -1061,7 +1101,12 @@ mod tests {
         state.active_chat_input_mut().set_enabled(true);
 
         // When handling InsertChar.
-        let _result = IntentHandler::handle(&Intent::InsertChar { ch: 'x' }, &mut state);
+        let _result = IntentHandler::handle(
+            &Intent::InsertChar { ch: 'x' },
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then the buffer has the inserted char.
         assert_eq!(state.active_chat_input().text(), "x");
@@ -1074,7 +1119,12 @@ mod tests {
         state.active_chat_input_mut().set_enabled(false);
 
         // When handling EnterNormalMode (a non-editing intent).
-        let result = IntentHandler::handle(&Intent::EnterNormalMode, &mut state);
+        let result = IntentHandler::handle(
+            &Intent::EnterNormalMode,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then the intent still routes — the gate is editing-only.
         assert!(
@@ -1103,7 +1153,12 @@ mod tests {
         };
 
         // When handling RenameInsertChar { ch: 'o' }.
-        let result = IntentHandler::handle(&Intent::RenameInsertChar { ch: 'o' }, &mut state);
+        let result = IntentHandler::handle(
+            &Intent::RenameInsertChar { ch: 'o' },
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then rename input is "Helo" (not chat input).
         assert_eq!(state.frontend.rename_session_input.text.input, "Helo");
@@ -1128,7 +1183,12 @@ mod tests {
         };
 
         // When handling RenameCursorLeft.
-        let result = IntentHandler::handle(&Intent::RenameCursorLeft, &mut state);
+        let result = IntentHandler::handle(
+            &Intent::RenameCursorLeft,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then cursor moved left.
         assert_eq!(state.frontend.rename_session_input.text.cursor_pos, 4);
@@ -1151,7 +1211,12 @@ mod tests {
         };
 
         // When handling RenameCursorRight.
-        let result = IntentHandler::handle(&Intent::RenameCursorRight, &mut state);
+        let result = IntentHandler::handle(
+            &Intent::RenameCursorRight,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then cursor moved right.
         assert_eq!(state.frontend.rename_session_input.text.cursor_pos, 1);
@@ -1174,7 +1239,12 @@ mod tests {
         };
 
         // When handling RenameDeleteGrapheme.
-        let result = IntentHandler::handle(&Intent::RenameDeleteGrapheme, &mut state);
+        let result = IntentHandler::handle(
+            &Intent::RenameDeleteGrapheme,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then last char deleted.
         assert_eq!(state.frontend.rename_session_input.text.input, "Hell");
@@ -1198,7 +1268,12 @@ mod tests {
         };
 
         // When handling RenameDeleteForward.
-        let result = IntentHandler::handle(&Intent::RenameDeleteForward, &mut state);
+        let result = IntentHandler::handle(
+            &Intent::RenameDeleteForward,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then char after cursor deleted.
         assert_eq!(state.frontend.rename_session_input.text.input, "Hllo");
@@ -1222,7 +1297,12 @@ mod tests {
         };
 
         // When handling InsertChar.
-        let _result = IntentHandler::handle(&Intent::InsertChar { ch: 'o' }, &mut state);
+        let _result = IntentHandler::handle(
+            &Intent::InsertChar { ch: 'o' },
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then arg_input received the char, not the chat input.
         assert_eq!(state.frontend.arg_input.text.input, "helo");
@@ -1240,7 +1320,12 @@ mod tests {
         state.frontend.scope_stack.push(FocusScope::Input);
 
         // When handling InsertChar.
-        let _result = IntentHandler::handle(&Intent::InsertChar { ch: 'x' }, &mut state);
+        let _result = IntentHandler::handle(
+            &Intent::InsertChar { ch: 'x' },
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then the chat input received the char.
         assert_eq!(state.active_chat_input().text(), "x");
@@ -1266,7 +1351,12 @@ mod tests {
         };
 
         // When handling DeleteGrapheme.
-        let _result = IntentHandler::handle(&Intent::DeleteGrapheme, &mut state);
+        let _result = IntentHandler::handle(
+            &Intent::DeleteGrapheme,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then arg_input had a char deleted.
         assert_eq!(state.frontend.arg_input.text.input, "ab");
@@ -1288,7 +1378,12 @@ mod tests {
         };
 
         // When handling MoveCursorLeft.
-        let _result = IntentHandler::handle(&Intent::MoveCursorLeft, &mut state);
+        let _result = IntentHandler::handle(
+            &Intent::MoveCursorLeft,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then arg_input cursor moved.
         assert_eq!(state.frontend.arg_input.text.cursor_pos, 1);
@@ -1310,7 +1405,12 @@ mod tests {
         };
 
         // When handling MoveCursorRight.
-        let _result = IntentHandler::handle(&Intent::MoveCursorRight, &mut state);
+        let _result = IntentHandler::handle(
+            &Intent::MoveCursorRight,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then arg_input cursor moved.
         assert_eq!(state.frontend.arg_input.text.cursor_pos, 1);
@@ -1332,7 +1432,12 @@ mod tests {
         };
 
         // When handling DeleteGraphemeForward.
-        let _result = IntentHandler::handle(&Intent::DeleteGraphemeForward, &mut state);
+        let _result = IntentHandler::handle(
+            &Intent::DeleteGraphemeForward,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then the char after cursor was deleted from arg_input.
         assert_eq!(state.frontend.arg_input.text.input, "ac");
@@ -1354,7 +1459,12 @@ mod tests {
         };
 
         // When handling EnterNormalMode.
-        let _result = IntentHandler::handle(&Intent::EnterNormalMode, &mut state);
+        let _result = IntentHandler::handle(
+            &Intent::EnterNormalMode,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then ArgInput scope is popped and state cleared.
         assert!(!matches!(
@@ -1379,6 +1489,8 @@ mod tests {
                 text: "hello".into(),
             },
             &mut state,
+            &empty_slices(),
+            &empty_routes(),
         );
 
         // Then it doesn't panic and completes (paste is handled by picker).
@@ -1407,6 +1519,8 @@ mod tests {
                 text: " new".into(),
             },
             &mut state,
+            &empty_slices(),
+            &empty_routes(),
         );
 
         // Then rename input received the paste.
@@ -1421,7 +1535,12 @@ mod tests {
         state.frontend.cancel_stream_prompt = true;
 
         // When handling NormalEscape.
-        let result = IntentHandler::handle(&Intent::NormalEscape, &mut state);
+        let result = IntentHandler::handle(
+            &Intent::NormalEscape,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then the prompt is dismissed and a CancelStream command is emitted.
         assert!(!state.frontend.cancel_stream_prompt);
@@ -1443,7 +1562,12 @@ mod tests {
         state.frontend.cancel_stream_prompt = true;
 
         // When handling a different intent (InsertChar).
-        let _result = IntentHandler::handle(&Intent::InsertChar { ch: 'a' }, &mut state);
+        let _result = IntentHandler::handle(
+            &Intent::InsertChar { ch: 'a' },
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then the prompt is dismissed but no CancelStream command.
         assert!(!state.frontend.cancel_stream_prompt);
@@ -1457,7 +1581,12 @@ mod tests {
         state.frontend.cancel_stream_prompt = false;
 
         // When handling NormalEscape.
-        let _result = IntentHandler::handle(&Intent::NormalEscape, &mut state);
+        let _result = IntentHandler::handle(
+            &Intent::NormalEscape,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then no cancel command is emitted (falls through to normal escape handling).
         // The prompt remains false.
@@ -1472,7 +1601,12 @@ mod tests {
         state.frontend.close_session_prompt = true;
 
         // When handling SidebarSessionClose.
-        let _result = IntentHandler::handle(&Intent::SidebarSessionClose, &mut state);
+        let _result = IntentHandler::handle(
+            &Intent::SidebarSessionClose,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then the prompt is dismissed.
         assert!(!state.frontend.close_session_prompt);
@@ -1486,7 +1620,12 @@ mod tests {
         state.frontend.close_session_prompt = true;
 
         // When handling a different intent (ScrollUp).
-        let _result = IntentHandler::handle(&Intent::ScrollUp, &mut state);
+        let _result = IntentHandler::handle(
+            &Intent::ScrollUp,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then the prompt is dismissed.
         assert!(!state.frontend.close_session_prompt);
@@ -1500,7 +1639,8 @@ mod tests {
         state.frontend.cancel_stream_prompt = true;
 
         // When handling NoOp (unmapped key).
-        let result = IntentHandler::handle(&Intent::NoOp, &mut state);
+        let result =
+            IntentHandler::handle(&Intent::NoOp, &mut state, &empty_slices(), &empty_routes());
 
         // Then the prompt is dismissed and no CancelStream command is emitted.
         assert!(!state.frontend.cancel_stream_prompt);
@@ -1522,7 +1662,8 @@ mod tests {
         state.frontend.close_session_prompt = true;
 
         // When handling NoOp (unmapped key).
-        let _result = IntentHandler::handle(&Intent::NoOp, &mut state);
+        let _result =
+            IntentHandler::handle(&Intent::NoOp, &mut state, &empty_slices(), &empty_routes());
 
         // Then the prompt is dismissed.
         assert!(!state.frontend.close_session_prompt);
@@ -1535,7 +1676,8 @@ mod tests {
         let mut state = AppState::default();
 
         // When handling NoOp.
-        let result = IntentHandler::handle(&Intent::NoOp, &mut state);
+        let result =
+            IntentHandler::handle(&Intent::NoOp, &mut state, &empty_slices(), &empty_routes());
 
         // Then result is empty.
         assert!(result.message_names.is_empty());
@@ -1562,7 +1704,12 @@ mod tests {
         // The easiest way: call handle with an intent that doesn't change active session,
         // verify no event. Then manually switch and verify event.
         state.session.set_active(first_id);
-        let result = IntentHandler::handle(&Intent::ChatEntrySelectNext, &mut state);
+        let result = IntentHandler::handle(
+            &Intent::ChatEntrySelectNext,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then no ActiveSessionChanged event (same session).
         let has_event = result
@@ -1583,7 +1730,12 @@ mod tests {
         state.frontend.scope_stack.push(FocusScope::TerminalControl);
 
         // When switching tabs.
-        IntentHandler::handle(&Intent::SwitchTab, &mut state);
+        IntentHandler::handle(
+            &Intent::SwitchTab,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then the scope stays TerminalControl — handback is the only exit.
         assert_eq!(
@@ -1602,7 +1754,12 @@ mod tests {
             .swap_base(FocusScope::TerminalView);
 
         // When handling TerminalTakeControl.
-        IntentHandler::handle(&Intent::TerminalTakeControl, &mut state);
+        IntentHandler::handle(
+            &Intent::TerminalTakeControl,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then the scope is TerminalControl.
         assert_eq!(
@@ -1627,6 +1784,8 @@ mod tests {
         IntentHandler::handle(
             &Intent::ToggleTerminalOverlay { session_id: None },
             &mut state,
+            &empty_slices(),
+            &empty_routes(),
         );
 
         // Then the overlay opens in view mode.
@@ -1645,6 +1804,8 @@ mod tests {
         IntentHandler::handle(
             &Intent::ToggleTerminalOverlay { session_id: None },
             &mut state,
+            &empty_slices(),
+            &empty_routes(),
         );
 
         // Then the scope stays Input (default scope; no overlay opened).
@@ -1660,6 +1821,8 @@ mod tests {
         IntentHandler::handle(
             &Intent::ToggleTerminalOverlay { session_id: None },
             &mut state,
+            &empty_slices(),
+            &empty_routes(),
         );
 
         // Then no overlay opened (still the default scope).
@@ -1683,7 +1846,12 @@ mod tests {
         state.frontend.status_hint = Some("stale hint".to_owned());
 
         // When handling any other intent.
-        IntentHandler::handle(&Intent::SwitchTab, &mut state);
+        IntentHandler::handle(
+            &Intent::SwitchTab,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then the hint is cleared.
         assert!(state.frontend.status_hint.is_none());
@@ -1698,12 +1866,16 @@ mod tests {
         IntentHandler::handle(
             &Intent::ToggleTerminalOverlay { session_id: None },
             &mut state,
+            &empty_slices(),
+            &empty_routes(),
         );
 
         // When toggling again.
         IntentHandler::handle(
             &Intent::ToggleTerminalOverlay { session_id: None },
             &mut state,
+            &empty_slices(),
+            &empty_routes(),
         );
 
         // Then the overlay closes back to the base scope (the input scope the
@@ -1725,6 +1897,8 @@ mod tests {
                 session_id: Some(selected.clone()),
             },
             &mut state,
+            &empty_slices(),
+            &empty_routes(),
         );
 
         // Then the overlay opens.
@@ -1740,12 +1914,22 @@ mod tests {
         let mut state = AppState::default();
 
         // When switching tabs twice.
-        IntentHandler::handle(&Intent::SwitchTab, &mut state);
+        IntentHandler::handle(
+            &Intent::SwitchTab,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
         // Then the base is Dashboard.
         assert_eq!(state.frontend.scope_stack.base(), &FocusScope::Dashboard);
 
         // When switching tabs again.
-        IntentHandler::handle(&Intent::SwitchTab, &mut state);
+        IntentHandler::handle(
+            &Intent::SwitchTab,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
         // Then the base is Normal (no Terminal tab in the cycle).
         assert_eq!(state.frontend.scope_stack.base(), &FocusScope::Normal);
     }
@@ -1759,6 +1943,8 @@ mod tests {
         IntentHandler::handle(
             &Intent::ToggleTerminalOverlay { session_id: None },
             &mut state,
+            &empty_slices(),
+            &empty_routes(),
         );
         assert_eq!(
             state.frontend.scope_stack.current(),
@@ -1766,7 +1952,12 @@ mod tests {
         );
 
         // When switching tabs.
-        IntentHandler::handle(&Intent::SwitchTab, &mut state);
+        IntentHandler::handle(
+            &Intent::SwitchTab,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then the overlay closed (back to base, not a tab flip).
         assert_eq!(state.frontend.scope_stack.current(), &FocusScope::Normal);
@@ -1789,6 +1980,8 @@ mod tests {
                 label: String::new(),
             },
             &mut state,
+            &empty_slices(),
+            &empty_routes(),
         );
 
         // Then no pty write command is published.
@@ -1811,10 +2004,20 @@ mod tests {
             (0, 0),
             false,
         );
-        IntentHandler::handle(&Intent::TerminalTakeControl, &mut state);
+        IntentHandler::handle(
+            &Intent::TerminalTakeControl,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // When handling TerminalHandback.
-        let result = IntentHandler::handle(&Intent::TerminalHandback, &mut state);
+        let result = IntentHandler::handle(
+            &Intent::TerminalHandback,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then the scope pops back to TerminalView.
         assert_eq!(
@@ -1863,7 +2066,12 @@ mod tests {
         );
 
         // When handling TerminalPushScreen.
-        let result = IntentHandler::handle(&Intent::TerminalPushScreen, &mut state);
+        let result = IntentHandler::handle(
+            &Intent::TerminalPushScreen,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then an enqueue message is published (idle dispatch path).
         assert!(
@@ -1901,7 +2109,12 @@ mod tests {
         }
 
         // When handling TerminalPushScreen.
-        let result = IntentHandler::handle(&Intent::TerminalPushScreen, &mut state);
+        let result = IntentHandler::handle(
+            &Intent::TerminalPushScreen,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then a steering message is published (buffer drains at next
         // dispatch-resume).
@@ -1933,7 +2146,12 @@ mod tests {
         );
 
         // When handling TerminalPushScreen.
-        IntentHandler::handle(&Intent::TerminalPushScreen, &mut state);
+        IntentHandler::handle(
+            &Intent::TerminalPushScreen,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then the screen text was also staged for the clipboard.
         assert_eq!(
@@ -1961,7 +2179,12 @@ mod tests {
         );
 
         // When handling TerminalYank.
-        IntentHandler::handle(&Intent::TerminalYank, &mut state);
+        IntentHandler::handle(
+            &Intent::TerminalYank,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then the screen text was staged for the clipboard.
         assert_eq!(
@@ -1990,7 +2213,12 @@ mod tests {
             .swap_base(FocusScope::TerminalView);
 
         // When handling TerminalYank.
-        IntentHandler::handle(&Intent::TerminalYank, &mut state);
+        IntentHandler::handle(
+            &Intent::TerminalYank,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
 
         // Then nothing was staged for the clipboard.
         assert!(state.frontend.tui_signals.yank_text.is_none());
@@ -2046,6 +2274,8 @@ mod tests {
         IntentHandler::handle(
             &Intent::ToggleTerminalOverlay { session_id: None },
             &mut state,
+            &empty_slices(),
+            &empty_routes(),
         );
 
         // Then the overlay closed (pop on a base-only stack is a no-op, so

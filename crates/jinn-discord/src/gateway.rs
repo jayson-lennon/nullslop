@@ -58,6 +58,9 @@ pub struct BotData {
     /// DAO over `sessions.db` for thread↔session mapping persistence.
     pub thread_map: DiscordThreadMap,
     pub config: Arc<DiscordConfig>,
+    /// Runtime services — the intent handler reads the slice registry and
+    /// key route table from here.
+    pub services: jinn_domain::Services,
     /// Capability for God-mode `State::write()` — held by the platform layer.
     pub intent_handler_cap: jinn_domain::common::tcaps::IntentHandlerCap,
 }

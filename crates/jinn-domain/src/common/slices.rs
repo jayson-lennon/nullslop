@@ -20,6 +20,7 @@
     test,
     allow(
         clippy::expect_used,
+        clippy::panic,
         reason = "test assertions on infallible registration"
     )
 )]
@@ -36,6 +37,8 @@ use std::sync::Arc;
 use parking_lot::RwLock;
 
 pub use cell::TypedCell;
+pub use view::SliceView;
+pub use view::ViewCx;
 
 /// Uniquely addresses one slice cell.
 ///
@@ -245,7 +248,13 @@ mod tests {
             self.slot.clone()
         }
 
-        fn render(&mut self, _frame: &mut Frame<'_>, area: Rect, slice: &Self::Slice) {
+        fn render(
+            &mut self,
+            _frame: &mut Frame<'_>,
+            area: Rect,
+            _cx: &super::view::ViewCx<'_>,
+            slice: &Self::Slice,
+        ) {
             // Record that rendering saw the payload, via the frame
             // buffer: write one char per value unit in row 0.
             // (Real assertions happen through TestBackend below.)
@@ -342,7 +351,14 @@ mod tests {
         fn slot(&self) -> SlotKey {
             self.0.clone()
         }
-        fn render(&mut self, _frame: &mut Frame<'_>, _area: Rect, _slice: &Self::Slice) {}
+        fn render(
+            &mut self,
+            _frame: &mut Frame<'_>,
+            _area: Rect,
+            _cx: &super::view::ViewCx<'_>,
+            _slice: &Self::Slice,
+        ) {
+        }
     }
 
     #[rstest::rstest]
@@ -435,7 +451,7 @@ mod tests {
             action,
         } = row
         else {
-            unreachable!("attached row is a guest row");
+            panic!("attached row should be a guest row");
         };
         assert_eq!(scope, "dashboard");
         assert_eq!(key, "ctrl+s");

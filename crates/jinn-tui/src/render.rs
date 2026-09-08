@@ -49,6 +49,7 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
 
     let mut rects = vec![];
     render_base_layers(
+        &app.services.slices,
         &mut app.sidebar,
         &mut app.ui_registry,
         frame,
@@ -115,9 +116,9 @@ fn apply_pre_render_mutation(app: &mut TuiApp, area: Rect) {
         }
     }
     match &pre_layout {
-        AppFrameLayout::Dashboard(dash) => {
-            wstate.frontend.dashboard.clamp_scroll(dash.content.height);
-        }
+        // The dashboard slice lives outside AppState; its scroll clamp is
+        // the actor's concern (ratatui re-derives visibility per frame).
+        AppFrameLayout::Dashboard(_) => {}
         AppFrameLayout::Chat(chat) => {
             let text_width = chat.main.width.saturating_sub(2) as usize;
             wstate.active_chat_input_mut().set_wrap_width(text_width);
@@ -192,6 +193,7 @@ fn refresh_mcp_inspector_snapshot(state: &mut jinn_domain::AppState) {
     reason = "all inputs are single-use render pass params"
 )]
 fn render_base_layers(
+    slices: &jinn_domain::common::slices::Slices,
     sidebar: &mut Sidebar,
     ui_registry: &mut AppUiRegistry,
     frame: &mut Frame<'_>,
@@ -204,7 +206,7 @@ fn render_base_layers(
     match layout {
         AppFrameLayout::Dashboard(dash) => {
             tab_bar::render_tab_bar(frame, dash.tab_bar, ctx);
-            dashboard_tab::render_dashboard(frame, dash.content, ctx);
+            dashboard_tab::render_dashboard(frame, dash.content, ctx, slices);
         }
         AppFrameLayout::Chat(chat) => {
             tab_bar::render_tab_bar(frame, chat.tab_bar, ctx);

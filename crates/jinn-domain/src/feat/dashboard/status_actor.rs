@@ -102,11 +102,12 @@ async fn drain_status_channel(rx: kanal::AsyncReceiver<DiscordStatusUpdate>, dep
 mod tests {
     #![allow(clippy::expect_used, clippy::panic, reason = "test code")]
     use super::*;
-    use crate::common::app_state::AppState;
     use crate::common::bus::test_harness::TestHarness;
-    use crate::common::state::State;
+    use crate::common::slices::Slices;
     use crate::feat::dashboard::ActorLifecycle;
+    use crate::feat::dashboard::DashboardState;
     use crate::feat::dashboard::dashboard_actor::{DashboardActor, DashboardActorDeps};
+    use crate::feat::dashboard::dashboard_slot;
     use kameo::actor::Spawn;
 
     async fn spawn_translator(
@@ -130,11 +131,13 @@ mod tests {
         // Given a DiscordStatusActor (translator) and a DashboardActor (consumer).
         let harness = TestHarness::new().await;
         let (tx, _actor) = spawn_translator(&harness).await;
-        let state = State::new(AppState::default());
+        let slices = Slices::new();
+        let cell = slices
+            .register(dashboard_slot(), DashboardState::new())
+            .expect("fresh registry");
         let dash = DashboardActor::spawn(DashboardActorDeps {
             deps: harness.actor_deps().await,
-            state: state.clone(),
-            cap: crate::common::tcaps::mint::mint_frontend_cap(),
+            cell: cell.clone(),
         });
         dash.wait_for_startup().await;
 
@@ -146,8 +149,8 @@ mod tests {
         // republished the update and wrote nothing itself.
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         let (lifecycle, message) = {
-            let g = state.read();
-            let actors = g.frontend.dashboard.actors();
+            let s = cell.read();
+            let actors = s.actors();
             let discord = actors
                 .iter()
                 .find(|e| e.name == "discord")

@@ -12,15 +12,33 @@
 //!   text). Other actors leave it `None` until they gain their own
 //!   service-level reporting.
 //!
-//! [`DashboardActor`] owns `frontend.dashboard`. It subscribes to the
-//! generic lifecycle events and to [`DiscordStatusUpdate`] (republished by
-//! [`DiscordStatusActor`] from the gateway kanal channel).
+//! [`DashboardActor`] owns the dashboard's slice cell (registered under
+//! `dashboard:status` in the [`Slices`](crate::common::slices::Slices)
+//! facade). It subscribes to the generic lifecycle events, to
+//! [`DiscordStatusUpdate`] (republished by [`DiscordStatusActor`] from
+//! the gateway kanal channel), and to [`DashboardNav`] for keyboard
+//! navigation.
 pub mod dashboard_actor;
+pub mod key_routes;
+pub mod nav;
 pub mod status_actor;
+pub mod view;
 
 pub use dashboard_actor::{DashboardActor, DashboardActorDeps};
+pub use key_routes::attach_dashboard_rows;
+pub use nav::DashboardNav;
 pub use status_actor::{DiscordStatusActor, DiscordStatusActorDeps, DiscordStatusUpdate};
 use std::collections::HashMap;
+pub use view::DashboardView;
+
+/// The dashboard slice's slot in the [`Slices`](crate::common::slices::Slices)
+/// facade.
+///
+/// Canonical key shared by actor wiring (which mints the cell), the
+/// renderer (which resolves a read handle), and tests.
+pub fn dashboard_slot() -> crate::common::slices::SlotKey {
+    crate::common::slices::SlotKey::builtin("dashboard", "status")
+}
 
 use crate::common::AppUiRegistry;
 
@@ -160,6 +178,18 @@ impl DashboardState {
         if !self.order.is_empty() {
             self.selected_index = self.order.len() - 1;
         }
+    }
+
+    /// Record that an actor is in (or has returned to) the startup phase.
+    ///
+    /// If the actor is new it is appended to the display order. Existing
+    /// entries keep their description unless a new one is supplied.
+    /// Resets the grid to empty — no actors, selection at top, scroll 0.
+    pub fn clear(&mut self) {
+        self.actors.clear();
+        self.order.clear();
+        self.selected_index = 0;
+        self.scroll_offset = 0;
     }
 
     /// Record that an actor is in (or has returned to) the startup phase.

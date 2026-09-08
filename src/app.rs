@@ -544,6 +544,7 @@ impl App {
                             config: std::sync::Arc::new(
                                 user_preferences_storage.read().discord.clone(),
                             ),
+                            services: services.clone(),
                             intent_handler_cap,
                         },
                         std::env::var("DISCORD_BOT_TOKEN")

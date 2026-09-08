@@ -9,6 +9,7 @@ use std::path::Path;
 
 use error_stack::{Report, ResultExt};
 use jinn_domain::common::system_resource::load_system_resource;
+use jinn_domain::feat::dashboard::DashboardView;
 use jinn_domain::feat::ui::sidebar::register_sections;
 use jinn_domain::feat::ui::sidebar::sidebar::Sidebar;
 use jinn_domain::{AppCore, AppUiRegistry, State};
@@ -48,7 +49,7 @@ pub struct LaunchError;
 /// cannot run without it).
 pub fn launch(
     core: AppCore,
-    services: jinn_domain::Services,
+    mut services: jinn_domain::Services,
 ) -> Result<TuiApp, Report<LaunchError>> {
     let paths = &services.paths;
     let intent_handler_cap = jinn_domain::common::tcaps::mint::mint_intent_handler_cap();
@@ -71,6 +72,11 @@ pub fn launch(
 
     let mut ui_registry = AppUiRegistry::new();
     jinn_domain::register_all_ui_elements(&mut ui_registry);
+
+    // Feature registrations: keybind routes and slice views. Both live in
+    // the registries carried in `Services`, populated once here (the single
+    // bootstrap point) so production and tests see identical wiring.
+    register_dashboard_wiring(&mut services);
 
     // The single keymap-bootstrap site. Production and tests reach this
     // via the same path. The terminal control-toggle binding comes from
@@ -173,9 +179,14 @@ pub fn load_theme(
 /// This is what [`crate::TuiAppBuilder`] delegates to so that tests still go
 /// through the single keymap-bootstrap site without requiring real on-disk
 /// prompt/theme files.
-pub fn launch_for_test(core: AppCore, services: jinn_domain::Services) -> TuiApp {
+pub fn launch_for_test(core: AppCore, mut services: jinn_domain::Services) -> TuiApp {
     let mut ui_registry = AppUiRegistry::new();
     jinn_domain::register_all_ui_elements(&mut ui_registry);
+
+    // Feature registrations: keybind routes and slice views. Both live in
+    // the registries carried in `Services`, populated once here (the single
+    // bootstrap point) so production and tests see identical wiring.
+    register_dashboard_wiring(&mut services);
 
     let initial_scope =
         crate::app::scope_for_focus(core.state.read().frontend.scope_stack.current());
@@ -201,5 +212,23 @@ pub fn launch_for_test(core: AppCore, services: jinn_domain::Services) -> TuiApp
             s
         },
         intent_handler_cap: jinn_domain::common::tcaps::mint::mint_intent_handler_cap(),
+    }
+}
+
+/// Registers the dashboard feature's contributions into the shared
+/// registries: the four nav route rows and the slice view. Shared by
+/// both bootstrap paths; the view/slot pairing is asserted here so a
+/// wiring regression fails at startup, not mid-frame.
+fn register_dashboard_wiring(services: &mut jinn_domain::Services) {
+    jinn_domain::feat::dashboard::attach_dashboard_rows(&services.key_routes);
+    #[expect(
+        clippy::panic,
+        reason = "bootstrap assertion: a broken pairing must abort launch, not render blank"
+    )]
+    if let Err(error) = services
+        .viewport
+        .register(DashboardView::new(), &services.slices)
+    {
+        panic!("dashboard view/slot pairing failed: {error}");
     }
 }

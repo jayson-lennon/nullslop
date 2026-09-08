@@ -130,6 +130,12 @@ pub struct Services {
     /// attach after startup wiring as features and plugins register.
     #[debug(skip)]
     pub key_routes: crate::common::slices::key_routes::KeyRoutes,
+
+    /// Erased slice views, one per rendered slot. Views pair with their
+    /// slice at registration (type-checked at startup); the renderer asks
+    /// the viewport for the active slot's view instead of hand-written
+    /// tab code.
+    pub viewport: crate::common::slices::view::Viewport,
 }
 
 impl Services {
@@ -201,6 +207,7 @@ impl Services {
             task_spawns: crate::feat::tools_actor::task_registry::TaskSpawnRegistry::default(),
             slices: crate::common::slices::Slices::new(),
             key_routes: crate::common::slices::key_routes::KeyRoutes::new(),
+            viewport: crate::common::slices::view::Viewport::new(),
         }
     }
 
@@ -252,6 +259,7 @@ impl Services {
             task_spawns: crate::feat::tools_actor::task_registry::TaskSpawnRegistry::default(),
             slices: crate::common::slices::Slices::new(),
             key_routes: crate::common::slices::key_routes::KeyRoutes::new(),
+            viewport: crate::common::slices::view::Viewport::new(),
         }
     }
 }

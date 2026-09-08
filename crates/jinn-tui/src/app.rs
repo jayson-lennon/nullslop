@@ -223,7 +223,12 @@ impl TuiApp {
         let (messages, signals) = {
             let mut state = self.core.state.write(&self.intent_handler_cap);
 
-            let result = IntentHandler::handle(&intent, &mut state);
+            let result = IntentHandler::handle(
+                &intent,
+                &mut state,
+                &self.services.slices,
+                &self.services.key_routes,
+            );
 
             // Cancel selection when mode changes away from Picker.
             if matches!(intent, Intent::EnterNormalMode | Intent::NormalEscape) {

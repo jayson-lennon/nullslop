@@ -432,7 +432,12 @@ fn session_new_works_when_sidebar_sessions_focused() {
     let _old_id = state.session.active_session_id().clone();
 
     // When handling SessionNew via IntentHandler.
-    let result = crate::feat::intent::IntentHandler::handle(&crate::Intent::SessionNew, &mut state);
+    let result = crate::feat::intent::IntentHandler::handle(
+        &crate::Intent::SessionNew,
+        &mut state,
+        &empty_slices(),
+        &empty_routes(),
+    );
 
     // Then a new session is created.
     // And SessionCreated and ActiveSessionChanged are emitted.
@@ -458,8 +463,12 @@ fn session_new_works_when_not_in_sidebar() {
     let old_id = state.session.active_session_id().clone();
 
     // When handling SessionNew via IntentHandler.
-    let _result =
-        crate::feat::intent::IntentHandler::handle(&crate::Intent::SessionNew, &mut state);
+    let _result = crate::feat::intent::IntentHandler::handle(
+        &crate::Intent::SessionNew,
+        &mut state,
+        &empty_slices(),
+        &empty_routes(),
+    );
 
     // Then a new session is created (no section restriction outside sidebar).
     assert_ne!(*state.session.active_session_id(), old_id);
@@ -608,6 +617,16 @@ fn resolve_selected_entry_id_returns_real_session_and_entry_ids() {
 }
 
 use crate::feat::session::tool_result_status::ToolResultStatus;
+
+/// Empty slice registry + route table for handler tests that don't
+/// exercise slices or route rows.
+fn empty_slices() -> crate::common::slices::Slices {
+    crate::common::slices::Slices::new()
+}
+
+fn empty_routes() -> crate::common::slices::key_routes::KeyRoutes {
+    crate::common::slices::key_routes::KeyRoutes::new()
+}
 
 /// Build an AppState with one pinned tool-result entry.
 fn state_with_pinned_tool_result(name: &str, content: &str) -> AppState {

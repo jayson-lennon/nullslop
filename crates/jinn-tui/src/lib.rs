@@ -10,6 +10,8 @@ pub mod convert;
 pub mod keymap;
 pub mod launch;
 pub mod msg;
+#[cfg(test)]
+mod nav_e2e_test;
 pub mod render;
 pub mod run;
 pub mod scope;

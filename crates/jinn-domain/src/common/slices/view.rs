@@ -15,11 +15,23 @@
 
 use std::fmt;
 
+use jinn_theme::Theme;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 
 use super::Slices;
 use super::SlotKey;
+
+/// Per-frame inputs a view needs beyond its slice.
+///
+/// Application data that is not slice payload but every view draws
+/// with — currently the resolved theme. Grows deliberately: anything
+/// added here must be cheap to borrow and immutable for the frame.
+#[derive(Debug)]
+pub struct ViewCx<'a> {
+    /// The application's resolved theme for this frame.
+    pub theme: &'a Theme,
+}
 
 /// A pure renderer for one slice's payload.
 ///
@@ -35,7 +47,7 @@ pub trait SliceView: fmt::Debug {
     fn slot(&self) -> SlotKey;
 
     /// Draws the slice into `area`.
-    fn render(&mut self, frame: &mut Frame<'_>, area: Rect, slice: &Self::Slice);
+    fn render(&mut self, frame: &mut Frame<'_>, area: Rect, cx: &ViewCx<'_>, slice: &Self::Slice);
 }
 
 /// Type-erased view stored by the [`Viewport`].
@@ -46,12 +58,18 @@ pub trait SliceView: fmt::Debug {
 /// resolution failure here is a programming error guarded against at
 /// `register` time, so the `Option` is an internal invariant, not an
 /// error path callers handle.
-pub trait ErasedView: fmt::Debug {
+pub trait ErasedView: fmt::Debug + Send + Sync {
     /// The slot this view renders.
     fn slot(&self) -> SlotKey;
 
     /// Draws the view after re-typing its slice from `slices`.
-    fn render_erased(&mut self, frame: &mut Frame<'_>, area: Rect, slices: &Slices);
+    fn render_erased(
+        &mut self,
+        frame: &mut Frame<'_>,
+        area: Rect,
+        cx: &ViewCx<'_>,
+        slices: &Slices,
+    );
 }
 
 /// Adapter: erases any [`SliceView`] while preserving its typing.
@@ -65,20 +83,26 @@ where
 
 impl<V> ErasedView for ViewAdapter<V>
 where
-    V: SliceView,
+    V: SliceView + Send + Sync,
 {
     fn slot(&self) -> SlotKey {
         self.view.slot()
     }
 
-    fn render_erased(&mut self, frame: &mut Frame<'_>, area: Rect, slices: &Slices) {
+    fn render_erased(
+        &mut self,
+        frame: &mut Frame<'_>,
+        area: Rect,
+        cx: &ViewCx<'_>,
+        slices: &Slices,
+    ) {
         let Some(cell) = slices.reader::<V::Slice>(&self.view.slot()) else {
             // Unreachable for views that went through `Viewport::register`;
             // cells are never unregistered, so the pairing holds for life.
             return;
         };
         let guard = cell.read();
-        self.view.render(frame, area, &guard);
+        self.view.render(frame, area, cx, &guard);
     }
 }
 
@@ -130,6 +154,17 @@ pub struct Viewport {
     views: Vec<Box<dyn ErasedView>>,
 }
 
+impl Clone for Viewport {
+    fn clone(&self) -> Self {
+        Self {
+            // `Services: Clone` demands it, but views are registered once
+            // at bootstrap; a clone is an empty shell, never a usable
+            // renderer. Documented loudly so nobody renders a clone.
+            views: Vec::new(),
+        }
+    }
+}
+
 impl Viewport {
     /// Creates an empty viewport.
     #[must_use]
@@ -151,7 +186,7 @@ impl Viewport {
     /// its cell's payload type differs from the view's slice type.
     pub fn register<V>(&mut self, view: V, slices: &Slices) -> Result<(), ViewSlotError>
     where
-        V: SliceView + 'static,
+        V: SliceView + Send + Sync + 'static,
     {
         let key = view.slot();
         let expected = std::any::type_name::<V::Slice>();
@@ -181,11 +216,12 @@ impl Viewport {
         frame: &mut Frame<'_>,
         area: Rect,
         key: &SlotKey,
+        cx: &ViewCx<'_>,
         slices: &Slices,
     ) {
         for view in &mut self.views {
             if view.slot() == *key {
-                view.render_erased(frame, area, slices);
+                view.render_erased(frame, area, cx, slices);
                 return;
             }
         }

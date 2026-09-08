@@ -12,6 +12,16 @@ use crate::feat::chat_input::{AutocompleteMatch, AutocompleteTrigger, InputMode}
 use crate::feat::session::phase_machine::PhaseKind;
 use crate::protocol::ChatEntry;
 
+/// Empty slice registry + route table for handler tests that don't
+/// exercise slices or route rows.
+fn empty_slices() -> crate::common::slices::Slices {
+    crate::common::slices::Slices::new()
+}
+
+fn empty_routes() -> crate::common::slices::key_routes::KeyRoutes {
+    crate::common::slices::key_routes::KeyRoutes::new()
+}
+
 #[rstest::rstest]
 fn insert_char_appends_to_buffer() {
     // Given a default AppState.
@@ -1777,7 +1787,12 @@ fn ctrl_clear_input_empties_chat_input_via_handler() {
     assert_eq!(state.active_chat_input().cursor_pos(), 2);
 
     // When handling CtrlClear via the IntentHandler.
-    let result = IntentHandler::handle(&Intent::CtrlClear, &mut state);
+    let result = IntentHandler::handle(
+        &Intent::CtrlClear,
+        &mut state,
+        &empty_slices(),
+        &empty_routes(),
+    );
 
     // Then the chat input is cleared and scope remains Input.
     assert!(state.active_chat_input().is_empty(), "input buffer cleared");
@@ -1806,7 +1821,12 @@ fn ctrl_clear_input_empty_is_noop_via_handler() {
     assert!(state.active_chat_input().is_empty());
 
     // When handling CtrlClear via the IntentHandler.
-    let result = IntentHandler::handle(&Intent::CtrlClear, &mut state);
+    let result = IntentHandler::handle(
+        &Intent::CtrlClear,
+        &mut state,
+        &empty_slices(),
+        &empty_routes(),
+    );
 
     // Then nothing changes: no scope change, no commands, buffer still empty.
     assert!(state.active_chat_input().is_empty(), "buffer still empty");
