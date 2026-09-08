@@ -18,7 +18,7 @@
 //! lifecycle events, [`DiscordStatusUpdate`](crate::feat::discord::DiscordStatusUpdate)
 //! (republished on the bus by discord's own status actor), and
 //! [`DashboardNav`] for keyboard navigation — all translated onto canvas
-//! topics by the kameo→canvas bridge.
+//! topics by the kameo→trouper bridge.
 pub mod canvas_actor;
 pub mod key_routes;
 pub mod nav;

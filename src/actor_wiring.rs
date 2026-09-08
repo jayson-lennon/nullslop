@@ -213,13 +213,13 @@ impl ActorSystemBuilder {
             services: services.clone(),
         };
 
-        // ── Kameo → canvas bridge ──────────────────────────────────────
+        // ── Kameo → trouper bridge ─────────────────────────────────────
         // The one translation seam between the two fabrics: forwards the
         // bus messages consumed by the ported canvas slice actors onto
         // their canvas topics. Must be subscribed before the dashboard
         // activates — the lifecycle announcements published afterwards
         // are what the dashboard's rows fold.
-        jinn_domain::common::canvas_bridge::spawn(&services).await;
+        jinn_domain::common::trouper_bridge::spawn_kameo_to_trouper(&services).await;
 
         // ── Dashboard slice ───────────────────────────────────────────
         // Activation mints the cell, spawns the canvas actor FIRST

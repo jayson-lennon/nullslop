@@ -21,7 +21,7 @@
 //!
 //! The actor runs on the trouper runtime ([`ServiceActor`] tier: a
 //! stateless fold into shared state, no journaling). The kameo→canvas
-//! bridge ([`crate::common::canvas_bridge`]) translates the bus messages
+//! bridge ([`crate::common::trouper_bridge`]) translates the bus messages
 //! onto its topics; the cell handle cannot ride the runtime's JSON start
 //! args, so it is injected through the builder's
 //! [`start_with`](trouper::builder::ServiceBuilder::start_with)
@@ -34,7 +34,7 @@ use trouper::system::ActorSystem;
 use trouper::types::ActorPath;
 
 use crate::common::actor::protocol::event::{ActorShutdownCompleted, ActorStarted, ActorStarting};
-use crate::common::canvas_bridge;
+use crate::common::trouper_bridge;
 use crate::feat::browser_binary_scan::{BinaryFamily, BrowserBinaryVerified};
 use crate::feat::dashboard::DashboardState;
 use crate::feat::dashboard::nav::DashboardNav;
@@ -95,10 +95,10 @@ impl DashboardCanvasActor {
             .handles::<DashboardNav>()
             .start();
         system
-            .subscribe(&path, &canvas_bridge::fabric_topic(), None)
+            .subscribe(&path, &trouper_bridge::fabric_topic(), None)
             .expect("dashboard actor subscribes to the fabric topic");
         system
-            .subscribe(&path, &canvas_bridge::dashboard_topic(), None)
+            .subscribe(&path, &trouper_bridge::dashboard_topic(), None)
             .expect("dashboard actor subscribes to the dashboard topic");
         path
     }
@@ -315,7 +315,7 @@ mod tests {
     async fn actor_starting_event_creates_entry_with_starting_lifecycle() {
         // Given a dashboard canvas actor wired behind the bridge.
         let services = crate::Services::new_fake().await;
-        canvas_bridge::spawn(&services).await;
+        trouper_bridge::spawn_kameo_to_trouper(&services).await;
         let cell = wire_actor(&services);
 
         // When publishing ActorStarting on the kameo bus.
@@ -339,7 +339,7 @@ mod tests {
     async fn actor_started_event_transitions_to_running() {
         // Given a dashboard canvas actor wired behind the bridge.
         let services = crate::Services::new_fake().await;
-        canvas_bridge::spawn(&services).await;
+        trouper_bridge::spawn_kameo_to_trouper(&services).await;
         let slices = Slices::new();
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
@@ -367,7 +367,7 @@ mod tests {
     async fn actor_shutdown_event_transitions_to_dead() {
         // Given a dashboard canvas actor whose llm entry is already Running.
         let services = crate::Services::new_fake().await;
-        canvas_bridge::spawn(&services).await;
+        trouper_bridge::spawn_kameo_to_trouper(&services).await;
         let slices = Slices::new();
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
@@ -405,7 +405,7 @@ mod tests {
     async fn discord_connecting_update_sets_status_message_via_bus() {
         // Given a dashboard canvas actor wired behind the bridge.
         let services = crate::Services::new_fake().await;
-        canvas_bridge::spawn(&services).await;
+        trouper_bridge::spawn_kameo_to_trouper(&services).await;
         let slices = Slices::new();
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
@@ -428,7 +428,7 @@ mod tests {
     async fn discord_connected_update_marks_running_with_message_via_bus() {
         // Given a dashboard canvas actor wired behind the bridge.
         let services = crate::Services::new_fake().await;
-        canvas_bridge::spawn(&services).await;
+        trouper_bridge::spawn_kameo_to_trouper(&services).await;
         let slices = Slices::new();
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
@@ -452,7 +452,7 @@ mod tests {
     async fn discord_error_update_marks_dead_with_error_message_via_bus() {
         // Given a dashboard canvas actor wired behind the bridge.
         let services = crate::Services::new_fake().await;
-        canvas_bridge::spawn(&services).await;
+        trouper_bridge::spawn_kameo_to_trouper(&services).await;
         let slices = Slices::new();
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
@@ -481,7 +481,7 @@ mod tests {
     async fn discord_error_update_first_still_sets_description() {
         // Given a dashboard canvas actor (simulating missing-token: Error arrives first).
         let services = crate::Services::new_fake().await;
-        canvas_bridge::spawn(&services).await;
+        trouper_bridge::spawn_kameo_to_trouper(&services).await;
         let slices = Slices::new();
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
@@ -509,7 +509,7 @@ mod tests {
     async fn browser_binary_verified_writes_chrome_label_to_web_fetch_notes() {
         // Given a dashboard canvas actor wired behind the bridge.
         let services = crate::Services::new_fake().await;
-        canvas_bridge::spawn(&services).await;
+        trouper_bridge::spawn_kameo_to_trouper(&services).await;
         let slices = Slices::new();
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
@@ -541,7 +541,7 @@ mod tests {
     async fn browser_binary_verified_writes_bundled_label_to_web_fetch_notes() {
         // Given a dashboard canvas actor wired behind the bridge.
         let services = crate::Services::new_fake().await;
-        canvas_bridge::spawn(&services).await;
+        trouper_bridge::spawn_kameo_to_trouper(&services).await;
         let slices = Slices::new();
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
@@ -576,7 +576,7 @@ mod tests {
     async fn browser_binary_verified_shows_fallback_version_when_undetected() {
         // Given a dashboard canvas actor wired behind the bridge.
         let services = crate::Services::new_fake().await;
-        canvas_bridge::spawn(&services).await;
+        trouper_bridge::spawn_kameo_to_trouper(&services).await;
         let slices = Slices::new();
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
@@ -611,7 +611,7 @@ mod tests {
     async fn browser_binary_verified_does_not_create_phantom_entry() {
         // Given a dashboard canvas actor wired behind the bridge.
         let services = crate::Services::new_fake().await;
-        canvas_bridge::spawn(&services).await;
+        trouper_bridge::spawn_kameo_to_trouper(&services).await;
         let slices = Slices::new();
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
@@ -640,7 +640,7 @@ mod tests {
     async fn dashboard_nav_command_moves_selection() {
         // Given a dashboard canvas actor with three actor rows.
         let services = crate::Services::new_fake().await;
-        canvas_bridge::spawn(&services).await;
+        trouper_bridge::spawn_kameo_to_trouper(&services).await;
         let slices = Slices::new();
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
@@ -673,7 +673,7 @@ mod tests {
     async fn events_published_after_wiring_are_not_missed() {
         // Given a canvas system with the bridge already spawned.
         let services = crate::Services::new_fake().await;
-        canvas_bridge::spawn(&services).await;
+        trouper_bridge::spawn_kameo_to_trouper(&services).await;
 
         // When the dashboard activates (spawn + subscribe) and only then
         // an ActorStarted is published.

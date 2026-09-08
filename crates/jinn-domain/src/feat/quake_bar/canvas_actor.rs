@@ -3,8 +3,8 @@
 //! The kameo counterpart of this actor was the first port to the
 //! the `trouper` runtime ([`ServiceActor`] tier: stateless
 //! side-effectful fold, no journaling). It subscribes to the
-//! `jinn.quake-bar` canvas topic — fed by the kameo→canvas bridge
-//! ([`crate::common::canvas_bridge`]) — and appends each
+//! `jinn.quake-bar` trouper topic — fed by the kameo→trouper bridge
+//! ([`crate::common::trouper_bridge`]) — and appends each
 //! [`SubmitQuakeBarCommand`] to the slice cell's log, exactly as the
 //! kameo actor did. The cell handle cannot ride the runtime's JSON
 //! start args, so it is injected through the builder's
@@ -19,7 +19,7 @@ use trouper::types::ActorPath;
 
 use jinn_slices::TypedCell;
 
-use crate::common::canvas_bridge;
+use crate::common::trouper_bridge;
 use crate::feat::quake_bar::command::SubmitQuakeBarCommand;
 use crate::feat::quake_bar::state::QuakeBarState;
 
@@ -67,7 +67,7 @@ impl QuakeBarCanvasActor {
             .handles::<SubmitQuakeBarCommand>()
             .start();
         system
-            .subscribe(&path, &canvas_bridge::quake_bar_topic(), None)
+            .subscribe(&path, &trouper_bridge::quake_bar_topic(), None)
             .expect("quake-bar actor subscribes to its topic");
         path
     }
@@ -88,7 +88,7 @@ mod tests {
         reason = "test code"
     )]
 
-    use crate::common::canvas_bridge;
+    use crate::common::trouper_bridge;
     use crate::feat::quake_bar::command::SubmitQuakeBarCommand;
     use crate::feat::quake_bar::state::QuakeBarState;
     use crate::feat::quake_bar::state::quake_bar_slot;
@@ -134,7 +134,7 @@ mod tests {
         // Given a canvas system with the bridge, the quake-bar canvas
         // actor, and a fabric-topic probe all wired.
         let services = crate::Services::new_fake().await;
-        canvas_bridge::spawn(&services).await;
+        trouper_bridge::spawn_kameo_to_trouper(&services).await;
         let slices = Slices::new();
         let cell = slices
             .register(quake_bar_slot(), QuakeBarState::default())

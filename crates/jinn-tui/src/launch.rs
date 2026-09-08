@@ -194,10 +194,10 @@ pub async fn launch_for_test(core: AppCore, mut services: jinn_domain::Services)
         reason = "bootstrap assertion: a broken pairing must abort launch, not render blank"
     )]
     {
-        // The kameo→canvas bridge must be subscribed before the slice
+        // The kameo→trouper bridge must be subscribed before the slice
         // activations, mirroring the production wiring order — the
         // dashboard's canvas actor consumes bus events through it.
-        jinn_domain::common::canvas_bridge::spawn(&services).await;
+        jinn_domain::common::trouper_bridge::spawn_kameo_to_trouper(&services).await;
         let activated = jinn_domain::feat::dashboard::activate(&mut services);
         if let Err(error) = activated {
             panic!("dashboard slice activation failed: {error}");

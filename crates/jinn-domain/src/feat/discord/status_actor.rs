@@ -25,7 +25,7 @@ use crate::common::slices::TypedCell;
 /// This type serves triple duty: it is the kanal message (gateway →
 /// [`DiscordStatusActor`]), the bus message ([`DiscordStatusActor`] →
 /// the dashboard canvas actor), and the canvas topic payload (the
-/// kameo→canvas bridge serializes it onto `jinn.fabric`) — hence the
+/// kameo→trouper bridge serializes it onto `jinn.fabric`) — hence the
 /// serde derives.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum DiscordStatusUpdate {
@@ -209,7 +209,7 @@ mod tests {
         // The dashboard display consumer runs on the canvas runtime, fed
         // by the bridge over the harness bus.
         let services = harness.services().await;
-        crate::common::canvas_bridge::spawn(&services).await;
+        crate::common::trouper_bridge::spawn_kameo_to_trouper(&services).await;
         DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
 
         // When the gateway sends a Connected update down the kanal channel.
