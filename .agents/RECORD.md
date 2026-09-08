@@ -60,9 +60,10 @@ Entries are added or amended **only with human approval**.
 - (context) `#name` prompt-template tokens in user text expand to the template body; both token kinds are consumed in a second expansion pass.
 - (context) `@path` tokens resolve to `file://` URIs against cwd/home when the file is a readable image; otherwise the token is left as literal text.
 - (dashboard) The dashboard tab tracks actor lifecycle (starting/running/dead) and browser-binary detection (Chrome vs bundled) for the web-fetch feature.
-- (dashboard) Dashboard state is a `Slices` cell owned by `DashboardActor`, fed by events and `DashboardNav` messages; `DiscordStatusActor` republishes its gateway status as a `DiscordStatusUpdate` event rather than writing the dashboard directly.
+- (dashboard) Dashboard state is a `Slices` cell owned by `DashboardActor`, fed by events and `DashboardNav` messages; the dashboard folds Discord's `DiscordStatusUpdate` event for display only.
 - (slices) Render slices live in per-slice typed cells behind the `Slices` facade; registration mints exactly one write handle, held by the owning actor; the renderer and intent router hold read handles only.
-- (keybinds) Feature keybinds are registered as route rows (intent → message) in a central route table; the router dispatches by lookup and sync-writes nothing; guests' keybinds enter the same table targeting the plugin coordinator.
+- (slices) Slice integration is a single `activate()` per slice called from composition (launch/actor-wiring); removing the call removes the slice with no other edits.
+- (keybinds) Feature keybinds are route rows carrying scope and key; keymap bindings are generated from registered rows at launch; dynamic intents and scope ids are data-carried, so an unregistered slice leaves no keymap, scope, or intent residue.
 - (discovery) Project discovery walks ancestors from the session cwd up to either a VCS root or `$HOME`, whichever comes first; `$HOME` is exclusive.
 - (discovery) VCS roots are detected by marker files (`.git`, `.hg`, `.fslckout`, `.fossil`, `.jj`), not by shelling out to a VCS CLI.
 - (discovery) A discovery coordinator orchestrates project, browser-binary, file-listing, and skills scans across ancestor dirs; a notifier surfaces settled results to the session.
@@ -226,6 +227,7 @@ Entries are added or amended **only with human approval**.
 - (testing) just lint rejects bare #[test]/#[tokio::test] attributes without an accompanying rstest attribute.
 - (discord) Inbound Discord input — plain messages and every slash command — is accepted only from user IDs listed in `[discord].authorized_users`; an empty or missing list authorizes nobody (deny by default).
 - (discord) Unauthorized slash-command use gets an ephemeral refusal; unauthorized plain messages are silently dropped.
+- (discord) `DiscordStatusUpdate` and `DiscordStatusActor` live in `feat/discord`; discord maintains its own connection cell, the authority for bot-connected checks; the dashboard consumes the event for display only.
 - (subagents) Subagents are regular sessions spawned by the `task` tool: fresh history, linked to the parent, inheriting the parent's model, cwd, tools, skills, MCP servers, and a snapshot of the parent's task list; they appear in the sidebar as children marked with a subagent symbol.
 - (subagents) A subagent's task-list mutations do not propagate to its parent's list; parent and child own independent copies after spawn.
 - (subagents) The `task` tool blocks until the child session reaches Idle and forwards the child's last chat entry as its tool result; cancellations forward the cancel entry as a failure.
