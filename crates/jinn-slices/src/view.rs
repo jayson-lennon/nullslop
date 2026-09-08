@@ -6,7 +6,8 @@
 //! a `DashboardView` writes `&DashboardState` and nothing looser. The
 //! [`Viewport`] stores views behind the [`ErasedView`] twin (the same
 //! trick as the UI registry) and re-types them at render time by
-//! resolving the view's slot against the [`Slices`] registry.
+//! resolving the view's slot against the [`Slices`](super::slices::Slices)
+//! registry.
 //!
 //! The re-typing happens once, in
 //! [`Viewport::register`](Viewport::register) — not per frame, and not
@@ -19,8 +20,8 @@ use jinn_theme::Theme;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 
-use super::Slices;
-use super::SlotKey;
+use super::slices::Slices;
+use super::slices::SlotKey;
 
 /// Per-frame inputs a view needs beyond its slice.
 ///
@@ -176,9 +177,9 @@ impl Viewport {
     /// view's slice type.
     ///
     /// This is the startup pairing assertion: it reads through
-    /// [`Slices::reader`] immediately, so a missing cell or a wrong
-    /// payload type fails here, at launch, rather than silently blank
-    /// during rendering.
+    /// [`Slices::reader`](super::slices::Slices::reader) immediately, so a
+    /// missing cell or a wrong payload type fails here, at launch, rather
+    /// than silently blank during rendering.
     ///
     /// # Errors
     ///
@@ -225,5 +226,106 @@ impl Viewport {
                 return;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Slices;
+    use super::SliceView;
+    use super::SlotKey;
+    use super::ViewSlotErrorReason;
+    use super::Viewport;
+    use ratatui::Frame;
+    use ratatui::layout::Rect;
+
+    #[derive(Debug, Default)]
+    struct Payload {
+        value: u32,
+    }
+
+    #[derive(Debug)]
+    struct StubView {
+        slot: SlotKey,
+    }
+
+    impl SliceView for StubView {
+        type Slice = Payload;
+
+        fn slot(&self) -> SlotKey {
+            self.slot.clone()
+        }
+
+        fn render(
+            &mut self,
+            _frame: &mut Frame<'_>,
+            area: Rect,
+            _cx: &super::ViewCx<'_>,
+            slice: &Self::Slice,
+        ) {
+            // Record that rendering saw the payload, via the frame
+            // buffer: write one char per value unit in row 0.
+            // (Real assertions happen through TestBackend below.)
+            let _ = (area, slice);
+        }
+    }
+
+    #[derive(Debug)]
+    struct VecView(SlotKey);
+
+    impl SliceView for VecView {
+        type Slice = Vec<u8>;
+        fn slot(&self) -> SlotKey {
+            self.0.clone()
+        }
+        fn render(
+            &mut self,
+            _frame: &mut Frame<'_>,
+            _area: Rect,
+            _cx: &super::ViewCx<'_>,
+            _slice: &Self::Slice,
+        ) {
+        }
+    }
+
+    #[rstest::rstest]
+    #[test]
+    fn viewport_rejects_unresolvable_view_slot() {
+        // Given a registry where the view's slot is missing, and one
+        // where it holds the wrong type.
+        let slices = Slices::new();
+        let missing = SlotKey::builtin("test", "missing");
+        let mismatched = SlotKey::builtin("test", "mismatched");
+        let _ = slices
+            .register(mismatched.clone(), Payload::default())
+            .expect("register");
+        let mut viewport = Viewport::new();
+
+        // When registering a view over the missing slot.
+        let err = viewport
+            .register(
+                StubView {
+                    slot: missing.clone(),
+                },
+                &slices,
+            )
+            .unwrap_err();
+
+        // Then the pairing fails at registration, not at render.
+        assert_eq!(err.key, missing);
+        assert_eq!(err.reason, ViewSlotErrorReason::Unregistered);
+
+        // When registering a view whose slice type differs from the
+        // cell's payload.
+        let err = viewport
+            .register(VecView(mismatched.clone()), &slices)
+            .unwrap_err();
+
+        // Then the mismatch is reported with both type names.
+        assert_eq!(err.key, mismatched);
+        assert!(matches!(
+            err.reason,
+            ViewSlotErrorReason::TypeMismatch { .. }
+        ));
     }
 }

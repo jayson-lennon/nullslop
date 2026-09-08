@@ -44,17 +44,9 @@ use crate::common::AppUiRegistry;
 
 /// Generic actor lifecycle, applicable to every actor in the system.
 ///
-/// Driven by the existing bus events: `ActorStarting`, `ActorStarted`, and
-/// `ActorShutdownCompleted`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ActorLifecycle {
-    /// The actor is currently starting up.
-    Starting,
-    /// The actor has finished starting and is ready.
-    Running,
-    /// The actor has shut down (crashed or intentional).
-    Dead,
-}
+/// Re-exported from `jinn-core-types` (where the type now lives) so the
+/// dashboard's historical import path keeps working during extraction.
+pub use jinn_core_types::ActorLifecycle;
 
 /// A single actor's display data in the dashboard.
 #[derive(Debug, Clone)]

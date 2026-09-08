@@ -23,6 +23,11 @@
 //! The table is small and scanned linearly; built-in rows win over
 //! guest rows on lookup because they are attached first (startup
 //! wiring registers built-ins before plugins load).
+//!
+//! This module lives in `jinn-domain` (not `jinn-slices`) because its
+//! rows are keyed on the central [`Intent`] protocol type — a
+//! composition concern. It moves to `jinn-slices` once rows are
+//! re-keyed off `Intent`.
 
 use std::mem::Discriminant;
 
@@ -93,9 +98,10 @@ impl DiscriminantKey {
 /// Registry of feature keybind routes.
 ///
 /// Rows attach after startup wiring (plugins load late), so the table
-/// is interior-mutable behind a lock — the same shape as [`Slices`].
-/// Lookup is infallible: an unbound intent yields `None` and the
-/// handler falls through to its own arms.
+/// is interior-mutable behind a lock — the same shape as
+/// [`Slices`](crate::common::slices::Slices). Lookup is infallible: an
+/// unbound intent yields `None` and the handler falls through to its
+/// own arms.
 #[derive(Clone, Debug, Default)]
 pub struct KeyRoutes {
     rows: row_store::Rows,
@@ -197,5 +203,79 @@ mod row_store {
         pub fn rows(&self) -> Vec<RouteRow> {
             self.inner.read().clone()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::KeyRoutes;
+    use super::RouteRow;
+    use crate::protocol::intent::Intent;
+    use crate::protocol::intent::IntentResult;
+
+    #[derive(Debug, Clone)]
+    struct StubMsg;
+
+    impl crate::common::bus::BusMessage for StubMsg {}
+
+    fn stub_action() -> IntentResult {
+        IntentResult::new_message(StubMsg)
+    }
+
+    #[rstest::rstest]
+    #[test]
+    fn route_lookup_produces_message_for_bound_intent() {
+        // Given a table with a row bound to a dashboard nav intent.
+        let routes = KeyRoutes::new();
+        routes.attach_builtin(&Intent::NoOp, stub_action, "stub");
+
+        // When looking up the action for that intent (data variants
+        // must match by discriminant, not payload).
+        let result = routes.action_for(&Intent::NoOp);
+
+        // Then the action produced the stub message.
+        let result = result.expect("bound intent resolves");
+        assert_eq!(result.message_names, vec![std::any::type_name::<StubMsg>()]);
+    }
+
+    #[rstest::rstest]
+    #[test]
+    fn unbound_key_is_noop() {
+        // Given a table with no row for quit.
+        let routes = KeyRoutes::new();
+
+        // When looking up the action for Intent::Quit.
+        let result = routes.action_for(&Intent::Quit);
+
+        // Then nothing resolves and the handler falls through.
+        assert!(result.is_none());
+    }
+
+    #[rstest::rstest]
+    #[test]
+    fn guest_route_row_targets_plugin_coordinator() {
+        // Given a table with a guest row attached.
+        let routes = KeyRoutes::new();
+        routes.attach_guest("dashboard", "ctrl+s", "my-plugin", "save");
+
+        // When looking up the guest row by scope and key.
+        let row = routes.guest_row("dashboard", "ctrl+s");
+
+        // Then the row carries the plugin and the coordinator-addressed
+        // action.
+        let row = row.expect("guest row resolves");
+        let RouteRow::Guest {
+            scope,
+            key,
+            plugin,
+            action,
+        } = row
+        else {
+            unreachable!("attached row should be a guest row");
+        };
+        assert_eq!(scope, "dashboard");
+        assert_eq!(key, "ctrl+s");
+        assert_eq!(plugin, "my-plugin");
+        assert_eq!(action, "save");
     }
 }

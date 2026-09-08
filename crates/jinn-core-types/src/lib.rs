@@ -7,6 +7,8 @@
 //! Types are added as-needed. This is not a dumping ground: only types that are
 //! both foundational and domain-agnostic belong here.
 
+pub mod actor_lifecycle;
 pub mod session_id;
 
+pub use actor_lifecycle::ActorLifecycle;
 pub use session_id::SessionId;

@@ -2658,6 +2658,7 @@ dependencies = [
  "jinn-provider-config",
  "jinn-selection-widget",
  "jinn-session-schema",
+ "jinn-slices",
  "jinn-testutil",
  "jinn-theme",
  "jinn-web-fetch",
@@ -2828,6 +2829,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "jinn-slices"
+version = "0.115.1"
+dependencies = [
+ "derive_more",
+ "jinn-theme",
+ "parking_lot",
+ "ratatui",
+ "rstest",
+]
+
+[[package]]
 name = "jinn-testutil"
 version = "0.115.1"
 dependencies = [
@@ -2862,6 +2874,7 @@ dependencies = [
  "error-stack",
  "jinn-domain",
  "jinn-selection-widget",
+ "jinn-slices",
  "jinn-testutil",
  "kameo",
  "kameo_actors",

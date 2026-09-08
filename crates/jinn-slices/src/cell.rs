@@ -1,10 +1,11 @@
 //! TypedCell — a shared, per-slice storage cell.
 //!
-//! A [`TypedCell`] is the write handle minted by [`Slices::register`]
-//! (see [`super`]). It wraps an `Arc<RwLock<T>>` so every clone — owner,
-//! renderer, or router — observes the same payload, while mutation stays
-//! closure-scoped: no `&mut T` ever escapes, so a render thread can never
-//! observe a half-applied update.
+//! A [`TypedCell`] is the write handle minted by
+//! [`Slices::register`](super::slices::Slices::register). It wraps an
+//! `Arc<RwLock<T>>` so every clone — owner, renderer, or router —
+//! observes the same payload, while mutation stays closure-scoped: no
+//! `&mut T` ever escapes, so a render thread can never observe a
+//! half-applied update.
 
 use std::sync::Arc;
 

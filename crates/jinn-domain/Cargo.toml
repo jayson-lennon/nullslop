@@ -13,6 +13,7 @@ syntax-all = ["ratatui-markdown/highlight-lang-all"]
 jinn-provider = { workspace = true }
 jinn-common = { workspace = true }
 jinn-core-types = { workspace = true }
+jinn-slices = { workspace = true }
 jinn-provider-config = { workspace = true }
 jinn-web-fetch = { workspace = true }
 jinn-web-search = { workspace = true }

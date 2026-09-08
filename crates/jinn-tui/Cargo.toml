@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 jinn-domain = { workspace = true }
+jinn-slices = { workspace = true }
 
 wherror = { workspace = true }
 error-stack = { workspace = true }

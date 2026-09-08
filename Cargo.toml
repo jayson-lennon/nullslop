@@ -96,6 +96,7 @@ jinn-domain = { path = "crates/jinn-domain" }
 jinn-discord = { path = "crates/jinn-discord" }
 jinn-common = { path = "crates/jinn-common" }
 jinn-core-types = { path = "crates/jinn-core-types" }
+jinn-slices = { path = "crates/jinn-slices" }
 jinn-session-schema = { path = "crates/jinn-session-schema" }
 jinn-provider-config = { path = "crates/jinn-provider-config" }
 ratatui-markdown = { path = "vendor/ratatui-markdown", features = [
