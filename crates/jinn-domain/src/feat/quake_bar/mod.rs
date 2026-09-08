@@ -8,14 +8,19 @@
 //! - `input` — the 1-line command input, edited synchronously by the
 //!   `IntentHandler` (like every other input popup).
 //! - `log`   — the persistent command log, owned solely by the
-//!   [`QuakeBarActor`], which is the only writer. Submit routes the typed line
-//!   through a [`SubmitQuakeBarCommand`](command::SubmitQuakeBarCommand) so the
-//!   actor is the single mutator of the log (future debug commands and event
+//!   [`QuakeBarCanvasActor`](canvas_actor::QuakeBarCanvasActor), which is the
+//!   only writer. Submit routes the typed line through a
+//!   [`SubmitQuakeBarCommand`](command::SubmitQuakeBarCommand) so the actor is
+//!   the single mutator of the log (future debug commands and event
 //!   subscriptions also funnel through the actor).
+//!
+//! The log writer runs on the actor-canvas runtime (see
+//! [`canvas_actor`]); the kameo→canvas bridge translates the bus
+//! command onto the `jinn.quake-bar` topic it subscribes to.
 
-mod command;
-mod intent;
-mod quake_bar_actor;
+pub mod canvas_actor;
+pub(crate) mod command;
+pub(crate) mod intent;
 mod render;
 pub mod state;
 
@@ -28,10 +33,8 @@ pub use state::quake_scope;
 pub(crate) use intent::attach_quake_bar_rows;
 pub(crate) use intent::register_quake_input_hook;
 
-use kameo::actor::Spawn;
-
-/// Activates the quake bar slice: mints the cell, spawns the actor,
-/// attaches the route rows, registers the input hook, the overlay
+/// Activates the quake bar slice: mints the cell, spawns the canvas
+/// actor, attaches the route rows, registers the input hook, the overlay
 /// geometry, and the render view.
 ///
 /// One call from composition (launch/wiring) is the slice's entire
@@ -39,26 +42,17 @@ use kameo::actor::Spawn;
 /// are never bound and its scope is unreachable — with no other edits.
 pub fn activate(services: &mut crate::Services) {
     // Mint the cell: the write handle is shared (by clone) between the
-    // actor (log writer) and the intent-handler input hook (input
+    // canvas actor (log writer) and the intent-handler input hook (input
     // writer); the renderer resolves a read handle.
     let cell = services
         .slices
         .register(quake_bar_slot(), QuakeBarState::default())
         .expect("quake-bar slot is registered exactly once at wiring");
 
-    // Spawn the actor: the log's single writer.
-    let deps = crate::common::actor_deps::ActorDeps {
-        services: services.clone(),
-    };
-    let _actor = quake_bar_actor::QuakeBarActor::supervise(
-        &services.root_supervisor,
-        quake_bar_actor::QuakeBarActorDeps {
-            deps,
-            cell: cell.clone(),
-        },
-    )
-    .restart_policy(kameo::supervision::RestartPolicy::Never)
-    .spawn();
+    // Spawn the canvas actor: the log's single writer. Subscribe returns
+    // only after the topic cursor is registered, so no later publish is
+    // missed. The bridge (spawned earlier in wiring) feeds the topic.
+    canvas_actor::QuakeBarCanvasActor::spawn(&services.canvas_system, cell.clone());
 
     // Route rows + input hook + overlay geometry + overlay renderer.
     intent::attach_quake_bar_rows(&services.key_routes, &cell);

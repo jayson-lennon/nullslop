@@ -204,22 +204,34 @@ impl ActorSystemBuilder {
             key_routes: jinn_domain::common::slices::key_routes::KeyRoutes::new(),
             viewport: jinn_domain::common::slices::view::Viewport::new(),
             overlay_views: jinn_domain::common::overlay_views::OverlayViews::new(),
+            canvas_system: std::sync::Arc::new(actor_runtime::system::ActorSystem::new(
+                actor_runtime::system::SystemConfig::production(),
+            )),
         };
 
         let actor_deps = ActorDeps {
             services: services.clone(),
         };
 
+        // ── Kameo → canvas bridge ──────────────────────────────────────
+        // The one translation seam between the two fabrics: forwards the
+        // bus messages consumed by the ported canvas slice actors onto
+        // their canvas topics. Must be subscribed before the dashboard
+        // activates — the lifecycle announcements published afterwards
+        // are what the dashboard's rows fold.
+        jinn_domain::common::canvas_bridge::spawn(&services).await;
+
         // ── Dashboard slice ───────────────────────────────────────────
-        // Activation mints the cell, spawns the actor FIRST (waiting for
-        // startup so no lifecycle event from subsequently spawned actors
-        // is missed), attaches rows, registers the view + tab. Slice
-        // integration is exactly this call.
+        // Activation mints the cell, spawns the canvas actor FIRST
+        // (subscribe is the readiness point, so no lifecycle event from
+        // subsequently spawned actors is missed), attaches rows,
+        // registers the view + tab. Slice integration is exactly this
+        // call.
         #[expect(
             clippy::panic,
             reason = "bootstrap assertion: broken slice wiring must abort launch, not continue degraded"
         )]
-        if let Err(error) = jinn_domain::feat::dashboard::activate(&mut services).await {
+        if let Err(error) = jinn_domain::feat::dashboard::activate(&mut services) {
             panic!("dashboard slice activation failed: {error}");
         }
 

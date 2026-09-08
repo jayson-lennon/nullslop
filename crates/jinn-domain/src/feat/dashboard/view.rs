@@ -1,7 +1,7 @@
 //! The dashboard's VIEW artifact — draws the dashboard slice payload.
 //!
 //! Third of the contribution triple (STATE = [`DashboardState`] cell,
-//! LOGIC = [`DashboardActor`](super::dashboard_actor::DashboardActor),
+//! LOGIC = [`DashboardCanvasActor`](super::canvas_actor::DashboardCanvasActor),
 //! VIEW = [`DashboardView`]): a pure renderer over `&DashboardState`
 //! plus the current theme, which stays in `AppState` because themes are
 //! runtime-switchable application data, not slice payload.

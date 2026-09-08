@@ -33,7 +33,8 @@ Entries are added or amended **only with human approval**.
 
 - (context) Outgoing context assembly converts history entries to messages directly; a final tripwire validator drops any invalid tool loop with a tracing warning instead of sending invalid sequencing.
 
-- (arch) A component/actor system built on `kameo` runs domain logic asynchronously, communicating via command routing and event broadcast.
+- (arch) A component/actor system built on `kameo` runs domain logic asynchronously, communicating via command routing and event broadcast — except the dashboard and quake-bar slice actors, which run on the actor-canvas `actor-runtime` and receive their inputs through a kameo→canvas bridge actor.
+- (arch) The `actor-runtime` `ActorSystem` handle lives in `Services`, built at the actor-wiring assembly block; slice actors spawn onto it inside their slice's `activate()`.
 - (arch) The `IntentHandler` mutates `AppState` directly and returns commands; it never touches external services or emits events.
 - (arch) User input flows through a `Keymap` that produces an `Intent`; the `IntentHandler` handles intents synchronously as a single match block.
 - (arch) `AppState` is the shared state; the frontend writes user input, domain actors write their owned fields, and the TUI renderer reads it on each tick.

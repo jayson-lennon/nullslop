@@ -22,10 +22,12 @@ use crate::common::slices::TypedCell;
 /// Rendered as the free-form third column of the discord dashboard entry.
 /// Other actors leave `status_message` empty; only discord populates this.
 ///
-/// This type serves double duty: it is both the kanal message (gateway →
-/// [`DiscordStatusActor`]) and the bus message ([`DiscordStatusActor`] →
-/// [`DashboardActor`](crate::feat::dashboard::dashboard_actor::DashboardActor)).
-#[derive(Debug, Clone)]
+/// This type serves triple duty: it is the kanal message (gateway →
+/// [`DiscordStatusActor`]), the bus message ([`DiscordStatusActor`] →
+/// the dashboard canvas actor), and the canvas topic payload (the
+/// kameo→canvas bridge serializes it onto `jinn.fabric`) — hence the
+/// serde derives.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum DiscordStatusUpdate {
     /// The gateway is attempting to connect to Discord.
     Connecting,
@@ -164,7 +166,7 @@ mod tests {
     use crate::common::slices::Slices;
     use crate::feat::dashboard::ActorLifecycle;
     use crate::feat::dashboard::DashboardState;
-    use crate::feat::dashboard::dashboard_actor::{DashboardActor, DashboardActorDeps};
+    use crate::feat::dashboard::canvas_actor::DashboardCanvasActor;
     use crate::feat::dashboard::dashboard_slot;
     use kameo::actor::Spawn;
 
@@ -204,11 +206,11 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        let dash = DashboardActor::spawn(DashboardActorDeps {
-            deps: harness.actor_deps().await,
-            cell: cell.clone(),
-        });
-        dash.wait_for_startup().await;
+        // The dashboard display consumer runs on the canvas runtime, fed
+        // by the bridge over the harness bus.
+        let services = harness.services().await;
+        crate::common::canvas_bridge::spawn(&services).await;
+        DashboardCanvasActor::spawn(&services.canvas_system, cell.clone());
 
         // When the gateway sends a Connected update down the kanal channel.
         let _ = tx.send(DiscordStatusUpdate::Connected);

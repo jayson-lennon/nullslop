@@ -20,7 +20,7 @@ use crate::BusMessage;
 ///
 /// Published by the intent router on behalf of the dashboard feature's
 /// keybind rows; consumed only by
-/// [`DashboardActor`](super::dashboard_actor::DashboardActor).
+/// [`DashboardCanvasActor`](super::canvas_actor::DashboardCanvasActor).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DashboardNav {
     /// Move selection up one entry (`k`).

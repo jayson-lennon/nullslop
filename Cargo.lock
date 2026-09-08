@@ -3,6 +3,22 @@
 version = 3
 
 [[package]]
+name = "actor-runtime"
+version = "0.1.0"
+dependencies = [
+ "arc-swap",
+ "derive_more",
+ "error-stack 0.8.0",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "uuid",
+ "wherror",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -159,6 +175,15 @@ dependencies = [
  "percent-encoding",
  "windows-sys 0.60.2",
  "x11rb",
+]
+
+[[package]]
+name = "arc-swap"
+version = "1.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c049c0be4daef0b145cb3555416b3b8ef5b7888a38aea1a3a155801fe7b0810b"
+dependencies = [
+ "rustversion",
 ]
 
 [[package]]
@@ -1565,6 +1590,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "error-stack"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d01a8d4d427153bae0c38ca68d7912cbf9903fdcc97ecac18801738b3656a46d"
+dependencies = [
+ "anyhow",
+ "rustc_version",
+]
+
+[[package]]
 name = "euclid"
 version = "0.22.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2536,6 +2571,7 @@ dependencies = [
 name = "jinn"
 version = "0.115.1"
 dependencies = [
+ "actor-runtime",
  "async-trait",
  "clap",
  "clap-verbosity-flag",
@@ -2543,7 +2579,7 @@ dependencies = [
  "ctor",
  "dirs",
  "dotenvy",
- "error-stack",
+ "error-stack 0.7.1",
  "jiff",
  "jinn-cli",
  "jinn-discord",
@@ -2579,7 +2615,7 @@ dependencies = [
  "clap",
  "clap-verbosity-flag",
  "clap_complete",
- "error-stack",
+ "error-stack 0.7.1",
  "jinn-domain",
  "rstest",
  "serde_json",
@@ -2594,7 +2630,7 @@ name = "jinn-common"
 version = "0.115.1"
 dependencies = [
  "dirs",
- "error-stack",
+ "error-stack 0.7.1",
  "libc",
  "rstest",
  "serde",
@@ -2620,7 +2656,7 @@ name = "jinn-discord"
 version = "0.115.1"
 dependencies = [
  "derive_more",
- "error-stack",
+ "error-stack 0.7.1",
  "jinn-domain",
  "kanal",
  "poise",
@@ -2634,6 +2670,7 @@ dependencies = [
 name = "jinn-domain"
 version = "0.115.1"
 dependencies = [
+ "actor-runtime",
  "anstyle",
  "anstyle-lossy",
  "async-trait",
@@ -2642,7 +2679,7 @@ dependencies = [
  "dashmap 6.2.1",
  "derive_more",
  "dirs",
- "error-stack",
+ "error-stack 0.7.1",
  "form_urlencoded",
  "futures",
  "fuzzy-matcher",
@@ -2708,7 +2745,7 @@ version = "0.115.1"
 dependencies = [
  "axum",
  "ctor",
- "error-stack",
+ "error-stack 0.7.1",
  "jinn-common",
  "jinn-provider",
  "reqwest 0.13.3",
@@ -2727,7 +2764,7 @@ dependencies = [
 name = "jinn-plugin"
 version = "0.115.1"
 dependencies = [
- "error-stack",
+ "error-stack 0.7.1",
  "jinn-plugin-api",
  "rstest",
  "serde",
@@ -2766,7 +2803,7 @@ dependencies = [
  "async-trait",
  "base64",
  "ctor",
- "error-stack",
+ "error-stack 0.7.1",
  "futures",
  "jiff",
  "mockito",
@@ -2788,7 +2825,7 @@ name = "jinn-provider-config"
 version = "0.115.1"
 dependencies = [
  "dirs",
- "error-stack",
+ "error-stack 0.7.1",
  "jiff",
  "jinn-common",
  "jinn-provider",
@@ -2818,7 +2855,7 @@ dependencies = [
 name = "jinn-session-schema"
 version = "0.1.0"
 dependencies = [
- "error-stack",
+ "error-stack 0.7.1",
  "jiff",
  "rstest",
  "rusqlite",
@@ -2852,7 +2889,7 @@ version = "0.115.1"
 dependencies = [
  "anstyle",
  "anstyle-lossy",
- "error-stack",
+ "error-stack 0.7.1",
  "jinn-selection-widget",
  "ratatui",
  "rstest",
@@ -2871,7 +2908,7 @@ dependencies = [
  "derive_more",
  "dialoguer",
  "dirs",
- "error-stack",
+ "error-stack 0.7.1",
  "futures",
  "jinn-domain",
  "jinn-selection-widget",
@@ -3809,7 +3846,7 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 name = "persona-loader"
 version = "0.115.1"
 dependencies = [
- "error-stack",
+ "error-stack 0.7.1",
  "jinn-plugin-api",
  "jinn-plugin-sdk",
  "rstest",
@@ -5802,7 +5839,7 @@ dependencies = [
 name = "theme-loader"
 version = "0.115.1"
 dependencies = [
- "error-stack",
+ "error-stack 0.7.1",
  "jinn-plugin-api",
  "jinn-plugin-sdk",
  "jinn-theme",
@@ -6912,9 +6949,9 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "uuid"
-version = "1.24.0"
+version = "1.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf3923a6f5c4c6382e0b653c4117f48d631ea17f38ed86e2a828e6f7412f5239"
+checksum = "b5772d71c9be8a8a6ac2117d949c5b224c1b72241bb611d9a3012edcf8af7812"
 dependencies = [
  "atomic",
  "getrandom 0.4.3",
@@ -7670,22 +7707,22 @@ dependencies = [
 
 [[package]]
 name = "wherror"
-version = "2.3.1"
+version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "173da68485ccbdef03f13567248aff45302bef208a1fe1b966b9d2d7292348ed"
+checksum = "9464ed694aa5abd4b6422fa111132e73f483dec7a96bd51bb88bb58dfba01f78"
 dependencies = [
  "wherror-impl",
 ]
 
 [[package]]
 name = "wherror-impl"
-version = "2.3.1"
+version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e1270ef9f7b3afa45a98deaaaed36e5edb116c03686f69b7a89e1cccc90572c"
+checksum = "c6930f5b954732bbc0f23bf1a769dd2f49f050b0f17e77068fca435690ae598f"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn 3.0.3",
 ]
 
 [[package]]

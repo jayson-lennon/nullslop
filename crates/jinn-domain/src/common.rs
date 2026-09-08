@@ -11,6 +11,7 @@ pub mod app_state;
 mod app_state_tests;
 pub mod bridge;
 pub mod bus;
+pub mod canvas_bridge;
 pub mod core;
 pub mod focus;
 pub mod frontmatter;

@@ -12,28 +12,29 @@
 //!   text). Other actors leave it `None` until they gain their own
 //!   service-level reporting.
 //!
-//! [`DashboardActor`] owns the dashboard's slice cell (registered under
-//! `dashboard:status` in the [`Slices`](crate::common::slices::Slices)
-//! facade). It subscribes to the generic lifecycle events, to
-//! [`DiscordStatusUpdate`](crate::feat::discord::DiscordStatusUpdate)
-//! (republished on the bus by discord's own status actor), and to
-//! [`DashboardNav`] for keyboard navigation.
-pub mod dashboard_actor;
+//! [`DashboardCanvasActor`](canvas_actor::DashboardCanvasActor) owns the
+//! dashboard's slice cell (registered under `dashboard:status` in the
+//! [`Slices`](crate::common::slices::Slices) facade). It receives the generic
+//! lifecycle events, [`DiscordStatusUpdate`](crate::feat::discord::DiscordStatusUpdate)
+//! (republished on the bus by discord's own status actor), and
+//! [`DashboardNav`] for keyboard navigation — all translated onto canvas
+//! topics by the kameo→canvas bridge.
+pub mod canvas_actor;
 pub mod key_routes;
 pub mod nav;
 pub mod view;
 
-pub use dashboard_actor::{DashboardActor, DashboardActorDeps};
-use kameo::actor::Spawn;
+pub use canvas_actor::DashboardCanvasActor;
 pub use key_routes::attach_dashboard_rows;
 pub use key_routes::dashboard_scope;
 pub use nav::DashboardNav;
 use std::collections::HashMap;
 pub use view::DashboardView;
 
-/// Activates the dashboard slice: mints the cell, spawns the actor
-/// (first, waiting for startup so no lifecycle event is missed),
-/// attaches the route rows, registers the view, and declares the tab.
+/// Activates the dashboard slice: mints the cell, spawns the canvas
+/// actor (subscribe is the readiness point, so no lifecycle event from
+/// subsequently spawned actors is missed), attaches the route rows,
+/// registers the view, and declares the tab.
 ///
 /// One call from composition (launch/wiring) is the slice's entire
 /// integration surface; commenting it out removes the slice with no
@@ -43,10 +44,8 @@ pub use view::DashboardView;
 ///
 /// Returns the view/slot pairing error if the view cannot resolve its
 /// cell — a wiring bug that must abort launch, not render blank.
-pub async fn activate(
-    services: &mut crate::Services,
-) -> Result<(), jinn_slices::view::ViewSlotError> {
-    // Mint the cell: the one write handle goes into the actor's deps;
+pub fn activate(services: &mut crate::Services) -> Result<(), jinn_slices::view::ViewSlotError> {
+    // Mint the cell: the one write handle goes into the canvas actor;
     // renderer and intent router resolve read handles only.
     let cell = services
         .slices
@@ -56,20 +55,13 @@ pub async fn activate(
             reason: jinn_slices::view::ViewSlotErrorReason::Unregistered,
         })?;
 
-    // Spawn FIRST — the dashboard must subscribe to lifecycle events
-    // before any other actor fires them.
-    let deps = crate::common::actor_deps::ActorDeps {
-        services: services.clone(),
-    };
-    let actor =
-        DashboardActor::supervise(&services.root_supervisor, DashboardActorDeps { deps, cell })
-            .restart_policy(kameo::supervision::RestartPolicy::Never)
-            .spawn()
-            .await;
-    // Wait for subscriptions to be fully wired before any subsequent
-    // actor spawns: otherwise bus events can be missed, leaving entries
-    // stuck on "Starting".
-    actor.wait_for_startup().await;
+    // Spawn FIRST — the dashboard must be subscribed to its topics
+    // before any other actor fires lifecycle events. `subscribe`
+    // registers the topic cursors synchronously, so events published
+    // after this point cannot be missed, leaving no entries stuck on
+    // "Starting". The bridge (spawned earlier in wiring) feeds the
+    // topics from the kameo bus.
+    canvas_actor::DashboardCanvasActor::spawn(&services.canvas_system, cell.clone());
 
     // Route rows + view + tab declaration.
     attach_dashboard_rows(&services.key_routes);
@@ -115,7 +107,7 @@ pub struct DashboardEntry {
 
 /// Tracks the status of all actors for dashboard display.
 ///
-/// Owned by [`crate::feat::dashboard::dashboard_actor::DashboardActor`] via
+/// Owned by [`DashboardCanvasActor`](canvas_actor::DashboardCanvasActor) via
 /// `frontend.dashboard`. The actor owns this field.
 #[derive(Debug, Clone, Default)]
 pub struct DashboardState {

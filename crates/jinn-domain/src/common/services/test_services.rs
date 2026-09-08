@@ -301,6 +301,9 @@ impl TestServices {
             key_routes: crate::common::slices::key_routes::KeyRoutes::new(),
             viewport: crate::common::slices::view::Viewport::new(),
             overlay_views: crate::common::overlay_views::OverlayViews::new(),
+            canvas_system: Arc::new(actor_runtime::system::ActorSystem::new(
+                actor_runtime::system::SystemConfig::production(),
+            )),
         }
     }
 }
