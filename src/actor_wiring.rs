@@ -209,35 +209,18 @@ impl ActorSystemBuilder {
             services: services.clone(),
         };
 
-        // ── Dashboard actor ───────────────────────────────────────────
-        // Always spawned FIRST — subscribes to lifecycle events before any
-        // other actor fires them, so the dashboard captures every actor.
-        // It owns the dashboard's slice cell (minted here, under
-        // `dashboard:status`): the one write handle lives in its deps;
-        // the renderer and intent router resolve read handles only.
-        let dashboard_cell = services
-            .slices
-            .register(
-                jinn_domain::feat::dashboard::dashboard_slot(),
-                jinn_domain::feat::dashboard::DashboardState::new(),
-            )
-            .expect("dashboard slot is registered exactly once at wiring");
-        let _dashboard = jinn_domain::feat::dashboard::dashboard_actor::DashboardActor::supervise(
-            &root,
-            jinn_domain::feat::dashboard::dashboard_actor::DashboardActorDeps {
-                deps: actor_deps.clone(),
-                cell: dashboard_cell,
-            },
-        )
-        .restart_policy(kameo::supervision::RestartPolicy::Never)
-        .spawn()
-        .await;
-        // Wait for the dashboard actor's subscriptions to be fully wired
-        // before spawning any other actors. Without this, the bus events
-        // (ActorStarting/ActorStarted) from subsequently spawned actors
-        // can be missed — leaving their dashboard entries stuck on
-        // "Starting" because ActorStarted was never received.
-        _dashboard.wait_for_startup().await;
+        // ── Dashboard slice ───────────────────────────────────────────
+        // Activation mints the cell, spawns the actor FIRST (waiting for
+        // startup so no lifecycle event from subsequently spawned actors
+        // is missed), attaches rows, registers the view + tab. Slice
+        // integration is exactly this call.
+        #[expect(
+            clippy::panic,
+            reason = "bootstrap assertion: broken slice wiring must abort launch, not continue degraded"
+        )]
+        if let Err(error) = jinn_domain::feat::dashboard::activate(&mut services).await {
+            panic!("dashboard slice activation failed: {error}");
+        }
 
         // ── Discord status actor ───────────────────────────────────────
         // A pure translator: drains the gateway kanal channel and
@@ -271,6 +254,11 @@ impl ActorSystemBuilder {
             .spawn()
             .await;
         _discord_status.wait_for_startup().await;
+
+        // Quake bar slice: activation mints the cell, spawns the actor
+        // (submit-log writer), attaches rows, and registers the input
+        // hook + overlay geometry. Composition owns exactly this call.
+        jinn_domain::feat::quake_bar::activate(&mut services);
 
         // ── Infrastructure actors ──────────────────────────────────────────
 
@@ -363,11 +351,6 @@ jinn_domain::feat::preferences_actor::preferences_actor::PreferencesActor::super
             .spawn()
             .await
         );
-
-        // Quake bar slice: activation mints the cell, spawns the actor
-        // (submit-log writer), attaches rows, and registers the input
-        // hook + overlay geometry. Composition owns exactly this call.
-        jinn_domain::feat::quake_bar::activate(&mut services);
 
         // ── Domain actors ──────────────────────────────────────────────────
 

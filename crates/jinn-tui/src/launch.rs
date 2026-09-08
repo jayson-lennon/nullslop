@@ -97,11 +97,8 @@ pub fn launch(
     let mut ui_registry = AppUiRegistry::new();
     jinn_domain::register_all_ui_elements(&mut ui_registry);
 
-    // Feature registrations: slice activation (cells, actors, views,
-    // tab/overlay descriptors) + generated keymap bindings. All live in
-    // the registries carried in `Services`, populated once here (the
-    // single bootstrap point) so production and tests see identical
-    // wiring.
+    // Generated keymap bindings from the slice route rows attached
+    // during actor-system bootstrap (single keymap bootstrap site).
     let mut keymap = keymap::init_with_control_toggle(&control_toggle);
     register_slice_wiring(&mut services, &mut keymap);
     let which_key = WhichKeyInstance::new(keymap, Scope::Normal);
@@ -185,16 +182,11 @@ pub async fn launch_for_test(core: AppCore, mut services: jinn_domain::Services)
     let mut ui_registry = AppUiRegistry::new();
     jinn_domain::register_all_ui_elements(&mut ui_registry);
 
-    // Feature registrations: slice activation (cells, actors, views,
-    // tab/overlay descriptors) + generated keymap bindings. All live in
-    // the registries carried in `Services`, populated once here (the
-    // single bootstrap point) so production and tests see identical
-    // wiring.
-    let mut keymap = keymap::init();
     // Slice activation on the ambient runtime (test path is async).
     // `Services` itself is mutated: the viewport is the render-side view
     // registry and `Viewport::clone` is an empty shell by design, so
     // views must register into the instance that reaches `TuiApp`.
+    let mut keymap = keymap::init();
     #[expect(
         clippy::panic,
         reason = "bootstrap assertion: a broken pairing must abort launch, not render blank"
@@ -232,14 +224,15 @@ pub async fn launch_for_test(core: AppCore, mut services: jinn_domain::Services)
     }
 }
 
-/// Generates slice keymap bindings from the attached route rows, then
-/// registers the slice contributions (cells, actors, views, tab/overlay
-/// descriptors). Shared by both bootstrap paths (production and test).
+/// Generates slice keymap bindings from the attached route rows.
 ///
-/// Keybind generation runs on the freshly built keymap so slice bindings
-/// land in the same tree as the built-in scope bindings. A slice whose
-/// activate is commented out leaves no keymap, scope, or which-key
-/// residue: removability is automatic.
+/// Slice activation (cells, actors, views, tab/overlay descriptors)
+/// happens in the actor-system bootstrap (`actor_wiring::build`) for the
+/// production path, or directly in [`launch_for_test`] for tests. This
+/// function runs after either, on the freshly built keymap, so slice
+/// bindings land in the same tree as the built-in scope bindings. A
+/// slice whose activate is commented out leaves no keymap, scope, or
+/// which-key residue: removability is automatic.
 fn register_slice_wiring(
     services: &mut jinn_domain::Services,
     keymap: &mut ratatui_which_key::Keymap<
@@ -249,29 +242,9 @@ fn register_slice_wiring(
         KeyCategory,
     >,
 ) {
+    // Slice activation happens in the actor-system bootstrap
+    // (`actor_wiring`), which is the async context kameo spawns need and
+    // the only place that can put the dashboard first in spawn order.
+    // This function runs after it, so every slice's rows exist by now.
     crate::keymap_gen::bind_route_rows(&services.key_routes, keymap);
-    // Slice activation (dashboard spawns its actor + waits for startup).
-    // `launch` is a sync bootstrap path: drive the async activation on a
-    // dedicated current-thread runtime. Kameo's actors `tokio::spawn`
-    // onto that runtime and it runs them while this thread blocks —
-    // exactly what a sync bootstrap does. (The async test path awaits
-    // the activation directly instead; see `launch_for_test`.)
-    #[expect(
-        clippy::panic,
-        reason = "bootstrap assertion: a broken pairing must abort launch, not render blank"
-    )]
-    let activated = {
-        // `Services` is mutated in place: `Viewport::clone` is an empty
-        // shell by design, so the dashboard view must register into the
-        // instance that reaches `TuiApp`.
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("bootstrap runtime for slice activation");
-        runtime.block_on(jinn_domain::feat::dashboard::activate(services))
-    };
-    if let Err(error) = activated {
-        panic!("dashboard slice activation failed: {error}");
-    }
-    jinn_domain::feat::quake_bar::activate(services);
 }

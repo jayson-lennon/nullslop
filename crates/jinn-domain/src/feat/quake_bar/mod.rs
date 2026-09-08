@@ -19,12 +19,12 @@ pub mod quake_bar_actor;
 pub mod render;
 pub mod state;
 
+pub use state::QuakeBarState;
 pub use state::quake_bar_slot;
 pub use state::quake_scope;
 
 use kameo::actor::Spawn;
 
-use state::QuakeBarState;
 
 /// Activates the quake bar slice: mints the cell, spawns the actor,
 /// attaches the route rows, registers the input hook, the overlay
