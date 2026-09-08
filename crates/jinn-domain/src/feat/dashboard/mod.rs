@@ -51,7 +51,7 @@ pub async fn activate(
     let cell = services
         .slices
         .register(dashboard_slot(), DashboardState::new())
-        .map_err(|_| jinn_slices::view::ViewSlotError {
+        .map_err(|_taken| jinn_slices::view::ViewSlotError {
             key: dashboard_slot(),
             reason: jinn_slices::view::ViewSlotErrorReason::Unregistered,
         })?;

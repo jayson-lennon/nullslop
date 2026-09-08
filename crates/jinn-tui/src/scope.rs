@@ -132,7 +132,7 @@ impl std::str::FromStr for Scope {
         // Dynamic scopes parse first: `dynamic:<slice>:<name>` is the
         // Display inverse and must round-trip.
         if let Some(rest) = s.strip_prefix("dynamic:") {
-            let id = rest.parse::<jinn_slices::SliceScopeId>().map_err(|()| ())?;
+            let id = rest.parse::<jinn_slices::SliceScopeId>()?;
             return Ok(Self::Dynamic(id));
         }
         match s {

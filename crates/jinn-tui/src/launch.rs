@@ -187,17 +187,21 @@ pub async fn launch_for_test(core: AppCore, mut services: jinn_domain::Services)
     // registry and `Viewport::clone` is an empty shell by design, so
     // views must register into the instance that reaches `TuiApp`.
     let mut keymap = keymap::init();
+    // The two activate calls below cannot panic directly, but the keymap
+    // bootstrap after them must abort launch on a broken pairing.
     #[expect(
         clippy::panic,
         reason = "bootstrap assertion: a broken pairing must abort launch, not render blank"
     )]
-    let activated = jinn_domain::feat::dashboard::activate(&mut services).await;
-    if let Err(error) = activated {
-        panic!("dashboard slice activation failed: {error}");
+    {
+        let activated = jinn_domain::feat::dashboard::activate(&mut services).await;
+        if let Err(error) = activated {
+            panic!("dashboard slice activation failed: {error}");
+        }
+        jinn_domain::feat::quake_bar::activate(&mut services);
+        // Bindings generate after all activations so every slice's rows exist.
+        crate::keymap_gen::bind_route_rows(&services.key_routes, &mut keymap);
     }
-    jinn_domain::feat::quake_bar::activate(&mut services);
-    // Bindings generate after all activations so every slice's rows exist.
-    crate::keymap_gen::bind_route_rows(&services.key_routes, &mut keymap);
 
     let initial_scope =
         crate::app::scope_for_focus(core.state.read().frontend.scope_stack.current());

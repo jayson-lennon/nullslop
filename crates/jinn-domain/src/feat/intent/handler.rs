@@ -115,10 +115,16 @@ fn next_tab_base(
     };
     match position {
         // Currently on a dynamic tab: advance, wrapping back to chat.
-        Some(i) if i + 1 < tabs.len() => FocusScope::Dynamic(tabs[i + 1].clone()),
-        Some(_) => FocusScope::Normal,
+        Some(i) => match tabs.get(i + 1) {
+            Some(next) => FocusScope::Dynamic(next.clone()),
+            // Last tab: wrap to chat.
+            None => FocusScope::Normal,
+        },
         // On chat (or any other base): enter the first dynamic tab.
-        None => FocusScope::Dynamic(tabs[0].clone()),
+        None => match tabs.first() {
+            Some(first) => FocusScope::Dynamic(first.clone()),
+            None => FocusScope::Normal,
+        },
     }
 }
 
