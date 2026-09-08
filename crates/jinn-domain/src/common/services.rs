@@ -136,6 +136,12 @@ pub struct Services {
     /// the viewport for the active slot's view instead of hand-written
     /// tab code.
     pub viewport: crate::common::slices::view::Viewport,
+
+    /// Slice-registered overlay renderers for dynamic scopes. Written at
+    /// activation; the generic overlay pass resolves the active scope's
+    /// renderer.
+    #[debug(skip)]
+    pub overlay_views: crate::common::overlay_views::OverlayViews,
 }
 
 impl Services {
@@ -208,6 +214,7 @@ impl Services {
             slices: crate::common::slices::Slices::new(),
             key_routes: crate::common::slices::key_routes::KeyRoutes::new(),
             viewport: crate::common::slices::view::Viewport::new(),
+            overlay_views: crate::common::overlay_views::OverlayViews::new(),
         }
     }
 
@@ -260,6 +267,7 @@ impl Services {
             slices: crate::common::slices::Slices::new(),
             key_routes: crate::common::slices::key_routes::KeyRoutes::new(),
             viewport: crate::common::slices::view::Viewport::new(),
+            overlay_views: crate::common::overlay_views::OverlayViews::new(),
         }
     }
 }

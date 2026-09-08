@@ -69,7 +69,7 @@ pub fn composition_routes() -> crate::common::slices::key_routes::KeyRoutes {
     let cell = slices
         .register(quake_bar::quake_bar_slot(), quake_bar::QuakeBarState::default())
         .expect("detached quake cell");
-    quake_bar::intent::attach_quake_bar_rows(&routes, &cell);
-    quake_bar::intent::register_quake_input_hook(&routes, &cell);
+    quake_bar::attach_quake_bar_rows(&routes, &cell);
+    quake_bar::register_quake_input_hook(&routes, &cell);
     routes
 }

@@ -33,7 +33,7 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
     apply_pre_render_mutation(app, area);
 
     let state = app.core.state.read();
-    let ctx = RenderCtx::new(&state, &app.services.slices);
+    let ctx = RenderCtx::new(&state, &app.services.slices, &app.services.overlay_views);
 
     // Layout kind comes from the base scope's registration: a dynamic
     // tab scope renders full-width (no chat chrome); everything else is
@@ -63,7 +63,7 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
         &mut rects,
     );
     if let Some(rect) =
-        render_active_overlay(frame, area, &ctx, &mut app.services.viewport, active_scope)
+        render_active_overlay(frame, area, &ctx, active_scope)
     {
         rects.push(rect);
     }
@@ -270,7 +270,6 @@ fn render_active_overlay(
     frame: &mut Frame<'_>,
     area: Rect,
     ctx: &RenderCtx<'_>,
-    viewport: &mut jinn_domain::common::slices::view::Viewport,
     scope: &FocusScope,
 ) -> Option<Rect> {
     match scope {
@@ -313,22 +312,13 @@ fn render_active_overlay(
             Some(overlay_rect)
         }
         FocusScope::Dynamic(id) => {
-            // Slice overlays: consult the geometry fn registered by the
-            // scope's slice. A registered overlay renders the slice's
-            // view; a dynamic scope without overlay geometry renders
-            // nothing (its view only draws when it owns the frame).
+            // Slice overlays: consult the geometry fn + renderer the
+            // scope's slice registered at activation. A dynamic scope
+            // without either renders nothing.
             let overlay = ctx.slices.overlay(id)?;
             let overlay_area = overlay(&area)?;
-            // The overlay renders the slice's view: the scope → slot
-            // mapping was registered at activation alongside the
-            // geometry fn.
-            let Some(slot) = ctx.slices.overlay_slot(id) else {
-                return None;
-            };
-            let cx = jinn_domain::common::slices::ViewCx {
-                theme: &ctx.state.frontend.theme,
-            };
-            viewport.render_slot(frame, overlay_area, &slot, &cx, ctx.slices);
+            let view = ctx.overlay_view(id)?;
+            view(frame, overlay_area, ctx);
             None
         }
         _ => None,

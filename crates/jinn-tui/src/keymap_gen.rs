@@ -9,6 +9,7 @@
 //! row's `(slice, action)` identity. An unregistered slice's keys are
 //! simply never bound — removability is automatic, not maintained.
 
+use jinn_domain::Key;
 use jinn_domain::KeyEvent;
 use jinn_domain::common::slices::key_routes::BindSite;
 use jinn_domain::common::slices::key_routes::KeyRoutes;
@@ -185,6 +186,21 @@ pub fn bind_route_rows(
                 }
             }
         }
+    }
+    // Typing carve-out: a slice with a registered input hook captures
+    // printable keystrokes in its own scope. The keymap synthesizes the
+    // generic editing intent; the intent handler's hook consult (not a
+    // god-match arm) routes it to the slice's sync writer.
+    for hook in hooks {
+        keymap.scope(Scope::Dynamic(hook), |b| {
+            b.catch_all(|key: KeyEvent| {
+                if let KeyEvent { key: Key::Char(c), .. } = &key {
+                    Some(Intent::InsertChar { ch: *c })
+                } else {
+                    None
+                }
+            });
+        });
     }
 }
 

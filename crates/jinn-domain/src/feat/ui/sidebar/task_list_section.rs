@@ -437,7 +437,8 @@ mod tests {
         let app = AppState::default();
         let section = TaskListSection;
         let slices = jinn_slices::Slices::new();
-        assert_eq!(section.content_height(&RenderCtx::new(&app, &slices)), 0);
+        let overlay_views = crate::common::overlay_views::OverlayViews::new();
+        assert_eq!(section.content_height(&RenderCtx::new(&app, &slices, &overlay_views)), 0);
     }
 
     #[rstest::rstest]
@@ -446,7 +447,8 @@ mod tests {
         let app = setup_with_tasks();
         let section = TaskListSection;
         let slices = jinn_slices::Slices::new();
-        let height = section.content_height(&RenderCtx::new(&app, &slices));
+        let overlay_views = crate::common::overlay_views::OverlayViews::new();
+        let height = section.content_height(&RenderCtx::new(&app, &slices, &overlay_views));
         assert!(height > 0, "expected non-zero height, got {height}");
     }
 
@@ -483,7 +485,8 @@ mod tests {
 
         // When computing the height and the render line count.
         let slices = jinn_slices::Slices::new();
-        let height = section.content_height(&RenderCtx::new(&app, &slices));
+        let overlay_views = crate::common::overlay_views::OverlayViews::new();
+        let height = section.content_height(&RenderCtx::new(&app, &slices, &overlay_views));
         let line_count = build_render_lines(&list, &app).len() as u16;
 
         // Then they agree (render/height lockstep).

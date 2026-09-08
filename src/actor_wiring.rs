@@ -203,6 +203,7 @@ impl ActorSystemBuilder {
             slices: jinn_domain::common::slices::Slices::new(),
             key_routes: jinn_domain::common::slices::key_routes::KeyRoutes::new(),
             viewport: jinn_domain::common::slices::view::Viewport::new(),
+            overlay_views: jinn_domain::common::overlay_views::OverlayViews::new(),
         };
 
         let actor_deps = ActorDeps {

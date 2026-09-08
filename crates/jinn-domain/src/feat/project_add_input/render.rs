@@ -191,7 +191,12 @@ mod tests {
         terminal
             .draw(|frame| {
                 let slices = jinn_slices::Slices::new();
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views = crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
                 render_project_add_input(frame, area, &ctx);
             })
             .unwrap();
@@ -222,7 +227,12 @@ mod tests {
         terminal
             .draw(|frame| {
                 let slices = jinn_slices::Slices::new();
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views = crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
                 render_project_add_input(frame, area, &ctx);
             })
             .unwrap();
@@ -262,7 +272,12 @@ mod tests {
         terminal
             .draw(|frame| {
                 let slices = jinn_slices::Slices::new();
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views = crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
                 render_project_add_input(frame, area, &ctx);
             })
             .unwrap();
@@ -299,7 +314,12 @@ mod tests {
         terminal
             .draw(|frame| {
                 let slices = jinn_slices::Slices::new();
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views = crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
                 render_project_add_input(frame, area, &ctx);
             })
             .unwrap();

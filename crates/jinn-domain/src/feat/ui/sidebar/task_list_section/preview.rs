@@ -415,7 +415,8 @@ mod tests {
         terminal
             .draw(|f| {
                 let slices = jinn_slices::Slices::new();
-                let ctx = RenderCtx::new(app, &slices);
+                let overlay_views = crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(app, &slices, &overlay_views);
                 render_task_list_preview_for_state(f, sidebar_rect(), frame_area(), &ctx);
             })
             .unwrap();

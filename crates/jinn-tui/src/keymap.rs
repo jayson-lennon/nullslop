@@ -1192,13 +1192,17 @@ mod tests {
         };
         let intent = wk.handle_key(key_x);
 
-        // Then which-key itself resolves nothing: the quake bar's typing
-        // capture is the slice's input hook, consulted by the intent
-        // handler (see feat::quake_bar::intent tests), not a keymap
-        // catch-all — so the keymap must not synthesize an intent here.
+        // Then which-key synthesizes the generic editing intent for the
+        // hook scopes: the intent handler's input-hook consult (not a
+        // god-match arm) routes it to the slice's sync writer. Without
+        // the catch-all the keystroke never reaches the slice — the
+        // hook only sees intents the keymap emits.
         assert!(
-            intent.is_none(),
-            "printable char must not resolve in the keymap; capture is the slice input hook; got {intent:?}",
+            matches!(
+                intent,
+                Some(Intent::InsertChar { ch: 'x' })
+            ),
+            "printable char must synthesize InsertChar for the slice input hook; got {intent:?}",
         );
     }
 

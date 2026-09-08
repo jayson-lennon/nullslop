@@ -263,7 +263,8 @@ mod tests {
         let area = Rect::new(0, 0, 80, 24);
         let guard = app.core.state.read();
         let slices = jinn_slices::Slices::new();
-        let ctx = RenderCtx::new(&guard, &slices);
+        let views = jinn_domain::common::overlay_views::OverlayViews::new();
+        let ctx = RenderCtx::new(&guard, &slices, &views);
         terminal
             .draw(|f| render_terminal_tab(f, area, &ctx))
             .expect("draw");
@@ -296,7 +297,8 @@ mod tests {
         let area = Rect::new(0, 0, 80, 24);
         let guard = app.core.state.read();
         let slices = jinn_slices::Slices::new();
-        let ctx = RenderCtx::new(&guard, &slices);
+        let views = jinn_domain::common::overlay_views::OverlayViews::new();
+        let ctx = RenderCtx::new(&guard, &slices, &views);
         terminal
             .draw(|f| render_terminal_tab(f, area, &ctx))
             .expect("draw");
@@ -364,7 +366,8 @@ mod tests {
         let area = Rect::new(0, 0, 80, 24);
         let guard = app.core.state.read();
         let slices = jinn_slices::Slices::new();
-        let ctx = RenderCtx::new(&guard, &slices);
+        let views = jinn_domain::common::overlay_views::OverlayViews::new();
+        let ctx = RenderCtx::new(&guard, &slices, &views);
         terminal
             .draw(|f| render_terminal_tab(f, area, &ctx))
             .expect("draw");
@@ -412,7 +415,8 @@ mod tests {
         let area = Rect::new(0, 0, 80, 24);
         let guard = app.core.state.read();
         let slices = jinn_slices::Slices::new();
-        let ctx = RenderCtx::new(&guard, &slices);
+        let views = jinn_domain::common::overlay_views::OverlayViews::new();
+        let ctx = RenderCtx::new(&guard, &slices, &views);
         terminal
             .draw(|f| render_terminal_tab(f, area, &ctx))
             .expect("draw");
@@ -523,7 +527,8 @@ mod tests {
         let area = Rect::new(0, 0, 80, 24);
         let guard = app.core.state.read();
         let slices = jinn_slices::Slices::new();
-        let ctx = RenderCtx::new(&guard, &slices);
+        let views = jinn_domain::common::overlay_views::OverlayViews::new();
+        let ctx = RenderCtx::new(&guard, &slices, &views);
         terminal
             .draw(|f| render_terminal_tab(f, area, &ctx))
             .expect("draw");
@@ -560,7 +565,8 @@ mod tests {
         let area = Rect::new(0, 0, 80, 24);
         let guard = app.core.state.read();
         let slices = jinn_slices::Slices::new();
-        let ctx = RenderCtx::new(&guard, &slices);
+        let views = jinn_domain::common::overlay_views::OverlayViews::new();
+        let ctx = RenderCtx::new(&guard, &slices, &views);
         terminal
             .draw(|f| render_terminal_tab(f, area, &ctx))
             .expect("draw");
@@ -653,7 +659,8 @@ mod tests {
         let mut terminal = Terminal::new(backend).expect("terminal");
         let guard = app.core.state.read();
         let slices = jinn_slices::Slices::new();
-        let ctx = RenderCtx::new(&guard, &slices);
+        let views = jinn_domain::common::overlay_views::OverlayViews::new();
+        let ctx = RenderCtx::new(&guard, &slices, &views);
         terminal
             .draw(|f| render_terminal_tab(f, f.area(), &ctx))
             .expect("draw");
@@ -730,7 +737,8 @@ mod tests {
         let app = crate::TuiApp::test_builder().state(state).build().await;
         let guard = app.core.state.read();
         let slices = jinn_slices::Slices::new();
-        let ctx = RenderCtx::new(&guard, &slices);
+        let views = jinn_domain::common::overlay_views::OverlayViews::new();
+        let ctx = RenderCtx::new(&guard, &slices, &views);
         let area = Rect::new(0, 0, 80, 24);
 
         // When rendering the overlay (mirrored screen is blank).
@@ -778,7 +786,8 @@ mod tests {
         let area = Rect::new(0, 0, 80, 24);
         let guard = app.core.state.read();
         let slices = jinn_slices::Slices::new();
-        let ctx = RenderCtx::new(&guard, &slices);
+        let views = jinn_domain::common::overlay_views::OverlayViews::new();
+        let ctx = RenderCtx::new(&guard, &slices, &views);
         terminal
             .draw(|f| render_terminal_tab(f, area, &ctx))
             .expect("draw");

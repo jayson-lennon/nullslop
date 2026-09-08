@@ -375,7 +375,13 @@ mod tests {
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views =
+                    crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -406,7 +412,13 @@ mod tests {
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views =
+                    crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -437,7 +449,13 @@ mod tests {
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views =
+                    crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -474,7 +492,13 @@ mod tests {
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views =
+                    crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -501,7 +525,13 @@ mod tests {
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views =
+                    crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -534,7 +564,13 @@ mod tests {
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views =
+                    crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -561,7 +597,13 @@ mod tests {
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views =
+                    crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -591,7 +633,13 @@ mod tests {
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views =
+                    crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -620,7 +668,13 @@ mod tests {
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views =
+                    crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -648,7 +702,13 @@ mod tests {
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views =
+                    crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -675,7 +735,13 @@ mod tests {
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views =
+                    crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -710,7 +776,13 @@ mod tests {
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views =
+                    crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -743,7 +815,13 @@ mod tests {
         // Snapshot the last visible log line before scrolling.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views =
+                    crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -766,7 +844,13 @@ mod tests {
         // Then the rendered bottom log line changes (the window moved up).
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views =
+                    crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();

@@ -16,8 +16,6 @@
 //! input in the hook action and emits [`SubmitQuakeBarCommand`] so the
 //! actor remains the single writer of the log.
 
-use jinn_slices::DynamicIntent;
-use jinn_slices::SliceScopeId;
 use jinn_slices::TypedCell;
 
 use super::command::SubmitQuakeBarCommand;
@@ -248,19 +246,11 @@ fn handle_scroll(cell: &TypedCell<QuakeBarState>, action: &str) -> IntentResult 
     IntentResult::empty()
 }
 
-/// Returns the dynamic intent for a quake bar action (helper for
-/// composition's keymap generator and tests).
+/// Returns the dynamic intent for a quake bar action (test helper).
+#[cfg(test)]
 #[must_use]
-pub fn quake_intent(action: &str, display: &str) -> DynamicIntent {
-    DynamicIntent::new(quake_scope(), action, display)
-}
-
-/// The quake bar's dynamic scope.
-///
-/// Re-exported for composition (keymap generation consults it).
-#[must_use]
-pub fn quake_bar_scope() -> SliceScopeId {
-    quake_scope()
+fn quake_intent(action: &str, display: &str) -> jinn_slices::DynamicIntent {
+    jinn_slices::DynamicIntent::new(quake_scope(), action, display)
 }
 
 #[cfg(test)]

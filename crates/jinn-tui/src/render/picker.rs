@@ -157,7 +157,8 @@ mod tests {
         terminal
             .draw(|frame| {
                 let slices = jinn_slices::Slices::new();
-                let ctx = jinn_domain::RenderCtx::new(&state, &slices);
+                let views = jinn_domain::common::overlay_views::OverlayViews::new();
+                let ctx = jinn_domain::RenderCtx::new(&state, &slices, &views);
                 super::render_picker(frame, area, &ctx);
             })
             .expect("draw");

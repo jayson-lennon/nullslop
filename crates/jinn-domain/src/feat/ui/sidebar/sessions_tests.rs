@@ -74,14 +74,26 @@ fn section_id_is_sessions() {
 fn content_height_with_one_session() {
     let section = SessionsSection::new();
     let state = AppState::default();
-    assert_eq!({ let slices = jinn_slices::Slices::new(); section.content_height(&RenderCtx::new(&state, &slices)) }, 2); // 1 session + footer
+    assert_eq!({ let slices = jinn_slices::Slices::new();
+                    let overlay_views = crate::common::overlay_views::OverlayViews::new();
+                    section.content_height(&RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                )) }, 2); // 1 session + footer
 }
 
 #[rstest::rstest]
 fn content_height_with_three_sessions() {
     let section = SessionsSection::new();
     let state = state_with_sessions(3);
-    assert_eq!({ let slices = jinn_slices::Slices::new(); section.content_height(&RenderCtx::new(&state, &slices)) }, 4); // 3 sessions + footer
+    assert_eq!({ let slices = jinn_slices::Slices::new();
+                    let overlay_views = crate::common::overlay_views::OverlayViews::new();
+                    section.content_height(&RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                )) }, 4); // 3 sessions + footer
 }
 
 #[rstest::rstest]
@@ -92,7 +104,12 @@ fn content_height_capped_at_max_visible() {
 
     // When computing content height.
     let slices = jinn_slices::Slices::new();
-        let height = section.content_height(&RenderCtx::new(&state, &slices));
+                let overlay_views = crate::common::overlay_views::OverlayViews::new();
+        let height = section.content_height(&RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                ));
 
     // Then it is capped at 15 + 1 = 16, not 20 + 1 = 21.
     assert_eq!(height, 16);
@@ -410,7 +427,8 @@ fn render_rows(
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let ctx = RenderCtx::new(state, &slices);
+                let overlay_views = crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(state, &slices, &overlay_views);
             section.render(frame, area, &ctx);
         })
         .unwrap();
@@ -562,7 +580,12 @@ fn render_arrow_has_inverted_colors() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views = crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
             section.render(frame, area, &ctx);
         })
         .unwrap();
@@ -591,7 +614,12 @@ fn render_footer_uses_focus_accent_when_sidebar_focused() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views = crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
             section.render(frame, area, &ctx);
         })
         .unwrap();
@@ -617,7 +645,12 @@ fn render_footer_uses_border_unfocused_when_sidebar_not_focused() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views = crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
             section.render(frame, area, &ctx);
         })
         .unwrap();
@@ -647,7 +680,12 @@ fn render_footer_uses_border_unfocused_when_other_sidebar_section_focused() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views = crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
             section.render(frame, area, &ctx);
         })
         .unwrap();
@@ -918,7 +956,12 @@ fn render_session_title_is_red_when_last_entry_is_error() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views = crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
             section.render(frame, area, &ctx);
         })
         .unwrap();
@@ -946,7 +989,12 @@ fn render_session_title_is_normal_when_last_entry_is_not_error() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views = crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
             section.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1753,7 +1801,12 @@ fn render_tree_shows_tree_characters() {
     terminal
         .draw(|frame| {
             let slices = jinn_slices::Slices::new();
-                let ctx = RenderCtx::new(&state, &slices);
+                let overlay_views = crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(
+                    &state,
+                    &slices,
+                    &overlay_views,
+                );
             section.render(frame, area, &ctx);
         })
         .unwrap();
@@ -2936,7 +2989,8 @@ fn render_archive_tree_prompt_rows(state: &AppState, sidebar_width: u16) -> Vec<
     };
     let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("terminal");
     let slices = jinn_slices::Slices::new();
-                let ctx = RenderCtx::new(state, &slices);
+                let overlay_views = crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(state, &slices, &overlay_views);
     terminal
         .draw(|frame| {
             crate::feat::ui::sidebar::sessions::render_archive_tree_prompt_for_state(
@@ -2970,7 +3024,8 @@ fn render_sessions_with_archive_tree_prompt(state: &AppState, sidebar_width: u16
     };
     let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("terminal");
     let slices = jinn_slices::Slices::new();
-                let ctx = RenderCtx::new(state, &slices);
+                let overlay_views = crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(state, &slices, &overlay_views);
     let mut sidebar = crate::feat::ui::sidebar::Sidebar::default();
     sidebar.register(Box::new(SessionsSection::new()));
     terminal
@@ -3023,7 +3078,8 @@ fn render_sessions_with_close_prompt(state: &AppState, sidebar_width: u16) -> Ve
     };
     let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("terminal");
     let slices = jinn_slices::Slices::new();
-                let ctx = RenderCtx::new(state, &slices);
+                let overlay_views = crate::common::overlay_views::OverlayViews::new();
+                let ctx = RenderCtx::new(state, &slices, &overlay_views);
     let mut sidebar = crate::feat::ui::sidebar::Sidebar::default();
     sidebar.register(Box::new(SessionsSection::new()));
     terminal
