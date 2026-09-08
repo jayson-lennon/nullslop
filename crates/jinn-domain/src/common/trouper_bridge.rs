@@ -123,22 +123,21 @@ pub(crate) fn forward_schema_ids() -> Vec<SchemaId> {
 ///
 /// Panics in debug builds when the two id lists intersect.
 pub(crate) fn assert_tables_are_disjoint(forward: &[SchemaId], reverse: &[SchemaId]) {
-    let overlap: Vec<&SchemaId> = forward
-        .iter()
-        .filter(|f| reverse.contains(f))
-        .collect();
+    let overlap: Vec<&SchemaId> = forward.iter().filter(|f| reverse.contains(f)).collect();
     debug_assert!(
         overlap.is_empty(),
-        "bridge route tables are not disjoint: {:?} is registered in both bridge directions; \
-         remove it from one table or messages will loop between the fabrics",
-        overlap
+        "bridge route tables are not disjoint: {overlap:?} is registered in both bridge \
+         directions; remove it from one table or messages will loop between the fabrics"
     );
 }
 
 /// Checks the shipped route tables against each other. Called from both
 /// spawn helpers.
 pub(crate) fn debug_assert_no_fabric_loops() {
-    assert_tables_are_disjoint(&forward_schema_ids(), &trouper_to_kameo::reverse_schema_ids());
+    assert_tables_are_disjoint(
+        &forward_schema_ids(),
+        &trouper_to_kameo::reverse_schema_ids(),
+    );
 }
 
 impl_schema!(SubmitQuakeBarCommand, "SubmitQuakeBarCommand", SchemaKind::Command,

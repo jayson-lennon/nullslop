@@ -75,7 +75,6 @@ macro_rules! reverse_routes {
             }
         )*
 
-        #[allow(unused_variables, reason = "zero-route expansions never subscribe")]
         pub fn spawn_trouper_to_kameo(
             system: &std::sync::Arc<ActorSystem>,
             bus: BusService,
@@ -94,7 +93,15 @@ macro_rules! reverse_routes {
             path
         }
 
-        #[allow(dead_code, reason = "test invocations may not consume the id list")]
+        /// The reverse route table's schema ids — the loop guard's
+        /// input. Debug builds read it through the spawn helper's
+        /// [`debug_assert`]; tests read it to simulate misuse. Only
+        /// release non-test builds see nothing, so the dead-code
+        /// allowance is scoped to exactly that combination.
+        #[cfg_attr(
+            all(not(debug_assertions), not(test)),
+            expect(dead_code, reason = "loop guard is debug-only; tests consume this directly")
+        )]
         pub(crate) fn reverse_schema_ids() -> Vec<trouper::types::SchemaId> {
             vec![$(<$ty as trouper::schema::Schema>::schema_id()),*]
         }
@@ -185,7 +192,12 @@ mod tests {
         // Then the kameo recorder receives exactly the typed message —
         // subscribe is the readiness point, so nothing is missed.
         let msgs = await_recorded(&recorder, 1, Duration::from_secs(2)).await;
-        assert_eq!(msgs, vec![ProbeEvent { note: "hello".to_owned() }]);
+        assert_eq!(
+            msgs,
+            vec![ProbeEvent {
+                note: "hello".to_owned()
+            }]
+        );
     }
 
     /// A message published on a topic without a reverse route never
@@ -209,7 +221,10 @@ mod tests {
 
         // Then nothing reaches the kameo recorder within the wait window.
         let msgs = await_recorded(&recorder, 1, Duration::from_millis(400)).await;
-        assert!(msgs.is_empty(), "unrouted topic leaked into kameo: {msgs:?}");
+        assert!(
+            msgs.is_empty(),
+            "unrouted topic leaked into kameo: {msgs:?}"
+        );
     }
 
     /// The shipped zero-route configuration spawns the bridge inert: a
@@ -234,11 +249,17 @@ mod tests {
     #[test]
     #[should_panic(expected = "registered in both bridge directions")]
     fn dual_direction_registration_panics_in_debug() {
-        // Given the same schema id in both direction tables.
-        let id = <ActorStarting as Schema>::schema_id();
+        // Given the reverse route table extended with a type the forward
+        // table also carries (`ActorStarting` is forward-registered).
+        let mut reverse = reverse_schema_ids();
+        reverse.push(<ActorStarting as Schema>::schema_id());
 
-        // When the loop guard compares the tables.
+        // When the loop guard compares the mutated table against the
+        // forward table.
         // Then it rejects the overlap (debug builds).
-        crate::common::trouper_bridge::assert_tables_are_disjoint(&[id.clone()], &[id]);
+        crate::common::trouper_bridge::assert_tables_are_disjoint(
+            &crate::common::trouper_bridge::forward_schema_ids(),
+            &reverse,
+        );
     }
 }
