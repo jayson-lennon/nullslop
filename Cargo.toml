@@ -61,7 +61,7 @@ tokio = { workspace = true }
 tokio-util = { workspace = true }
 kameo = { workspace = true }
 kameo_actors = { workspace = true }
-actor-runtime = { workspace = true }
+trouper = { workspace = true }
 async-trait = { workspace = true }
 wherror = { workspace = true }
 kanal = { workspace = true }
@@ -156,9 +156,9 @@ futures = "0.3"
 kameo = { version = "0.20", features = ["tracing"] }
 kameo_actors = "0.5"
 
-# Actor canvas runtime (path dep on the sibling actor-canvas workspace;
+# The trouper actor runtime (path dep on the sibling trouper workspace;
 # an unpublished crate — see .plans/actor-canvas/plan.md)
-actor-runtime = { path = "../../actor-canvas/actor-canvas-sdk/crates/actor-runtime" }
+trouper = { path = "../../trouper/trouper-sdk/crates/trouper" }
 
 # PTY + terminal emulation (interactive_term tool)
 portable-pty = "0.9"

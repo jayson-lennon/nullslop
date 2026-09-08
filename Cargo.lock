@@ -3,22 +3,6 @@
 version = 3
 
 [[package]]
-name = "actor-runtime"
-version = "0.1.0"
-dependencies = [
- "arc-swap",
- "derive_more",
- "error-stack 0.8.0",
- "parking_lot",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "uuid",
- "wherror",
-]
-
-[[package]]
 name = "addr2line"
 version = "0.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2571,7 +2555,6 @@ dependencies = [
 name = "jinn"
 version = "0.115.1"
 dependencies = [
- "actor-runtime",
  "async-trait",
  "clap",
  "clap-verbosity-flag",
@@ -2605,6 +2588,7 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-subscriber",
+ "trouper",
  "wherror",
 ]
 
@@ -2670,7 +2654,6 @@ dependencies = [
 name = "jinn-domain"
 version = "0.115.1"
 dependencies = [
- "actor-runtime",
  "anstyle",
  "anstyle-lossy",
  "async-trait",
@@ -2728,6 +2711,7 @@ dependencies = [
  "toml 0.8.23",
  "toml_edit 0.22.27",
  "tracing",
+ "trouper",
  "trybuild",
  "unicode-segmentation",
  "unicode-width 0.2.2",
@@ -6702,6 +6686,22 @@ name = "triomphe"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b2cb4fbb9995eeb36ac86fadf24031ccd58f99d6b4b2d7b911db70bddb80d90"
+
+[[package]]
+name = "trouper"
+version = "0.1.0"
+dependencies = [
+ "arc-swap",
+ "derive_more",
+ "error-stack 0.8.0",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "uuid",
+ "wherror",
+]
 
 [[package]]
 name = "try-lock"

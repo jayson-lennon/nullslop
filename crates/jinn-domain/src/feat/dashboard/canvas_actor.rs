@@ -1,4 +1,4 @@
-//! The dashboard actor — owns the dashboard slice cell on actor-canvas.
+//! The dashboard actor — owns the dashboard slice cell on trouper.
 //!
 //! Aggregates two data sources into a single dashboard view:
 //!
@@ -19,19 +19,19 @@
 //! are symmetric producers: they publish events, and this actor is the
 //! single sink.
 //!
-//! The actor runs on the actor-canvas runtime ([`ServiceActor`] tier: a
+//! The actor runs on the trouper runtime ([`ServiceActor`] tier: a
 //! stateless fold into shared state, no journaling). The kameo→canvas
 //! bridge ([`crate::common::canvas_bridge`]) translates the bus messages
 //! onto its topics; the cell handle cannot ride the runtime's JSON start
 //! args, so it is injected through the builder's
-//! [`start_with`](actor_runtime::builder::ServiceBuilder::start_with)
+//! [`start_with`](trouper::builder::ServiceBuilder::start_with)
 //! override.
 
-use actor_runtime::actor::{MsgHandler, ServiceActor};
-use actor_runtime::context::MsgCtx;
-use actor_runtime::registry::RegistryError;
-use actor_runtime::system::ActorSystem;
-use actor_runtime::types::ActorPath;
+use trouper::actor::{MsgHandler, ServiceActor};
+use trouper::context::MsgCtx;
+use trouper::registry::RegistryError;
+use trouper::system::ActorSystem;
+use trouper::types::ActorPath;
 
 use crate::common::actor::protocol::event::{ActorShutdownCompleted, ActorStarted, ActorStarting};
 use crate::common::canvas_bridge;
@@ -61,7 +61,7 @@ pub struct DashboardCanvasActor {
 impl ServiceActor for DashboardCanvasActor {
     async fn start(
         _args: &serde_json::Value,
-    ) -> Result<Self, actor_runtime::error_stack::Report<RegistryError>> {
+    ) -> Result<Self, trouper::error_stack::Report<RegistryError>> {
         // Never called: the spawn helper injects the cell via `start_with`.
         unreachable!(
             "DashboardCanvasActor is spawned via start_with; start requires the typed cell"
@@ -81,7 +81,7 @@ impl DashboardCanvasActor {
         system: &std::sync::Arc<ActorSystem>,
         cell: TypedCell<DashboardState>,
     ) -> ActorPath {
-        let path = actor_runtime::builder::spawn_service_builder::<Self>(system)
+        let path = trouper::builder::spawn_service_builder::<Self>(system)
             .at(ActorPath::new("dashboard"))
             .start_with({
                 let cell = cell.clone();
@@ -306,7 +306,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.canvas_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
         cell
     }
 
@@ -344,7 +344,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.canvas_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
 
         // When publishing ActorStarted on the kameo bus.
         services
@@ -372,7 +372,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.canvas_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
         services
             .bus
             .publish(ActorStarted {
@@ -410,7 +410,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.canvas_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
 
         // When publishing a Connecting update on the bus (as DiscordStatusActor does).
         services.bus.publish(DiscordStatusUpdate::Connecting).await;
@@ -433,7 +433,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.canvas_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
 
         // When publishing a Connected update on the bus.
         services.bus.publish(DiscordStatusUpdate::Connected).await;
@@ -457,7 +457,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.canvas_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
 
         // When publishing an Error update on the bus.
         services
@@ -486,7 +486,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.canvas_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
 
         // When publishing an Error update as the very first message.
         services
@@ -514,7 +514,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.canvas_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
 
         // When publishing BrowserBinaryVerified for a system Chrome.
         services
@@ -546,7 +546,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.canvas_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
 
         // When publishing BrowserBinaryVerified for the bundled binary.
         services
@@ -581,7 +581,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.canvas_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
 
         // When publishing BrowserBinaryVerified for a system Chromium with no version.
         services
@@ -616,7 +616,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.canvas_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
 
         // When publishing BrowserBinaryVerified.
         services
@@ -645,7 +645,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.canvas_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
         for name in ["a", "b", "c"] {
             services
                 .bus
@@ -681,7 +681,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.canvas_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
         services
             .bus
             .publish(ActorStarted {

@@ -146,9 +146,9 @@ pub struct Services {
     /// Actor-canvas runtime system hosting the ported slice actors
     /// (dashboard, quake-bar). Built once here; slice `activate` functions
     /// spawn their canvas actors onto it and subscribe them to topics fed
-    /// by the kameo→canvas bridge. See `.plans/actor-canvas/plan.md`.
+    /// by the kameo→trouper bridge. See `.plans/actor-canvas/plan.md`.
     #[debug(skip)]
-    pub canvas_system: Arc<actor_runtime::system::ActorSystem>,
+    pub trouper_system: Arc<trouper::system::ActorSystem>,
 }
 
 impl Services {
@@ -222,8 +222,8 @@ impl Services {
             key_routes: crate::common::slices::key_routes::KeyRoutes::new(),
             viewport: crate::common::slices::view::Viewport::new(),
             overlay_views: crate::common::overlay_views::OverlayViews::new(),
-            canvas_system: Arc::new(actor_runtime::system::ActorSystem::new(
-                actor_runtime::system::SystemConfig::production(),
+            trouper_system: Arc::new(trouper::system::ActorSystem::new(
+                trouper::system::SystemConfig::production(),
             )),
         }
     }
@@ -278,8 +278,8 @@ impl Services {
             key_routes: crate::common::slices::key_routes::KeyRoutes::new(),
             viewport: crate::common::slices::view::Viewport::new(),
             overlay_views: crate::common::overlay_views::OverlayViews::new(),
-            canvas_system: Arc::new(actor_runtime::system::ActorSystem::new(
-                actor_runtime::system::SystemConfig::production(),
+            trouper_system: Arc::new(trouper::system::ActorSystem::new(
+                trouper::system::SystemConfig::production(),
             )),
         }
     }

@@ -1,8 +1,8 @@
-//! Kameo → actor-canvas bridge.
+//! Kameo → trouper bridge.
 //!
-//! Jinn's kameo message bus and the actor-canvas `ActorSystem` are two
+//! Jinn's kameo message bus and the trouper `ActorSystem` are two
 //! separate fabrics. The slice actors that have been ported to
-//! actor-canvas (dashboard, quake-bar) can no longer subscribe to kameo
+//! trouper (dashboard, quake-bar) can no longer subscribe to kameo
 //! bus messages directly, so this module is the one translation seam:
 //! a kameo actor that subscribes to exactly the messages the ported
 //! slices consume and republishes each one onto its canvas topic, where
@@ -23,10 +23,10 @@
 //! Delivery semantics match the bus's `BestEffort` strategy:
 //! fire-and-forget, a warn log on unroutable sends, no retry.
 
-use actor_runtime::envelope::Event;
-use actor_runtime::schema::{FieldDef, FieldTy, Schema, SchemaDef, SchemaKind};
-use actor_runtime::system::ActorSystem;
-use actor_runtime::types::Topic;
+use trouper::envelope::Event;
+use trouper::schema::{FieldDef, FieldTy, Schema, SchemaDef, SchemaKind};
+use trouper::system::ActorSystem;
+use trouper::types::Topic;
 
 use kameo::actor::Spawn;
 use kameo::prelude::{Actor, ActorRef, Context, Message};
@@ -262,7 +262,7 @@ pub async fn spawn(services: &Services) -> ActorRef<CanvasBridgeActor> {
             deps: ActorDeps {
                 services: services.clone(),
             },
-            system: services.canvas_system.clone(),
+            system: services.trouper_system.clone(),
         },
     )
     .restart_policy(kameo::supervision::RestartPolicy::Never)
@@ -282,14 +282,14 @@ mod tests {
         reason = "test code"
     )]
     use super::*;
-    use actor_runtime::types::SchemaId;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use trouper::types::SchemaId;
 
-    use actor_runtime::actor::MsgHandler;
-    use actor_runtime::context::MsgCtx;
-    use actor_runtime::registry::RegistryError;
-    use actor_runtime::types::ActorPath;
+    use trouper::actor::MsgHandler;
+    use trouper::context::MsgCtx;
+    use trouper::registry::RegistryError;
+    use trouper::types::ActorPath;
 
     /// Every crossing message type round-trips through serde and carries
     /// a stable version-1 schema id.
@@ -380,10 +380,10 @@ mod tests {
         hits: Arc<AtomicUsize>,
     }
 
-    impl actor_runtime::actor::ServiceActor for ProbeActor {
+    impl trouper::actor::ServiceActor for ProbeActor {
         async fn start(
             _args: &serde_json::Value,
-        ) -> Result<Self, actor_runtime::error_stack::Report<RegistryError>> {
+        ) -> Result<Self, trouper::error_stack::Report<RegistryError>> {
             unreachable!("spawned via start_with; start is never called")
         }
     }
@@ -404,8 +404,8 @@ mod tests {
         let services = Services::new_fake().await;
         spawn(&services).await;
         let hits = Arc::new(AtomicUsize::new(0));
-        let system = services.canvas_system.clone();
-        actor_runtime::builder::spawn_service_builder::<ProbeActor>(&system)
+        let system = services.trouper_system.clone();
+        trouper::builder::spawn_service_builder::<ProbeActor>(&system)
             .at(ActorPath::new("probe"))
             .start_with({
                 let hits = hits.clone();

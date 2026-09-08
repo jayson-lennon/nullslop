@@ -14,8 +14,8 @@
 //!   the single mutator of the log (future debug commands and event
 //!   subscriptions also funnel through the actor).
 //!
-//! The log writer runs on the actor-canvas runtime (see
-//! [`canvas_actor`]); the kameo→canvas bridge translates the bus
+//! The log writer runs on the trouper runtime (see
+//! [`canvas_actor`]); the kameo→trouper bridge translates the bus
 //! command onto the `jinn.quake-bar` topic it subscribes to.
 
 pub mod canvas_actor;
@@ -52,7 +52,7 @@ pub fn activate(services: &mut crate::Services) {
     // Spawn the canvas actor: the log's single writer. Subscribe returns
     // only after the topic cursor is registered, so no later publish is
     // missed. The bridge (spawned earlier in wiring) feeds the topic.
-    canvas_actor::QuakeBarCanvasActor::spawn(&services.canvas_system, cell.clone());
+    canvas_actor::QuakeBarCanvasActor::spawn(&services.trouper_system, cell.clone());
 
     // Route rows + input hook + overlay geometry + overlay renderer.
     intent::attach_quake_bar_rows(&services.key_routes, &cell);

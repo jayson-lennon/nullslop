@@ -204,8 +204,8 @@ impl ActorSystemBuilder {
             key_routes: jinn_domain::common::slices::key_routes::KeyRoutes::new(),
             viewport: jinn_domain::common::slices::view::Viewport::new(),
             overlay_views: jinn_domain::common::overlay_views::OverlayViews::new(),
-            canvas_system: std::sync::Arc::new(actor_runtime::system::ActorSystem::new(
-                actor_runtime::system::SystemConfig::production(),
+            trouper_system: std::sync::Arc::new(trouper::system::ActorSystem::new(
+                trouper::system::SystemConfig::production(),
             )),
         };
 

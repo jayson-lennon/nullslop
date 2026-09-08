@@ -79,7 +79,7 @@ kameo_actors = { workspace = true }
 
 # Actor canvas runtime (jinn slice actors ported onto it — see
 # .plans/actor-canvas/plan.md)
-actor-runtime = { workspace = true }
+trouper = { workspace = true }
 
 # SQLite driver — dao wraps rusqlite but the migrator and tests use the raw
 # `rusqlite::Connection` (via `pool.with_conn`) for FK toggles and row-by-row

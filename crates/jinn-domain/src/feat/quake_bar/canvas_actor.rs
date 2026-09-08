@@ -1,21 +1,21 @@
-//! The quake bar's canvas actor — the log writer on actor-canvas.
+//! The quake bar's canvas actor — the log writer on trouper.
 //!
 //! The kameo counterpart of this actor was the first port to the
-//! actor-canvas `actor-runtime` ([`ServiceActor`] tier: stateless
+//! the `trouper` runtime ([`ServiceActor`] tier: stateless
 //! side-effectful fold, no journaling). It subscribes to the
 //! `jinn.quake-bar` canvas topic — fed by the kameo→canvas bridge
 //! ([`crate::common::canvas_bridge`]) — and appends each
 //! [`SubmitQuakeBarCommand`] to the slice cell's log, exactly as the
 //! kameo actor did. The cell handle cannot ride the runtime's JSON
 //! start args, so it is injected through the builder's
-//! [`start_with`](actor_runtime::builder::ServiceBuilder::start_with)
+//! [`start_with`](trouper::builder::ServiceBuilder::start_with)
 //! override.
 
-use actor_runtime::actor::{MsgHandler, ServiceActor};
-use actor_runtime::context::MsgCtx;
-use actor_runtime::registry::RegistryError;
-use actor_runtime::system::ActorSystem;
-use actor_runtime::types::ActorPath;
+use trouper::actor::{MsgHandler, ServiceActor};
+use trouper::context::MsgCtx;
+use trouper::registry::RegistryError;
+use trouper::system::ActorSystem;
+use trouper::types::ActorPath;
 
 use jinn_slices::TypedCell;
 
@@ -35,7 +35,7 @@ pub struct QuakeBarCanvasActor {
 impl ServiceActor for QuakeBarCanvasActor {
     async fn start(
         _args: &serde_json::Value,
-    ) -> Result<Self, actor_runtime::error_stack::Report<RegistryError>> {
+    ) -> Result<Self, trouper::error_stack::Report<RegistryError>> {
         // Never called: the spawn helper injects the cell via `start_with`.
         unreachable!("QuakeBarCanvasActor is spawned via start_with; start requires the typed cell")
     }
@@ -58,7 +58,7 @@ impl QuakeBarCanvasActor {
         system: &std::sync::Arc<ActorSystem>,
         cell: TypedCell<QuakeBarState>,
     ) -> ActorPath {
-        let path = actor_runtime::builder::spawn_service_builder::<Self>(system)
+        let path = trouper::builder::spawn_service_builder::<Self>(system)
             .at(ActorPath::new("quake-bar"))
             .start_with({
                 let cell = cell.clone();
@@ -139,7 +139,7 @@ mod tests {
         let cell = slices
             .register(quake_bar_slot(), QuakeBarState::default())
             .expect("fresh registry");
-        QuakeBarCanvasActor::spawn(&services.canvas_system, cell.clone());
+        QuakeBarCanvasActor::spawn(&services.trouper_system, cell.clone());
         // When a SubmitQuakeBarCommand is published on the kameo bus.
         services
             .bus
