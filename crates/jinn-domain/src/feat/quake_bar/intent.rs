@@ -1,49 +1,235 @@
-//! Quake bar intent handlers — open, close, submit, scroll, and input editing.
+//! Quake bar keybind routing — the slice's rows, actions, and input hook.
 //!
-//! The input buffer is the synchronous side of the quake bar: the
-//! `IntentHandler` edits it directly (mirroring `cwd_input`). The command log,
-//! by contrast, is owned by the [`QuakeBarActor`](super::quake_bar_actor) —
-//! `handle_submit` clears the input here and routes the text to the actor via
-//! [`SubmitQuakeBarCommand`](super::command::SubmitQuakeBarCommand) so there is
-//! exactly one writer of the log.
+//! The quake bar's key handling is data, not handler arms:
+//!
+//! - **Route rows** (attached by [`attach_quake_bar_rows`]) map keys in
+//!   the slice's dynamic scope to actions: submit, scroll, close.
+//! - The **open toggle** is a row on the [`BindSite::GlobalToggle`]
+//!   site: it emits a [`ScopeSignal::Push`] so the handler (the exempt
+//!   `scope_stack` writer) enters the slice's scope.
+//! - The **input hook** (registered by [`register_quake_input_hook`])
+//!   intercepts editing intents while the quake scope is active and
+//!   writes the slice cell synchronously — the sanctioned carve-out for
+//!   per-keystroke typing.
+//!
+//! The command log is owned by the [`QuakeBarActor`]; submit clears the
+//! input in the hook action and emits [`SubmitQuakeBarCommand`] so the
+//! actor remains the single writer of the log.
 
-use crate::common::app_state::AppState;
-use crate::common::focus::FocusScope;
-use crate::feat::quake_bar::command::SubmitQuakeBarCommand;
+use jinn_slices::DynamicIntent;
+use jinn_slices::SliceScopeId;
+use jinn_slices::TypedCell;
+
+use super::command::SubmitQuakeBarCommand;
+use super::state::QuakeBarInput;
+use super::state::QuakeBarState;
+use super::state::quake_scope;
+use crate::common::slices::key_routes::ActionFn;
+use crate::common::slices::key_routes::BindSite;
+use crate::common::slices::key_routes::InputHook;
+use crate::common::slices::key_routes::KeyRoutes;
+use crate::common::slices::key_routes::RouteOutcome;
+use crate::common::slices::key_routes::RouteRow;
+use crate::protocol::Intent;
 use crate::protocol::IntentResult;
+use crate::protocol::ScopeSignal;
 
-/// Opens the quake bar overlay.
-///
-/// Pushes `FocusScope::QuakeBar` onto the scope stack. The quake bar captures
-/// all keystrokes while open; the only exit is ESC (`handle_close`).
-pub fn handle_open(state: &mut AppState) -> IntentResult {
-    state.frontend.scope_stack.push(FocusScope::QuakeBar);
-    IntentResult::empty()
+/// Route ids for the quake bar's rows (composition resolution +
+/// diagnostics).
+pub mod route_ids {
+    use crate::common::slices::key_routes::RouteId;
+
+    /// Open the quake bar overlay (the global `<M-\`>` toggle).
+    pub const OPEN: RouteId = RouteId::new("quake-bar:open");
+    /// Close the overlay (`<esc>` / `<M-\`>`).
+    pub const CLOSE: RouteId = RouteId::new("quake-bar:close");
+    /// Submit the input line (`<enter>`).
+    pub const SUBMIT: RouteId = RouteId::new("quake-bar:submit");
+    /// Scroll the log toward older lines (`<pgup>`).
+    pub const SCROLL_UP: RouteId = RouteId::new("quake-bar:scroll-up");
+    /// Scroll the log toward newer lines (`<pgdn>`).
+    pub const SCROLL_DOWN: RouteId = RouteId::new("quake-bar:scroll-down");
+    /// Clear the input or close when empty (`<c-c>`).
+    pub const CTRL_CLEAR: RouteId = RouteId::new("quake-bar:ctrl-clear");
 }
 
-/// Closes the quake bar overlay.
-///
-/// Pops `FocusScope::QuakeBar` only when it is the current (top) scope. A no-op
-/// otherwise — defensive, since the quake bar is an interrupting overlay that
-/// should be the top scope whenever it is visible.
-pub fn handle_close(state: &mut AppState) -> IntentResult {
-    if matches!(state.frontend.scope_stack.current(), FocusScope::QuakeBar) {
-        state.frontend.scope_stack.pop();
+/// Attaches the quake bar's route rows. Called once from the slice's
+/// `activate()`; the cell handle is captured by the actions that need
+/// it (the same handle the actor holds — never a second mint).
+pub fn attach_quake_bar_rows(routes: &KeyRoutes, cell: &TypedCell<QuakeBarState>) {
+    let scope = quake_scope();
+    let open_scope = scope.clone();
+
+    // Global toggle: opens the overlay from any static scope (and other
+    // slices' scopes). Skipped inside the quake scope itself, where the
+    // close row binds the same key.
+    routes.attach(RouteRow {
+        route_id: route_ids::OPEN,
+        scope: open_scope,
+        key: "<M-`>",
+        category: "general",
+        site: BindSite::GlobalToggle,
+        feature: "quake-bar",
+        outcome: RouteOutcome::Action {
+            action: "open",
+            display: "quake bar",
+            run: ActionFn::new(|| {
+                IntentResult::empty().with_scope_signal(ScopeSignal::Push(quake_scope()))
+            }),
+        },
+    });
+
+    routes.attach(RouteRow {
+        route_id: route_ids::CLOSE,
+        scope: scope.clone(),
+        key: "<esc>",
+        category: "general",
+        site: BindSite::OwnScope,
+        feature: "quake-bar",
+        outcome: RouteOutcome::Action {
+            action: "close",
+            display: "close quake bar",
+            run: ActionFn::new(|| {
+                IntentResult::empty().with_scope_signal(ScopeSignal::PopIf(quake_scope()))
+            }),
+        },
+    });
+    routes.attach(RouteRow {
+        route_id: route_ids::CLOSE,
+        scope: scope.clone(),
+        key: "<M-`>",
+        category: "general",
+        site: BindSite::OwnScope,
+        feature: "quake-bar",
+        outcome: RouteOutcome::Action {
+            action: "close",
+            display: "close quake bar",
+            run: ActionFn::new(|| {
+                IntentResult::empty().with_scope_signal(ScopeSignal::PopIf(quake_scope()))
+            }),
+        },
+    });
+
+    // Submit needs the cell: it reads + clears the input buffer. The
+    // handle is a clone of the one minted at activation.
+    let submit_cell = cell.clone();
+    routes.attach(RouteRow {
+        route_id: route_ids::SUBMIT,
+        scope: scope.clone(),
+        key: "<enter>",
+        category: "input",
+        site: BindSite::OwnScope,
+        feature: "quake-bar",
+        outcome: RouteOutcome::Action {
+            action: "submit",
+            display: "submit command",
+            run: ActionFn::new(move || handle_submit(&submit_cell)),
+        },
+    });
+
+    for (route_id, key, action, display) in [
+        (route_ids::SCROLL_UP, "<pgup>", "scroll-up", "scroll up"),
+        (route_ids::SCROLL_DOWN, "<pgdn>", "scroll-down", "scroll down"),
+    ] {
+        let cell = cell.clone();
+        routes.attach(RouteRow {
+            route_id,
+            scope: scope.clone(),
+            key,
+            category: "navigation",
+            site: BindSite::OwnScope,
+            feature: "quake-bar",
+            outcome: RouteOutcome::Action {
+                action,
+                display,
+                run: ActionFn::new(move || handle_scroll(&cell, action)),
+            },
+        });
     }
-    IntentResult::empty()
+
+    routes.attach(RouteRow {
+        route_id: route_ids::CTRL_CLEAR,
+        scope: scope,
+        key: "<c-c>",
+        category: "general",
+        site: BindSite::OwnScope,
+        feature: "quake-bar",
+        outcome: RouteOutcome::Action {
+            action: "ctrl-clear",
+            display: "clear input",
+            run: ActionFn::new({
+                let cell = cell.clone();
+                move || {
+                    cell.update(|s| *s = QuakeBarState::default());
+                    IntentResult::empty()
+                }
+            }),
+        },
+    });
+}
+
+/// Registers the quake bar's synchronous input hook.
+///
+/// While the quake scope is the active focus, editing intents route
+/// here instead of the chat input. Writing the cell keeps the typing
+/// carve-out: per-keystroke sync mutation of the slice's own input
+/// buffer, exactly what a built-in input popup does.
+pub fn register_quake_input_hook(routes: &KeyRoutes, cell: &TypedCell<QuakeBarState>) {
+    let hook_cell = cell.clone();
+    let hook: InputHook = std::sync::Arc::new(move |intent: &Intent| {
+        let cell = &hook_cell;
+        match intent {
+            Intent::InsertChar { ch } => {
+                cell.update(|s| s.input.text.insert_char(*ch));
+                Some(IntentResult::empty())
+            }
+            Intent::DeleteGrapheme => {
+                cell.update(|s| s.input.text.delete());
+                Some(IntentResult::empty())
+            }
+            Intent::DeleteGraphemeForward => {
+                cell.update(|s| s.input.text.delete_forward());
+                Some(IntentResult::empty())
+            }
+            Intent::MoveCursorLeft => {
+                cell.update(|s| s.input.text.cursor_left());
+                Some(IntentResult::empty())
+            }
+            Intent::MoveCursorRight => {
+                cell.update(|s| s.input.text.cursor_right());
+                Some(IntentResult::empty())
+            }
+            Intent::MoveCursorToStart => {
+                cell.update(|s| s.input.text.cursor_pos = 0);
+                Some(IntentResult::empty())
+            }
+            Intent::MoveCursorToEnd => {
+                cell.update(|s| {
+                    let len = s.input.text.input.len();
+                    s.input.text.cursor_pos = len;
+                });
+                Some(IntentResult::empty())
+            }
+            _ => None,
+        }
+    });
+    routes.register_input_hook(&quake_scope(), hook);
 }
 
 /// Submits the quake bar input into the command log.
 ///
-/// Reads and trims the input text, clears the input buffer, and — if the text
-/// is non-empty — emits a [`SubmitQuakeBarCommand`] so the
-/// [`QuakeBarActor`](super::quake_bar_actor) appends it to the log. Empty input
-/// is a no-op (no command emitted).
-pub fn handle_submit(state: &mut AppState) -> IntentResult {
-    let text = state.frontend.quake_bar.input.text.input.trim().to_owned();
-
-    // Clear the input buffer regardless: the key was pressed, so reset the box.
-    state.frontend.quake_bar.input = crate::feat::quake_bar::state::QuakeBarInput::default();
+/// Reads and trims the input text, clears the input buffer, and — if
+/// the text is non-empty — emits a [`SubmitQuakeBarCommand`] so the
+/// [`QuakeBarActor`](super::quake_bar_actor::QuakeBarActor) appends it
+/// to the log. Empty input is a no-op (no command emitted).
+fn handle_submit(cell: &TypedCell<QuakeBarState>) -> IntentResult {
+    let text = {
+        let guard = cell.read();
+        guard.input.text.input.trim().to_owned()
+    };
+    // Clear the input buffer regardless: the key was pressed, so reset
+    // the box.
+    cell.update(|s| s.input = QuakeBarInput::default());
 
     if text.is_empty() {
         IntentResult::empty()
@@ -52,59 +238,29 @@ pub fn handle_submit(state: &mut AppState) -> IntentResult {
     }
 }
 
-/// Scrolls the command log one line toward the oldest content.
-pub fn handle_scroll_up(state: &mut AppState) -> IntentResult {
-    state.frontend.quake_bar.log.scroll_up();
+/// Scrolls the command log one line in the direction named by `action`
+/// (`scroll-up` toward older lines, `scroll-down` toward newer).
+fn handle_scroll(cell: &TypedCell<QuakeBarState>, action: &str) -> IntentResult {
+    cell.update(|s| match action {
+        "scroll-up" => s.log.scroll_up(),
+        _ => s.log.scroll_down(),
+    });
     IntentResult::empty()
 }
 
-/// Scrolls the command log one line toward the newest content.
-pub fn handle_scroll_down(state: &mut AppState) -> IntentResult {
-    state.frontend.quake_bar.log.scroll_down();
-    IntentResult::empty()
+/// Returns the dynamic intent for a quake bar action (helper for
+/// composition's keymap generator and tests).
+#[must_use]
+pub fn quake_intent(action: &str, display: &str) -> DynamicIntent {
+    DynamicIntent::new(quake_scope(), action, display)
 }
 
-/// Inserts a character at the cursor position.
-pub fn handle_insert_char(state: &mut AppState, ch: char) -> IntentResult {
-    state.frontend.quake_bar.input.text.insert_char(ch);
-    IntentResult::empty()
-}
-
-/// Deletes the grapheme before the cursor.
-pub fn handle_delete(state: &mut AppState) -> IntentResult {
-    state.frontend.quake_bar.input.text.delete();
-    IntentResult::empty()
-}
-
-/// Deletes the grapheme at/after the cursor (forward delete).
-pub fn handle_delete_forward(state: &mut AppState) -> IntentResult {
-    state.frontend.quake_bar.input.text.delete_forward();
-    IntentResult::empty()
-}
-
-/// Moves the cursor one grapheme left.
-pub fn handle_cursor_left(state: &mut AppState) -> IntentResult {
-    state.frontend.quake_bar.input.text.cursor_left();
-    IntentResult::empty()
-}
-
-/// Moves the cursor one grapheme right.
-pub fn handle_cursor_right(state: &mut AppState) -> IntentResult {
-    state.frontend.quake_bar.input.text.cursor_right();
-    IntentResult::empty()
-}
-
-/// Moves the cursor to the start of the input.
-pub fn handle_cursor_to_start(state: &mut AppState) -> IntentResult {
-    state.frontend.quake_bar.input.text.cursor_pos = 0;
-    IntentResult::empty()
-}
-
-/// Moves the cursor to the end of the input.
-pub fn handle_cursor_to_end(state: &mut AppState) -> IntentResult {
-    let len = state.frontend.quake_bar.input.text.input.len();
-    state.frontend.quake_bar.input.text.cursor_pos = len;
-    IntentResult::empty()
+/// The quake bar's dynamic scope.
+///
+/// Re-exported for composition (keymap generation consults it).
+#[must_use]
+pub fn quake_bar_scope() -> SliceScopeId {
+    quake_scope()
 }
 
 #[cfg(test)]
@@ -117,93 +273,69 @@ mod tests {
         reason = "test code"
     )]
 
-    use super::*;
-    use crate::common::app_state::AppState;
+    use super::QuakeBarState;
+    use super::attach_quake_bar_rows;
+    use super::handle_submit;
+    use super::quake_scope;
+    use super::register_quake_input_hook;
+    use crate::common::slices::key_routes::KeyRoutes;
+    use crate::protocol::intent::Intent;
+    use crate::protocol::ScopeSignal;
+    use jinn_slices::Slices;
 
-    #[rstest::rstest]
-    #[test]
-    fn open_pushes_quake_bar_scope() {
-        // Given default app state (Normal scope on top).
-        let mut state = AppState::default();
+    use crate::feat::quake_bar::state::quake_bar_slot;
 
-        // When opening the quake bar.
-        handle_open(&mut state);
-
-        // Then the top scope is QuakeBar.
-        assert!(matches!(
-            state.frontend.scope_stack.current(),
-            FocusScope::QuakeBar
-        ));
+    fn wired() -> (KeyRoutes, jinn_slices::TypedCell<QuakeBarState>) {
+        let slices = Slices::new();
+        let cell = slices
+            .register(quake_bar_slot(), QuakeBarState::default())
+            .expect("fresh registry");
+        let routes = KeyRoutes::new();
+        attach_quake_bar_rows(&routes, &cell);
+        register_quake_input_hook(&routes, &cell);
+        (routes, cell)
     }
 
     #[rstest::rstest]
     #[test]
-    fn close_pops_when_quake_bar_is_top() {
-        // Given a state with the quake bar open.
-        let mut state = AppState::default();
-        handle_open(&mut state);
+    fn open_action_emits_push_scope_signal() {
+        // Given a wired quake slice.
+        let (routes, _cell) = wired();
 
-        // When closing.
-        handle_close(&mut state);
+        // When dispatching the open dynamic intent.
+        let intent = Intent::Dynamic(super::quake_intent("open", "quake bar"));
+        let result = routes.action_for(&intent).expect("open row attached");
 
-        // Then the QuakeBar scope is no longer on top.
-        assert!(!matches!(
-            state.frontend.scope_stack.current(),
-            FocusScope::QuakeBar
-        ));
+        // Then the result carries a Push signal for the quake scope.
+        assert_eq!(result.scope_signal, Some(ScopeSignal::Push(quake_scope())));
     }
 
     #[rstest::rstest]
     #[test]
-    fn close_is_noop_when_quake_bar_not_top() {
-        // Given a state in the default scope (quake bar not open).
-        let mut state = AppState::default();
-        let scope_before = state.frontend.scope_stack.current().clone();
+    fn close_action_emits_pop_scope_signal() {
+        // Given a wired quake slice.
+        let (routes, _cell) = wired();
 
-        // When closing (defensively).
-        handle_close(&mut state);
+        // When dispatching the close dynamic intent.
+        let intent = Intent::Dynamic(super::quake_intent("close", "close quake bar"));
+        let result = routes.action_for(&intent).expect("close row attached");
 
-        // Then the scope is unchanged.
-        assert_eq!(state.frontend.scope_stack.current(), &scope_before);
-    }
-    #[rstest::rstest]
-    #[test]
-    fn insert_char_appends_to_input() {
-        // Given a quake bar with an empty input.
-        let mut state = AppState::default();
-
-        // When inserting a character.
-        handle_insert_char(&mut state, 'x');
-
-        // Then the input buffer holds that character.
-        assert_eq!(state.frontend.quake_bar.input.text.input, "x");
+        // Then the result carries a PopIf signal for the quake scope.
+        assert_eq!(result.scope_signal, Some(ScopeSignal::PopIf(quake_scope())));
     }
 
     #[rstest::rstest]
     #[test]
-    fn submit_clears_input_buffer() {
-        // Given a quake bar with typed input.
-        let mut state = AppState::default();
-        handle_insert_char(&mut state, 'h');
-        handle_insert_char(&mut state, 'i');
+    fn submit_with_text_emits_submit_command_and_clears_input() {
+        // Given a wired quake slice with typed input.
+        let (_routes, cell) = wired();
+        cell.update(|s| {
+            s.input.text.insert_char('h');
+            s.input.text.insert_char('i');
+        });
 
         // When submitting.
-        let _ = handle_submit(&mut state);
-
-        // Then the input buffer is empty.
-        assert!(state.frontend.quake_bar.input.text.input.is_empty());
-    }
-
-    #[rstest::rstest]
-    #[test]
-    fn submit_with_text_emits_submit_command() {
-        // Given a quake bar with typed input.
-        let mut state = AppState::default();
-        handle_insert_char(&mut state, 'h');
-        handle_insert_char(&mut state, 'i');
-
-        // When submitting.
-        let result = handle_submit(&mut state);
+        let result = handle_submit(&cell);
 
         // Then a SubmitQuakeBarCommand message was emitted.
         assert_eq!(result.message_names.len(), 1);
@@ -213,18 +345,80 @@ mod tests {
                 .first()
                 .is_some_and(|name| name.ends_with("SubmitQuakeBarCommand"))
         );
+        // And the input buffer is empty.
+        assert!(cell.read().input.text.input.is_empty());
     }
 
     #[rstest::rstest]
     #[test]
     fn submit_with_empty_input_emits_no_command() {
-        // Given a quake bar with empty input.
-        let mut state = AppState::default();
+        // Given a wired quake slice with empty input.
+        let (_routes, cell) = wired();
 
         // When submitting.
-        let result = handle_submit(&mut state);
+        let result = handle_submit(&cell);
 
         // Then no command was emitted.
         assert!(result.message_names.is_empty());
+    }
+
+    #[rstest::rstest]
+    #[test]
+    fn input_hook_inserts_characters_into_the_cell() {
+        // Given a wired quake slice.
+        let (routes, cell) = wired();
+        let hook = routes
+            .input_hook(&quake_scope())
+            .expect("hook registered");
+
+        // When the hook intercepts insert-char intents.
+        let _ = hook(&Intent::InsertChar { ch: 'x' });
+        let _ = hook(&Intent::InsertChar { ch: 'y' });
+
+        // Then the cell's input buffer holds those characters.
+        assert_eq!(cell.read().input.text.input, "xy");
+    }
+
+    #[rstest::rstest]
+    #[test]
+    fn input_hook_declines_non_editing_intents() {
+        // Given a wired quake slice.
+        let (routes, _cell) = wired();
+        let hook = routes
+            .input_hook(&quake_scope())
+            .expect("hook registered");
+
+        // When the hook sees a non-editing intent.
+        let result = hook(&Intent::Quit);
+
+        // Then it declines to serve it.
+        assert!(result.is_none());
+    }
+
+    #[rstest::rstest]
+    #[test]
+    fn scroll_actions_move_the_log_window() {
+        // Given a wired quake slice with a multi-line log, scrolled up once.
+        let (routes, cell) = wired();
+        for i in 0..5 {
+            cell.update(|s| s.log.push(format!("line-{i}")));
+        }
+        let intent = Intent::Dynamic(super::quake_intent("scroll-up", "scroll up"));
+        let _ = routes.action_for(&intent).expect("scroll-up row");
+        let before = {
+            let guard = cell.read();
+            guard.log.visible_lines(2).to_vec()
+        };
+
+        // When dispatching scroll-down.
+        let intent = Intent::Dynamic(super::quake_intent("scroll-down", "scroll down"));
+        let _ = routes.action_for(&intent).expect("scroll-down row");
+
+        // Then the visible window shifted toward the newest line.
+        let after = {
+            let guard = cell.read();
+            guard.log.visible_lines(2).to_vec()
+        };
+        assert_ne!(after, before.as_slice());
     }
 }

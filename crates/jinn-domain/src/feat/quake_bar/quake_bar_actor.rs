@@ -1,25 +1,29 @@
 //! Quake bar actor — the sole owner/writer of the command log.
 //!
-//! Subscribes to [`SubmitQuakeBarCommand`] and appends the submitted line to
-//! [`QuakeBarState::log`](super::state::QuakeBarState::log). Keeping this actor
-//! as the only writer of the log lets future quake-specific debug commands and
+//! Subscribes to [`SubmitQuakeBarCommand`] and appends the submitted
+//! line to the slice's cell
+//! ([`QuakeBarState::log`](super::state::QuakeBarState::log)). The cell
+//! handle arrives in the actor's deps — a clone of the one handle
+//! minted at activation (the intent-handler input hook holds another
+//! clone for the input field only). Keeping this actor as the only
+//! writer of the log lets future quake-specific debug commands and
 //! event subscriptions funnel through one mutator.
 
 use kameo::prelude::{Actor, ActorRef, Context, Message};
 
+use jinn_slices::TypedCell;
+
 use crate::common::actor_deps::ActorDeps;
-use crate::common::state::State;
 use crate::feat::quake_bar::command::SubmitQuakeBarCommand;
+use crate::feat::quake_bar::state::QuakeBarState;
 
 /// Owns the quake bar command log.
 ///
-/// The single subscriber to [`SubmitQuakeBarCommand`]; the only writer of
-/// [`QuakeBarState::log`](super::state::QuakeBarState::log).
+/// The single subscriber to [`SubmitQuakeBarCommand`]; the only writer
+/// of the log field of the slice cell.
 pub struct QuakeBarActor {
-    /// Shared application state.
-    state: State,
-    /// Capability to write `frontend.quake_bar`.
-    cap: crate::common::tcaps::frontend::FrontendCap,
+    /// The slice cell (the one write handle, shared by clone).
+    cell: TypedCell<QuakeBarState>,
 }
 
 /// Dependencies for spawning a [`QuakeBarActor`].
@@ -27,10 +31,8 @@ pub struct QuakeBarActor {
 pub struct QuakeBarActorDeps {
     /// Universal actor dependencies (bus, services, etc.).
     pub deps: ActorDeps,
-    /// Shared application state.
-    pub state: State,
-    /// Capability to write `frontend.quake_bar`.
-    pub cap: crate::common::tcaps::frontend::FrontendCap,
+    /// The quake bar's slice cell — the handle minted at activation.
+    pub cell: TypedCell<QuakeBarState>,
 }
 
 impl Actor for QuakeBarActor {
@@ -41,10 +43,7 @@ impl Actor for QuakeBarActor {
         args.deps
             .subscribe(actor_ref.recipient::<SubmitQuakeBarCommand>())
             .await;
-        Ok(Self {
-            state: args.state,
-            cap: args.cap,
-        })
+        Ok(Self { cell: args.cell })
     }
 }
 
@@ -63,9 +62,7 @@ impl Message<SubmitQuakeBarCommand> for QuakeBarActor {
 impl QuakeBarActor {
     /// Appends the submitted text to the command log.
     fn apply_submit(&self, msg: SubmitQuakeBarCommand) {
-        use crate::common::tcaps::frontend::QuakeBarLogWrite;
-        self.state
-            .with_quake_bar(&self.cap, |ops| ops.push_log(msg.text));
+        self.cell.update(|s| s.log.push(msg.text));
     }
 }
 
@@ -79,26 +76,26 @@ mod tests {
         reason = "test code"
     )]
 
-    use crate::common::app_state::AppState;
-    use crate::common::state::State;
     use crate::feat::quake_bar::command::SubmitQuakeBarCommand;
+    use crate::feat::quake_bar::state::QuakeBarState;
+    use crate::feat::quake_bar::state::quake_bar_slot;
+    use jinn_slices::Slices;
 
     use super::QuakeBarActor;
 
-    fn create_actor() -> (QuakeBarActor, State) {
-        let state = State::new(AppState::default());
-        let actor = QuakeBarActor {
-            state: state.clone(),
-            cap: crate::common::tcaps::mint::mint_frontend_cap(),
-        };
-        (actor, state)
+    fn create_actor() -> (QuakeBarActor, jinn_slices::TypedCell<QuakeBarState>) {
+        let slices = Slices::new();
+        let cell = slices
+            .register(quake_bar_slot(), QuakeBarState::default())
+            .expect("fresh registry");
+        (QuakeBarActor { cell: cell.clone() }, cell)
     }
 
     #[rstest::rstest]
     #[test]
     fn submit_command_appends_text_to_log() {
-        // Given a quake bar actor.
-        let (actor, state) = create_actor();
+        // Given a quake bar actor over its slice cell.
+        let (actor, cell) = create_actor();
 
         // When applying a SubmitQuakeBarCommand.
         actor.apply_submit(SubmitQuakeBarCommand {
@@ -106,10 +103,10 @@ mod tests {
         });
 
         // Then the text appears in the command log.
-        let guard = state.read();
-        assert_eq!(guard.frontend.quake_bar.log.len(), 1);
+        let guard = cell.read();
+        assert_eq!(guard.log.len(), 1);
         assert_eq!(
-            guard.frontend.quake_bar.log.visible_lines(5),
+            guard.log.visible_lines(5),
             &["hello".to_owned()]
         );
     }

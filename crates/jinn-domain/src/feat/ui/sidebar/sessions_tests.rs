@@ -74,14 +74,14 @@ fn section_id_is_sessions() {
 fn content_height_with_one_session() {
     let section = SessionsSection::new();
     let state = AppState::default();
-    assert_eq!(section.content_height(&{ RenderCtx::new(&state) }), 2); // 1 session + footer
+    assert_eq!({ let slices = jinn_slices::Slices::new(); section.content_height(&RenderCtx::new(&state, &slices)) }, 2); // 1 session + footer
 }
 
 #[rstest::rstest]
 fn content_height_with_three_sessions() {
     let section = SessionsSection::new();
     let state = state_with_sessions(3);
-    assert_eq!(section.content_height(&{ RenderCtx::new(&state) }), 4); // 3 sessions + footer
+    assert_eq!({ let slices = jinn_slices::Slices::new(); section.content_height(&RenderCtx::new(&state, &slices)) }, 4); // 3 sessions + footer
 }
 
 #[rstest::rstest]
@@ -91,7 +91,8 @@ fn content_height_capped_at_max_visible() {
     let state = state_with_sessions(20);
 
     // When computing content height.
-    let height = section.content_height(&{ RenderCtx::new(&state) });
+    let slices = jinn_slices::Slices::new();
+        let height = section.content_height(&RenderCtx::new(&state, &slices));
 
     // Then it is capped at 15 + 1 = 16, not 20 + 1 = 21.
     assert_eq!(height, 16);
@@ -408,7 +409,8 @@ fn render_rows(
     let (mut terminal, area) = setup_term(width, height);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(state, &slices);
             section.render(frame, area, &ctx);
         })
         .unwrap();
@@ -559,7 +561,8 @@ fn render_arrow_has_inverted_colors() {
     let (mut terminal, area) = setup_term(30, 20);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             section.render(frame, area, &ctx);
         })
         .unwrap();
@@ -587,7 +590,8 @@ fn render_footer_uses_focus_accent_when_sidebar_focused() {
     let (mut terminal, area) = setup_term(30, 5);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             section.render(frame, area, &ctx);
         })
         .unwrap();
@@ -612,7 +616,8 @@ fn render_footer_uses_border_unfocused_when_sidebar_not_focused() {
     let (mut terminal, area) = setup_term(30, 5);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             section.render(frame, area, &ctx);
         })
         .unwrap();
@@ -641,7 +646,8 @@ fn render_footer_uses_border_unfocused_when_other_sidebar_section_focused() {
     let (mut terminal, area) = setup_term(30, 5);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             section.render(frame, area, &ctx);
         })
         .unwrap();
@@ -911,7 +917,8 @@ fn render_session_title_is_red_when_last_entry_is_error() {
     let (mut terminal, area) = setup_term(30, 5);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             section.render(frame, area, &ctx);
         })
         .unwrap();
@@ -938,7 +945,8 @@ fn render_session_title_is_normal_when_last_entry_is_not_error() {
     let (mut terminal, area) = setup_term(30, 5);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             section.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1744,7 +1752,8 @@ fn render_tree_shows_tree_characters() {
     let (mut terminal, area) = jinn_testutil::setup_term(30, 15);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             section.render(frame, area, &ctx);
         })
         .unwrap();
@@ -2926,7 +2935,8 @@ fn render_archive_tree_prompt_rows(state: &AppState, sidebar_width: u16) -> Vec<
         height,
     };
     let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("terminal");
-    let ctx = RenderCtx::new(state);
+    let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(state, &slices);
     terminal
         .draw(|frame| {
             crate::feat::ui::sidebar::sessions::render_archive_tree_prompt_for_state(
@@ -2959,7 +2969,8 @@ fn render_sessions_with_archive_tree_prompt(state: &AppState, sidebar_width: u16
         height,
     };
     let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("terminal");
-    let ctx = RenderCtx::new(state);
+    let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(state, &slices);
     let mut sidebar = crate::feat::ui::sidebar::Sidebar::default();
     sidebar.register(Box::new(SessionsSection::new()));
     terminal
@@ -3011,7 +3022,8 @@ fn render_sessions_with_close_prompt(state: &AppState, sidebar_width: u16) -> Ve
         height,
     };
     let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("terminal");
-    let ctx = RenderCtx::new(state);
+    let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(state, &slices);
     let mut sidebar = crate::feat::ui::sidebar::Sidebar::default();
     sidebar.register(Box::new(SessionsSection::new()));
     terminal

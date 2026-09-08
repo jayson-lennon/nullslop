@@ -3,7 +3,6 @@
 pub mod app_layout;
 pub mod chat_tab;
 pub mod clipboard;
-pub mod dashboard_tab;
 pub mod picker;
 pub mod selection_highlight;
 pub mod status_bar;
@@ -34,15 +33,18 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
     apply_pre_render_mutation(app, area);
 
     let state = app.core.state.read();
-    let ctx = RenderCtx::new(&state);
+    let ctx = RenderCtx::new(&state, &app.services.slices);
 
-    let is_dashboard = matches!(state.frontend.scope_stack.base(), FocusScope::Dashboard,);
+    // Layout kind comes from the base scope's registration: a dynamic
+    // tab scope renders full-width (no chat chrome); everything else is
+    // the chat layout. The chat tab is the default for unregistered
+    // scopes.
     let layout = AppFrameLayout::new(
         area,
         state.active_chat_input().visual_line_count() as u16,
         area.height / 2,
         state.frontend.sidebar_width,
-        is_dashboard,
+        is_full_width_tab(&app.services.slices, state.frontend.scope_stack.base()),
     );
     let sidebar_focused = state.frontend.scope_stack.is_sidebar();
     let active_scope = state.frontend.scope_stack.current();
@@ -50,6 +52,7 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
     let mut rects = vec![];
     render_base_layers(
         &app.services.slices,
+        &mut app.services.viewport,
         &mut app.sidebar,
         &mut app.ui_registry,
         frame,
@@ -59,7 +62,9 @@ pub fn render(app: &mut TuiApp, frame: &mut Frame<'_>) {
         sidebar_focused,
         &mut rects,
     );
-    if let Some(rect) = render_active_overlay(frame, area, &ctx, active_scope) {
+    if let Some(rect) =
+        render_active_overlay(frame, area, &ctx, &mut app.services.viewport, active_scope)
+    {
         rects.push(rect);
     }
     // The which-key help popup paints last so it sits above every overlay
@@ -83,16 +88,13 @@ fn apply_pre_render_mutation(app: &mut TuiApp, area: Rect) {
     let picker_viewport =
         jinn_domain::feat::picker::geometry::measure_active_picker_results_height(&wstate, area);
     wstate.frontend.set_picker_results_viewport(picker_viewport);
-    let is_dashboard = matches!(
-        wstate.frontend.scope_stack.base(),
-        jinn_domain::FocusScope::Dashboard,
-    );
+    let full_width = is_full_width_tab(&app.services.slices, wstate.frontend.scope_stack.base());
     let pre_layout = AppFrameLayout::new(
         area,
         wstate.active_chat_input().visual_line_count() as u16,
         area.height / 2,
         wstate.frontend.sidebar_width,
-        is_dashboard,
+        full_width,
     );
     // The terminal overlay's inner rect sizes the pty (WYSIWYG). Computed
     // every frame while open; deduped by the mirror, sent through the bridge.
@@ -194,6 +196,7 @@ fn refresh_mcp_inspector_snapshot(state: &mut jinn_domain::AppState) {
 )]
 fn render_base_layers(
     slices: &jinn_domain::common::slices::Slices,
+    viewport: &mut jinn_domain::common::slices::view::Viewport,
     sidebar: &mut Sidebar,
     ui_registry: &mut AppUiRegistry,
     frame: &mut Frame<'_>,
@@ -206,7 +209,19 @@ fn render_base_layers(
     match layout {
         AppFrameLayout::Dashboard(dash) => {
             tab_bar::render_tab_bar(frame, dash.tab_bar, ctx);
-            dashboard_tab::render_dashboard(frame, dash.content, ctx, slices);
+            // The active tab's slice view draws the content: the base
+            // scope's slot resolves through the viewport. An unregistered
+            // slot renders nothing (blank tab — a wiring bug caught by
+            // the startup pairing check, not silently here).
+            let base = ctx.state.frontend.scope_stack.base();
+            if let FocusScope::Dynamic(id) = base {
+                if let Some(slot) = slices.tab_slot(id) {
+                    let cx = jinn_domain::common::slices::ViewCx {
+                        theme: &ctx.state.frontend.theme,
+                    };
+                    viewport.render_slot(frame, dash.content, &slot, &cx, slices);
+                }
+            }
         }
         AppFrameLayout::Chat(chat) => {
             tab_bar::render_tab_bar(frame, chat.tab_bar, ctx);
@@ -255,6 +270,7 @@ fn render_active_overlay(
     frame: &mut Frame<'_>,
     area: Rect,
     ctx: &RenderCtx<'_>,
+    viewport: &mut jinn_domain::common::slices::view::Viewport,
     scope: &FocusScope,
 ) -> Option<Rect> {
     match scope {
@@ -296,16 +312,36 @@ fn render_active_overlay(
             crate::render::terminal_tab::render_terminal_tab(frame, overlay_rect, ctx);
             Some(overlay_rect)
         }
-        FocusScope::QuakeBar => {
-            let quake_area = ratatui::layout::Rect {
-                x: area.x,
-                y: area.y + 1,
-                width: area.width,
-                height: area.height.saturating_sub(1),
+        FocusScope::Dynamic(id) => {
+            // Slice overlays: consult the geometry fn registered by the
+            // scope's slice. A registered overlay renders the slice's
+            // view; a dynamic scope without overlay geometry renders
+            // nothing (its view only draws when it owns the frame).
+            let overlay = ctx.slices.overlay(id)?;
+            let overlay_area = overlay(&area)?;
+            // The overlay renders the slice's view: the scope → slot
+            // mapping was registered at activation alongside the
+            // geometry fn.
+            let Some(slot) = ctx.slices.overlay_slot(id) else {
+                return None;
             };
-            jinn_domain::feat::quake_bar::render::render_quake_bar(frame, quake_area, ctx);
+            let cx = jinn_domain::common::slices::ViewCx {
+                theme: &ctx.state.frontend.theme,
+            };
+            viewport.render_slot(frame, overlay_area, &slot, &cx, ctx.slices);
             None
         }
         _ => None,
+    }
+}
+
+/// Returns `true` when `scope` is a registered full-width tab.
+///
+/// Tab scopes are declared by slices at activation; the chat tab is
+/// the fallback for Normal and any unregistered scope.
+fn is_full_width_tab(slices: &jinn_slices::Slices, scope: &FocusScope) -> bool {
+    match scope {
+        FocusScope::Dynamic(id) => slices.tab_scopes().contains(id),
+        _ => false,
     }
 }

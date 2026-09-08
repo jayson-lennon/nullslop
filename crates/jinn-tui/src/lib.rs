@@ -8,6 +8,7 @@ pub mod app_state;
 pub mod config;
 pub mod convert;
 pub mod keymap;
+pub mod keymap_gen;
 pub mod launch;
 pub mod msg;
 #[cfg(test)]
@@ -38,3 +39,4 @@ mod render_tests;
 
 #[cfg(test)]
 mod selection_tests;
+

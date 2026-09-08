@@ -232,7 +232,8 @@ fn content_height_is_zero_when_empty() {
     let state = AppState::default();
 
     // When asking for content height.
-    let height = section.content_height(&{ RenderCtx::new(&state) });
+    let slices = jinn_slices::Slices::new();
+        let height = section.content_height(&RenderCtx::new(&state, &slices));
 
     // Then it returns 0 (section is hidden when empty).
     assert_eq!(height, 0);
@@ -245,7 +246,8 @@ fn content_height_matches_entry_count() {
     let state = state_with_pinned(3);
 
     // When asking for content height.
-    let height = section.content_height(&{ RenderCtx::new(&state) });
+    let slices = jinn_slices::Slices::new();
+        let height = section.content_height(&RenderCtx::new(&state, &slices));
 
     // Then it returns header(1) + header-gap(1) + entries(3) + trailing gap(1) = 6.
     assert_eq!(height, 6);
@@ -260,7 +262,8 @@ fn render_rows(
     let (mut terminal, area) = setup_term(width, height);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(state, &slices);
             section.render(frame, area, &ctx);
         })
         .unwrap();
@@ -332,7 +335,8 @@ fn render_selected_entry_has_yellow_marker_when_sidebar_focused() {
     let (mut terminal, area) = setup_term(60, 20);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             section.render(frame, area, &ctx);
         })
         .unwrap();
@@ -354,7 +358,8 @@ fn render_selected_entry_has_darkgray_marker_when_not_focused() {
     let (mut terminal, area) = setup_term(60, 20);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             section.render(frame, area, &ctx);
         })
         .unwrap();

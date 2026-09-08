@@ -52,3 +52,24 @@ pub mod tools_actor;
 pub mod ui;
 pub mod web_fetch_actor;
 pub mod web_search_actor;
+
+/// A `KeyRoutes` pre-seeded with every built-in slice's rows, mirroring
+/// what composition produces at launch (all `activate()` calls made).
+///
+/// Test-only seam: keymap tests query [`crate::feat`] consumers like the
+/// quake toggle without standing up the actor system.
+#[must_use]
+pub fn composition_routes() -> crate::common::slices::key_routes::KeyRoutes {
+    let routes = crate::common::slices::key_routes::KeyRoutes::new();
+    dashboard::attach_dashboard_rows(&routes);
+    // The quake rows' submit/scroll actions capture a cell handle; the
+    // seam mints a detached one (never registered into a live `Slices`)
+    // since only row *shape* matters for keymap tests.
+    let slices = crate::common::slices::Slices::new();
+    let cell = slices
+        .register(quake_bar::quake_bar_slot(), quake_bar::state::QuakeBarState::default())
+        .expect("detached quake cell");
+    quake_bar::intent::attach_quake_bar_rows(&routes, &cell);
+    quake_bar::intent::register_quake_input_hook(&routes, &cell);
+    routes
+}

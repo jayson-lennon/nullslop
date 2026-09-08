@@ -262,7 +262,8 @@ mod tests {
         let mut terminal = Terminal::new(backend).expect("terminal");
         let area = Rect::new(0, 0, 80, 24);
         let guard = app.core.state.read();
-        let ctx = RenderCtx::new(&guard);
+        let slices = jinn_slices::Slices::new();
+        let ctx = RenderCtx::new(&guard, &slices);
         terminal
             .draw(|f| render_terminal_tab(f, area, &ctx))
             .expect("draw");
@@ -294,7 +295,8 @@ mod tests {
         let mut terminal = Terminal::new(backend).expect("terminal");
         let area = Rect::new(0, 0, 80, 24);
         let guard = app.core.state.read();
-        let ctx = RenderCtx::new(&guard);
+        let slices = jinn_slices::Slices::new();
+        let ctx = RenderCtx::new(&guard, &slices);
         terminal
             .draw(|f| render_terminal_tab(f, area, &ctx))
             .expect("draw");
@@ -361,7 +363,8 @@ mod tests {
         let mut terminal = Terminal::new(backend).expect("terminal");
         let area = Rect::new(0, 0, 80, 24);
         let guard = app.core.state.read();
-        let ctx = RenderCtx::new(&guard);
+        let slices = jinn_slices::Slices::new();
+        let ctx = RenderCtx::new(&guard, &slices);
         terminal
             .draw(|f| render_terminal_tab(f, area, &ctx))
             .expect("draw");
@@ -408,7 +411,8 @@ mod tests {
         let mut terminal = Terminal::new(backend).expect("terminal");
         let area = Rect::new(0, 0, 80, 24);
         let guard = app.core.state.read();
-        let ctx = RenderCtx::new(&guard);
+        let slices = jinn_slices::Slices::new();
+        let ctx = RenderCtx::new(&guard, &slices);
         terminal
             .draw(|f| render_terminal_tab(f, area, &ctx))
             .expect("draw");
@@ -518,7 +522,8 @@ mod tests {
         let mut terminal = Terminal::new(backend).expect("terminal");
         let area = Rect::new(0, 0, 80, 24);
         let guard = app.core.state.read();
-        let ctx = RenderCtx::new(&guard);
+        let slices = jinn_slices::Slices::new();
+        let ctx = RenderCtx::new(&guard, &slices);
         terminal
             .draw(|f| render_terminal_tab(f, area, &ctx))
             .expect("draw");
@@ -554,7 +559,8 @@ mod tests {
         let mut terminal = Terminal::new(backend).expect("terminal");
         let area = Rect::new(0, 0, 80, 24);
         let guard = app.core.state.read();
-        let ctx = RenderCtx::new(&guard);
+        let slices = jinn_slices::Slices::new();
+        let ctx = RenderCtx::new(&guard, &slices);
         terminal
             .draw(|f| render_terminal_tab(f, area, &ctx))
             .expect("draw");
@@ -646,7 +652,8 @@ mod tests {
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).expect("terminal");
         let guard = app.core.state.read();
-        let ctx = RenderCtx::new(&guard);
+        let slices = jinn_slices::Slices::new();
+        let ctx = RenderCtx::new(&guard, &slices);
         terminal
             .draw(|f| render_terminal_tab(f, f.area(), &ctx))
             .expect("draw");
@@ -722,7 +729,8 @@ mod tests {
         }
         let app = crate::TuiApp::test_builder().state(state).build().await;
         let guard = app.core.state.read();
-        let ctx = RenderCtx::new(&guard);
+        let slices = jinn_slices::Slices::new();
+        let ctx = RenderCtx::new(&guard, &slices);
         let area = Rect::new(0, 0, 80, 24);
 
         // When rendering the overlay (mirrored screen is blank).
@@ -769,7 +777,8 @@ mod tests {
         let mut terminal = Terminal::new(backend).expect("terminal");
         let area = Rect::new(0, 0, 80, 24);
         let guard = app.core.state.read();
-        let ctx = RenderCtx::new(&guard);
+        let slices = jinn_slices::Slices::new();
+        let ctx = RenderCtx::new(&guard, &slices);
         terminal
             .draw(|f| render_terminal_tab(f, area, &ctx))
             .expect("draw");

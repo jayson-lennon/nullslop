@@ -156,7 +156,8 @@ mod tests {
             Terminal::new(TestBackend::new(area.width, area.height)).expect("terminal");
         terminal
             .draw(|frame| {
-                let ctx = jinn_domain::RenderCtx::new(&state);
+                let slices = jinn_slices::Slices::new();
+                let ctx = jinn_domain::RenderCtx::new(&state, &slices);
                 super::render_picker(frame, area, &ctx);
             })
             .expect("draw");

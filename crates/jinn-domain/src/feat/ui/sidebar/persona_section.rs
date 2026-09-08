@@ -173,7 +173,8 @@ mod tests {
         }));
 
         // When asking for content height.
-        let height = section.content_height(&{ RenderCtx::new(&state) });
+        let slices = jinn_slices::Slices::new();
+        let height = section.content_height(&RenderCtx::new(&state, &slices));
 
         // Then it returns 4 (header + blank + entry + trailing gap).
         assert_eq!(height, 4);
@@ -186,7 +187,8 @@ mod tests {
         let state = AppState::default();
 
         // When asking for content height.
-        let height = section.content_height(&{ RenderCtx::new(&state) });
+        let slices = jinn_slices::Slices::new();
+        let height = section.content_height(&RenderCtx::new(&state, &slices));
 
         // Then it returns 4 (consistent layout).
         assert_eq!(height, 4);
@@ -251,7 +253,8 @@ mod tests {
         let (mut terminal, area) = setup_term(width, height);
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(state);
+                let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(state, &slices);
                 section.render(frame, area, &ctx);
             })
             .unwrap();

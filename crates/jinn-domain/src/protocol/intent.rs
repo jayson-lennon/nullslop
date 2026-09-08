@@ -26,7 +26,7 @@ impl std::fmt::Display for CwdRoot {
 ///
 /// Every keymap binding and mouse event produces exactly one [`Intent`] variant.
 /// The keymap decides the intent; the `IntentHandler` decides what to do with it.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Intent {
     /// Insert a character at the cursor position.
     InsertChar {
@@ -358,16 +358,14 @@ pub enum Intent {
         root: CwdRoot,
     },
 
-    /// Open the quake bar overlay (pushes `FocusScope::QuakeBar`).
-    OpenQuakeBar,
-    /// Close the quake bar overlay (pops `FocusScope::QuakeBar`).
-    CloseQuakeBar,
-    /// Submit the quake bar input into the command log.
-    SubmitQuakeBar,
-    /// Scroll the quake bar command log toward the oldest line.
-    QuakeBarScrollUp,
-    /// Scroll the quake bar command log toward the newest line.
-    QuakeBarScrollDown,
+    /// A dynamically-registered slice's action.
+    ///
+    /// Dispatched exclusively through the feature route table
+    /// ([`KeyRoutes`](crate::common::slices::key_routes::KeyRoutes)):
+    /// a slice that never registered a row for this intent is inert by
+    /// construction. Carries its identity as data, so slices never edit
+    /// this enum.
+    Dynamic(jinn_slices::DynamicIntent),
 
     /// Scroll the task list preview popup toward the top (older tasks).
     TaskListPreviewScrollUp,
@@ -377,14 +375,6 @@ pub enum Intent {
     // ── Dashboard tab ──────────────────────────────────────────────
     /// Switch between Chat and Dashboard tabs.
     SwitchTab,
-    /// Move dashboard selection up one row.
-    DashboardSelectUp,
-    /// Move dashboard selection down one row.
-    DashboardSelectDown,
-    /// Move dashboard selection to the first row.
-    DashboardSelectFirst,
-    /// Move dashboard selection to the last row.
-    DashboardSelectLast,
 
     // ── Terminal overlay (interactive_term takeover) ──────────────
     /// Toggle the terminal overlay for a session (global `<M-t>`, or the
@@ -582,18 +572,10 @@ impl std::fmt::Display for Intent {
 
             Intent::ChangeCwd { root } => write!(f, "change cwd from '{root}'"),
 
-            Intent::OpenQuakeBar => write!(f, "open quake bar"),
-            Intent::CloseQuakeBar => write!(f, "close quake bar"),
-            Intent::SubmitQuakeBar => write!(f, "quake bar submit"),
-            Intent::QuakeBarScrollUp => write!(f, "quake bar scroll up"),
-            Intent::QuakeBarScrollDown => write!(f, "quake bar scroll down"),
+            Intent::Dynamic(dynamic) => write!(f, "{dynamic}"),
             Intent::TaskListPreviewScrollUp => write!(f, "task list preview scroll up"),
             Intent::TaskListPreviewScrollDown => write!(f, "task list preview scroll down"),
             Intent::SwitchTab => write!(f, "switch tab"),
-            Intent::DashboardSelectUp => write!(f, "dashboard select up"),
-            Intent::DashboardSelectDown => write!(f, "dashboard select down"),
-            Intent::DashboardSelectFirst => write!(f, "dashboard select first"),
-            Intent::DashboardSelectLast => write!(f, "dashboard select last"),
             Intent::ToggleTerminalOverlay { session_id } => match session_id {
                 Some(id) => write!(f, "toggle terminal overlay for session {id}"),
                 None => write!(f, "toggle terminal overlay"),
@@ -616,12 +598,30 @@ impl std::fmt::Display for Intent {
 /// What an intent handler returns after processing an intent.
 ///
 /// Carries typed message closures to be dispatched to the actor system
-/// via the kameo message bus.
+/// via the kameo message bus, plus an optional scope transition. The
+/// scope signal is applied by the handler (an exempt `scope_stack`
+/// writer) *before* the messages publish, so a slice that opens itself
+/// pushes its scope before any bus message a subscriber could observe.
 pub struct IntentResult {
     /// Typed message closures to publish to the kameo bus.
     pub messages: Vec<BridgeClosure>,
     /// Type names of messages, for test inspection.
     pub message_names: Vec<&'static str>,
+    /// Scope transition to apply before publishing, if any.
+    pub scope_signal: Option<ScopeSignal>,
+}
+
+/// A scope-stack transition requested by a route action.
+///
+/// Slices declare their transitions as data; the composition-side
+/// handler applies them. Ownership stays single-writer: only the
+/// handler mutates `scope_stack`, and it does so only on these signals.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ScopeSignal {
+    /// Push `scope` onto the stack (entering the slice's overlay/tab).
+    Push(jinn_slices::SliceScopeId),
+    /// Pop `scope` if it is the current top scope (leaving the slice).
+    PopIf(jinn_slices::SliceScopeId),
 }
 
 impl IntentResult {
@@ -631,6 +631,7 @@ impl IntentResult {
         Self {
             messages: vec![],
             message_names: vec![],
+            scope_signal: None,
         }
     }
 
@@ -646,7 +647,16 @@ impl IntentResult {
         Self {
             messages: vec![crate::common::bridge::Bridge::publish_closure(msg)],
             message_names: vec![std::any::type_name::<M>()],
+            scope_signal: None,
         }
+    }
+
+    /// Requests a scope transition, applied by the handler before the
+    /// messages publish.
+    #[must_use]
+    pub fn with_scope_signal(mut self, signal: ScopeSignal) -> Self {
+        self.scope_signal = Some(signal);
+        self
     }
 
     /// Append multiple messages of one type at the same time.

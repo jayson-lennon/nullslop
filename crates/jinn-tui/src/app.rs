@@ -146,7 +146,7 @@ impl TuiApp {
                             return; // consumed by selection
                         }
                         // Fall through to keymap for scroll, etc.
-                        let scope = *self.which_key.scope();
+                        let scope = self.which_key.scope().clone();
                         let Some(intent) = self
                             .which_key
                             .keymap()
@@ -288,7 +288,7 @@ impl TuiApp {
         let state_read = self.core.state.read();
         let new_scope = scope_for_focus(state_read.frontend.scope_stack.current());
         drop(state_read);
-        self.which_key.set_scope(new_scope);
+        self.which_key.set_scope(new_scope.clone());
     }
 
     /// Renders the application for a single frame.
@@ -327,11 +327,11 @@ pub fn scope_for_focus(focus: &jinn_domain::FocusScope) -> Scope {
         FocusScope::CwdInput => Scope::CwdInput,
         FocusScope::ProjectAddInput => Scope::ProjectAddInput,
         FocusScope::PrunerAccumulationInput => Scope::PrunerAccumulationInput,
-        FocusScope::QuakeBar => Scope::QuakeBar,
+        // Dynamic slice scopes pass their identity through unchanged.
+        FocusScope::Dynamic(id) => Scope::Dynamic(id.clone()),
         FocusScope::SidebarResize => Scope::SidebarResize,
 
         FocusScope::Normal => Scope::Normal,
-        FocusScope::Dashboard => Scope::Dashboard,
         FocusScope::TerminalView => Scope::TerminalView,
         FocusScope::TerminalControl => Scope::TerminalControl,
     }

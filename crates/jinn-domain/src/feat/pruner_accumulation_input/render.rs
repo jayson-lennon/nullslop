@@ -123,7 +123,8 @@ mod tests {
         let mut terminal = Terminal::new(backend).expect("terminal");
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
                 render_pruner_accumulation_input(frame, area, &ctx);
             })
             .expect("draw");

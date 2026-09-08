@@ -124,7 +124,8 @@ mod tests {
         let (mut terminal, area) = setup_term(30, 1);
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
                 element.render(frame, area, &ctx);
             })
             .unwrap();
@@ -148,7 +149,8 @@ mod tests {
         let (mut terminal, area) = setup_term(30, 1);
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
                 element.render(frame, area, &ctx);
             })
             .unwrap();
@@ -175,7 +177,8 @@ mod tests {
         let (mut terminal, area) = setup_term(30, 1);
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
                 element.render(frame, area, &ctx);
             })
             .unwrap();

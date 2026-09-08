@@ -28,7 +28,8 @@ fn render_shows_no_model_selected_when_unset() {
     let (mut terminal, area) = setup_term(50, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -46,7 +47,8 @@ fn render_shows_status_hint_instead_of_model_when_set() {
     let (mut terminal, area) = setup_term(60, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -68,7 +70,8 @@ fn render_shows_provider_and_model() {
     let (mut terminal, area) = setup_term(50, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -101,7 +104,8 @@ fn render_single_model_ignores_stale_ledger_model_used() {
     let (mut terminal, area) = setup_term(50, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -129,7 +133,8 @@ fn render_right_aligns_text() {
     let (mut terminal, area) = setup_term(50, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -151,7 +156,8 @@ fn render_shows_provider_with_slash_in_model() {
     let (mut terminal, area) = setup_term(80, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -169,7 +175,8 @@ fn render_shows_token_counts_with_zero_values() {
     let (mut terminal, area) = setup_term(80, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -202,7 +209,8 @@ fn render_shows_token_counts_with_values() {
     let (mut terminal, area) = setup_term(80, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -236,7 +244,8 @@ fn render_shows_cache_percent_when_cached_tokens_present() {
     let (mut terminal, area) = setup_term(80, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -296,7 +305,8 @@ fn render_info_line_cache_segment_is_error_below_90_percent(
     // When rendering.
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -329,7 +339,8 @@ fn render_info_line_cache_segment_is_success_at_or_above_95_percent(
     // When rendering.
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -362,7 +373,8 @@ fn render_info_line_cache_segment_is_warning_between_90_and_94_percent(
     // When rendering.
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -399,7 +411,8 @@ fn render_hides_cache_glyph_when_no_cached_tokens() {
     let (mut terminal, area) = setup_term(80, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -441,7 +454,8 @@ fn render_cache_percent_uses_measured_turns_only() {
     let (mut terminal, area) = setup_term(80, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -473,7 +487,8 @@ fn render_shows_zero_percent_max_when_context_size_but_no_limit() {
     let (mut terminal, area) = setup_term(80, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -491,7 +506,8 @@ fn render_shows_zero_percent_max_when_no_context_size() {
     let (mut terminal, area) = setup_term(80, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -514,7 +530,8 @@ fn render_shows_zero_turns_when_no_history() {
     let (mut terminal, area) = setup_term(80, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -547,7 +564,8 @@ fn render_shows_turn_count_with_history() {
     let (mut terminal, area) = setup_term(80, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -584,7 +602,8 @@ fn render_turn_count_skips_tool_loop_intermediates() {
     let (mut terminal, area) = setup_term(80, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -602,7 +621,8 @@ fn render_shows_cwd_on_first_line() {
     let (mut terminal, area) = setup_term(80, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -626,7 +646,8 @@ fn render_shows_absolute_path_for_non_home_cwd() {
     let (mut terminal, area) = setup_term(80, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -652,7 +673,8 @@ fn render_shows_tilde_for_home_cwd() {
     let (mut terminal, area) = setup_term(80, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -680,7 +702,8 @@ fn render_shows_tilde_substitution_for_path_under_home() {
     let (mut terminal, area) = setup_term(80, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -731,7 +754,8 @@ fn render_shows_context_limit_with_usage_and_percentage() {
     let (mut terminal, area) = setup_term(100, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -779,7 +803,8 @@ fn render_falls_back_when_no_context_limit_in_cache() {
     let (mut terminal, area) = setup_term(80, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -817,7 +842,8 @@ fn render_falls_back_when_no_model_cache() {
     let (mut terminal, area) = setup_term(80, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -857,7 +883,8 @@ fn render_shows_zero_percent_with_max_when_no_messages_sent() {
     let (mut terminal, area) = setup_term(100, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -895,7 +922,8 @@ fn render_shows_used_over_unknown_when_no_context_length() {
     let (mut terminal, area) = setup_term(100, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -913,7 +941,8 @@ fn render_always_shows_cost_even_when_zero() {
     let (mut terminal, area) = setup_term(80, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -947,7 +976,8 @@ fn render_shows_cost_with_non_zero_value() {
     let (mut terminal, area) = setup_term(80, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1000,7 +1030,8 @@ fn render_tree_cache_segment_is_success_when_at_or_above_95_percent() {
     let (mut terminal, area) = setup_term(120, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1062,7 +1093,8 @@ fn render_tree_cache_segment_keeps_muted_neighbors() {
     let (mut terminal, area) = setup_term(120, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1111,7 +1143,8 @@ fn render_shows_cost_before_turns_indicator() {
     let (mut terminal, area) = setup_term(80, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1139,7 +1172,8 @@ fn render_hides_tree_aggregate_for_single_session() {
     let (mut terminal, area) = setup_term(120, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1194,7 +1228,8 @@ fn render_shows_tree_aggregate_when_parent_has_child() {
     let (mut terminal, area) = setup_term(120, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1242,7 +1277,8 @@ fn render_shows_tree_aggregate_from_child_viewpoint() {
     let (mut terminal, area) = setup_term(120, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1268,7 +1304,8 @@ fn render_single_model_shows_provider_and_model_without_alloy_prefix() {
     let (mut terminal, area) = setup_term(50, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1313,7 +1350,8 @@ fn render_alloy_with_token_records_shows_prefix_and_last_dispatched_model() {
     let (mut terminal, area) = setup_term(60, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1344,7 +1382,8 @@ fn render_alloy_with_no_token_records_falls_back_to_first_model() {
     let (mut terminal, area) = setup_term(50, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1372,7 +1411,8 @@ fn render_alloy_with_one_model_shows_alloy_1() {
     let (mut terminal, area) = setup_term(50, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1400,7 +1440,8 @@ fn render_appends_resolved_reasoning_effort_after_model() {
     let (mut terminal, area) = setup_term(50, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1430,7 +1471,8 @@ fn render_session_override_beats_global_reasoning_effort() {
     let (mut terminal, area) = setup_term(50, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1461,7 +1503,8 @@ fn render_omits_reasoning_effort_bracket_when_unresolved() {
     let (mut terminal, area) = setup_term(50, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();
@@ -1501,7 +1544,8 @@ fn render_model_row(state: &AppState) -> String {
     let (mut terminal, area) = setup_term(80, 2);
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx::new(state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(state, &slices);
             element.render(frame, area, &ctx);
         })
         .unwrap();

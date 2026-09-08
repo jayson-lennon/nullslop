@@ -293,7 +293,8 @@ mod tests {
         let (mut terminal, area) = setup_term(width, height);
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(state);
+                let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(state, &slices);
                 section.render(frame, area, &ctx);
             })
             .unwrap();
@@ -441,7 +442,8 @@ mod tests {
         let section = McpServersSection;
 
         // When computing the content height.
-        let height = section.content_height(&{ RenderCtx::new(&state) });
+        let slices = jinn_slices::Slices::new();
+        let height = section.content_height(&RenderCtx::new(&state, &slices));
 
         // Then the section collapses to zero height (hidden).
         assert_eq!(
@@ -460,7 +462,8 @@ mod tests {
         let section = McpServersSection;
 
         // When computing the content height.
-        let height = section.content_height(&{ RenderCtx::new(&state) });
+        let slices = jinn_slices::Slices::new();
+        let height = section.content_height(&RenderCtx::new(&state, &slices));
 
         // Then it counts only the enabled servers:
         // header(1) + blank(1) + 2 rows + trailing gap(1) = 5.

@@ -1,110 +1,179 @@
-//! Feature-registered keybind routing.
+//! Feature-registered keybind routing — the slice keybind manifest.
 //!
-//! The central intent handler is a god-match: one arm per keybound
-//! behavior, hand-written in one place, growing linearly with features.
-//! [`KeyRoutes`] dissolves that coupling: each feature registers *route
-//! rows* — "when this intent fires, produce this message" — and the
-//! handler consults the table by lookup instead of mutating foreign
-//! state arm by arm.
+//! [`KeyRoutes`] dissolves the central-handler coupling: each slice
+//! registers *route rows* — "when this key fires in this scope, produce
+//! this outcome" — and composition generates the keymap bindings from
+//! the registered rows. Rows carry no `Intent`: a row either resolves
+//! through the route table itself (a [`RouteOutcome::Action`], looked up
+//! by dynamic intent) or names a static intent by [`RouteId`] for
+//! composition to bind directly ([`RouteOutcome::StaticIntent`]). The
+//! intent vocabulary therefore lives in exactly one place — the
+//! composition-side `RouteId` map — and slices never edit central
+//! enums.
 //!
-//! Rows come in two kinds, mirroring the two kinds of writers:
+//! Rows also declare *where* their key binds: a slice's own dynamic
+//! scope ([`BindSite::OwnScope`]) or every composition scope
+//! ([`BindSite::GlobalToggle`] — e.g. the key that opens the slice).
+//! Composition's generator walks the rows; nothing else does.
 //!
-//! - [`RouteRow::Builtin`] maps an intent to a Rust closure producing
-//!   an [`IntentResult`] (typically a single bus message for the
-//!   feature's owning actor).
-//! - [`RouteRow::Guest`] maps a (scope, key) pair to a coordinator-
-//!   addressed action for a WASM plugin. Guests cannot be dispatched to
-//!   directly — a slice is storage and a plugin's logic lives behind
-//!   its host-side coordinator — so guest rows are data (`plugin`,
-//!   `action`) that the runtime resolves against the plugin
-//!   coordinator. Data-only in this phase; never dispatched by the
-//!   sync path.
+//! Alongside the rows, a slice may register one *input hook* per scope
+//! ([`InputHook`]): a synchronous interceptor consulted before the
+//! handler's built-in arms while that scope is active. This is the
+//! sanctioned carve-out for per-keystroke input surfaces — the hook
+//! writes the slice's own state synchronously, exactly as a built-in
+//! input popup does.
 //!
-//! The table is small and scanned linearly; built-in rows win over
-//! guest rows on lookup because they are attached first (startup
-//! wiring registers built-ins before plugins load).
-//!
-//! This module lives in `jinn-domain` (not `jinn-slices`) because its
-//! rows are keyed on the central [`Intent`] protocol type — a
-//! composition concern. It moves to `jinn-slices` once rows are
-//! re-keyed off `Intent`.
+//! The table is small and scanned linearly; rows attach at slice
+//! activation (startup wiring) before the keymap is generated.
 
-use std::mem::Discriminant;
+use std::sync::Arc;
+
+use jinn_slices::SliceScopeId;
 
 use crate::protocol::intent::Intent;
 use crate::protocol::intent::IntentResult;
 
-/// A feature-registered keybind route.
+/// Composition-side identifier for a route's intent resolution.
+///
+/// Rows never name [`Intent`] variants directly — they carry a
+/// [`RouteId`], and composition's generator maps ids to intents in one
+/// table. A `RouteId` an unknown id to that map is a wiring bug that
+/// surfaces as an unbound key at startup, not a compile error; the
+/// mapping test pins every registered id against it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct RouteId(&'static str);
+
+impl RouteId {
+    /// Mints a route id from its canonical dotted name.
+    #[must_use]
+    pub const fn new(name: &'static str) -> Self {
+        Self(name)
+    }
+
+    /// The canonical name, e.g. `dashboard:nav-down`.
+    #[must_use]
+    pub fn as_str(&self) -> &'static str {
+        self.0
+    }
+}
+
+/// Where a row's keybinding materializes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BindSite {
+    /// Bind in the slice's own dynamic scope only.
+    OwnScope,
+    /// Bind in every composition (static) scope — and in other slices'
+    /// dynamic scopes — so a slice's entry-point key works everywhere.
+    /// Within the slice's own scope the row is skipped, letting the
+    /// slice's own binding (e.g. a close key) win.
+    GlobalToggle,
+}
+
+/// What a row's keypress produces.
 #[derive(Debug, Clone)]
-pub enum RouteRow {
-    /// A built-in feature's row: intent → message-producing action.
-    Builtin {
-        /// Which intent this row serves. Stored as a [`DiscriminantKey`]
-        /// because `Intent` has data-carrying variants (`InsertChar`
-        /// and friends); discriminants key by *shape*, not payload.
-        intent: DiscriminantKey,
-        /// Produces the messages to publish when the intent fires.
-        action: fn() -> IntentResult,
-        /// Display name of the owning feature, for diagnostics and the
-        /// dashboard's route listing.
-        feature: &'static str,
-    },
-    /// A WASM plugin's row: (scope, key) → coordinator-addressed action.
-    ///
-    /// Data-only: the plugin coordinator owns dispatch. The sync intent
-    /// path never runs guest actions — a guest is remote by
-    /// construction, so no sync write handle can reach it.
-    Guest {
-        /// Keymap scope the guest bound itself to (e.g. `dashboard`).
-        scope: String,
-        /// The key, in keymap display form (e.g. `ctrl+s`).
-        key: String,
-        /// The plugin that registered the row.
-        plugin: String,
-        /// Coordinator-addressed action name.
-        action: String,
+pub enum RouteOutcome {
+    /// Bind the key to a static intent, resolved by composition from
+    /// the [`RouteId`]. The route table is not consulted at keypress
+    /// time — the intent flows through the handler's built-in arms.
+    /// Used for a slice's shared-chrome keys (`q` → quit).
+    StaticIntent(RouteId),
+    /// A slice-specific action: the key binds to a dynamic intent and
+    /// the handler dispatches through this row's `run`.
+    Action {
+        /// The action name — the route-table key within the slice.
+        action: &'static str,
+        /// Human-readable label for which-key popups.
+        display: &'static str,
+        /// Produces the outcome when the dynamic intent fires.
+        run: ActionFn,
     },
 }
 
-impl RouteRow {
-    /// Returns the row's keymap scope, if it declares one.
+/// A row action: produces the intent result (messages + optional scope
+/// signal) when its dynamic intent fires.
+///
+/// A closure, not a bare `fn` pointer: actions may capture the slice's
+/// cell handle (e.g. submit reads and clears the input buffer). The
+/// captured handle is the one registered at slice activation — closure
+/// capture does not mint a second write capability.
+#[derive(Clone)]
+pub struct ActionFn(Arc<dyn Fn() -> IntentResult + Send + Sync>);
+
+impl ActionFn {
+    /// Wraps a closure or function into a row action.
     #[must_use]
-    pub fn scope(&self) -> Option<&str> {
-        match self {
-            Self::Builtin { .. } => None,
-            Self::Guest { scope, .. } => Some(scope),
+    pub fn new<F>(f: F) -> Self
+    where
+        F: Fn() -> IntentResult + Send + Sync + 'static,
+    {
+        Self(Arc::new(f))
+    }
+
+    /// Runs the action.
+    #[must_use]
+    pub fn run(&self) -> IntentResult {
+        (self.0)()
+    }
+}
+
+impl std::fmt::Debug for ActionFn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ActionFn(..)")
+    }
+}
+
+/// A slice-registered keybind row — one entry of the slice manifest.
+#[derive(Debug, Clone)]
+pub struct RouteRow {
+    /// Composition-facing id (static resolution + diagnostics).
+    pub route_id: RouteId,
+    /// The dynamic scope this row's key lives in.
+    pub scope: SliceScopeId,
+    /// The key, in keymap display form (e.g. `<esc>`, `j`).
+    pub key: &'static str,
+    /// Keymap category hint: `general`, `navigation`, or `input`.
+    pub category: &'static str,
+    /// Where the binding materializes.
+    pub site: BindSite,
+    /// Display name of the owning slice, for diagnostics.
+    pub feature: &'static str,
+    /// What the keypress produces.
+    pub outcome: RouteOutcome,
+}
+
+impl RouteRow {
+    /// The which-key label this row's key shows.
+    ///
+    /// Static intents are labeled by composition (the bound intent's
+    /// own `Display`); dynamic actions carry their label here.
+    #[must_use]
+    pub fn display(&self) -> &'static str {
+        match &self.outcome {
+            RouteOutcome::StaticIntent(_) => "",
+            RouteOutcome::Action { display, .. } => display,
         }
     }
 }
 
-/// Hashable wrapper around [`std::mem::Discriminant<Intent>`].
+/// A synchronous per-scope input interceptor.
 ///
-/// `Discriminant` is `Hash` but the bound shows up awkwardly in map
-/// keys and diagnostics; this newtype centralizes the indirection and
-/// gives the table's key a speakable name. Display strings of intents
-/// are deliberately *not* used as keys — they are UI-facing and not
-/// stable identifiers.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct DiscriminantKey(Discriminant<Intent>);
+/// Consulted by the intent handler while the hook's scope is the active
+/// focus: editing intents (typing, cursor moves) are routed here so the
+/// slice's input surface captures keystrokes without hard-coded handler
+/// arms. Returning `None` lets the intent fall through to the built-in
+/// arms (quit and other app-level intents keep working).
+pub type InputHook = Arc<dyn Fn(&Intent) -> Option<IntentResult> + Send + Sync>;
 
-impl DiscriminantKey {
-    /// Keys by the intent's variant, ignoring payload data.
-    #[must_use]
-    pub fn of(intent: &Intent) -> Self {
-        Self(std::mem::discriminant(intent))
-    }
-}
-
-/// Registry of feature keybind routes.
+/// Registry of slice keybind routes and input hooks.
 ///
-/// Rows attach after startup wiring (plugins load late), so the table
-/// is interior-mutable behind a lock — the same shape as
-/// [`Slices`](crate::common::slices::Slices). Lookup is infallible: an
-/// unbound intent yields `None` and the handler falls through to its
-/// own arms.
+/// Rows attach at slice activation (startup wiring), so the table is
+/// interior-mutable behind a lock — the same shape as
+/// [`Slices`](super::Slices). Lookup is infallible: an unbound dynamic
+/// intent yields `None` and the handler treats it as inert.
 #[derive(Clone, Debug, Default)]
 pub struct KeyRoutes {
     rows: row_store::Rows,
+    hooks: row_store::Hooks,
 }
 
 impl KeyRoutes {
@@ -114,58 +183,49 @@ impl KeyRoutes {
         Self::default()
     }
 
-    /// Attaches a built-in row: `probe`'s discriminant names the
-    /// intent; `action` produces the messages.
-    pub fn attach_builtin(
-        &self,
-        probe: &Intent,
-        action: fn() -> IntentResult,
-        feature: &'static str,
-    ) {
-        self.rows.push(RouteRow::Builtin {
-            intent: DiscriminantKey::of(probe),
-            action,
-            feature,
-        });
+    /// Attaches a built-in row.
+    pub fn attach(&self, row: RouteRow) {
+        self.rows.push(row);
     }
 
-    /// Attaches a guest row for a plugin keybind.
-    pub fn attach_guest(&self, scope: &str, key: &str, plugin: &str, action: &str) {
-        self.rows.push(RouteRow::Guest {
-            scope: scope.to_owned(),
-            key: key.to_owned(),
-            plugin: plugin.to_owned(),
-            action: action.to_owned(),
-        });
+    /// Registers the synchronous input hook for a slice's scope.
+    pub fn register_input_hook(&self, scope: &SliceScopeId, hook: InputHook) {
+        self.hooks.insert(scope.key(), hook);
     }
 
-    /// Looks up the action bound to `intent`, if a built-in row serves it.
+    /// Returns the input hook registered for `scope`, if any.
+    #[must_use]
+    pub fn input_hook(&self, scope: &SliceScopeId) -> Option<InputHook> {
+        self.hooks.get(&scope.key())
+    }
+
+    /// Dispatches a dynamic intent through its registered row.
+    ///
+    /// Matches by `(slice, action)` — the dynamic intent's identity.
+    /// `None` means no row serves this intent: the handler treats the
+    /// intent as inert.
     #[must_use]
     pub fn action_for(&self, intent: &Intent) -> Option<IntentResult> {
-        let probe = DiscriminantKey::of(intent);
-        let action = {
+        let jinn_slices::DynamicIntent {
+            slice,
+            action,
+            display: _,
+        } = match intent {
+            Intent::Dynamic(dynamic) => dynamic,
+            _ => return None,
+        };
+        let run = {
             let rows = self.rows.rows();
-            rows.into_iter().find_map(|row| match row {
-                RouteRow::Builtin { intent, action, .. } if intent == probe => Some(action),
+            rows.into_iter().find_map(|row| match row.outcome {
+                RouteOutcome::Action {
+                    action: row_action,
+                    display: _,
+                    run,
+                } if row_action == action && row.scope == *slice => Some(run),
                 _ => None,
             })
         };
-        action.map(|action| action())
-    }
-
-    /// Looks up a guest row by keymap scope and key.
-    ///
-    /// Returns an owned row: rows are small data, and a clone spares
-    /// callers any lifetime tie to the table's lock.
-    #[must_use]
-    pub fn guest_row(&self, scope: &str, key: &str) -> Option<RouteRow> {
-        let rows = self.rows.rows();
-        rows.into_iter().find(|row| match row {
-            RouteRow::Guest {
-                scope: s, key: k, ..
-            } => s == scope && k == key,
-            RouteRow::Builtin { .. } => false,
-        })
+        Some(run?.run())
     }
 
     /// Returns all attached rows in attach order.
@@ -173,12 +233,24 @@ impl KeyRoutes {
     pub fn rows(&self) -> Vec<RouteRow> {
         self.rows.rows()
     }
+
+    /// Returns the scope ids of all registered input hooks.
+    #[must_use]
+    pub fn hook_scopes(&self) -> Vec<SliceScopeId> {
+        self.hooks
+            .keys()
+            .into_iter()
+            .filter_map(|key| key.parse::<SliceScopeId>().ok())
+            .collect()
+    }
 }
 
-/// Append-only row store shared by all clones of the table.
+/// Append-only row/hook store shared by all clones of the table.
 mod row_store {
+    use super::InputHook;
     use super::RouteRow;
     use parking_lot::RwLock;
+    use std::collections::HashMap;
     use std::sync::Arc;
 
     #[derive(Debug, Default)]
@@ -204,78 +276,158 @@ mod row_store {
             self.inner.read().clone()
         }
     }
+
+    #[derive(Debug, Default)]
+    pub struct Hooks {
+        inner: Arc<RwLock<HashMap<String, HookEntry>>>,
+    }
+
+    /// A hook wrapped for `Debug` (closures are not `Debug`).
+    #[derive(Clone)]
+    struct HookEntry(InputHook);
+
+    impl std::fmt::Debug for HookEntry {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("InputHook(..)")
+        }
+    }
+
+    impl Clone for Hooks {
+        fn clone(&self) -> Self {
+            Self {
+                inner: Arc::clone(&self.inner),
+            }
+        }
+    }
+
+    impl Hooks {
+        pub fn insert(&self, key: String, hook: InputHook) {
+            self.inner.write().insert(key, HookEntry(hook));
+        }
+
+        pub fn get(&self, key: &str) -> Option<InputHook> {
+            self.inner.read().get(key).map(|entry| entry.0.clone())
+        }
+
+        pub fn keys(&self) -> Vec<String> {
+            self.inner.read().keys().cloned().collect()
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::ActionFn;
+    use super::BindSite;
     use super::KeyRoutes;
+    use super::RouteId;
+    use super::RouteOutcome;
     use super::RouteRow;
     use crate::protocol::intent::Intent;
     use crate::protocol::intent::IntentResult;
+    use jinn_slices::DynamicIntent;
+    use jinn_slices::SliceScopeId;
 
-    #[derive(Debug, Clone)]
-    struct StubMsg;
+    fn scope() -> SliceScopeId {
+        SliceScopeId::new("test-slice", "main")
+    }
 
-    impl crate::common::bus::BusMessage for StubMsg {}
+    fn row(action: &'static str, key: &'static str) -> RouteRow {
+        RouteRow {
+            route_id: RouteId::new("test-slice:action"),
+            scope: scope(),
+            key,
+            category: "general",
+            site: BindSite::OwnScope,
+            feature: "test-slice",
+            outcome: RouteOutcome::Action {
+                action,
+                display: "test action",
+                run: ActionFn::new(|| IntentResult::empty()),
+            },
+        }
+    }
 
-    fn stub_action() -> IntentResult {
-        IntentResult::new_message(StubMsg)
+    fn dynamic_intent(action: &str) -> Intent {
+        Intent::Dynamic(DynamicIntent::new(scope(), action, "test action"))
     }
 
     #[rstest::rstest]
     #[test]
-    fn route_lookup_produces_message_for_bound_intent() {
-        // Given a table with a row bound to a dashboard nav intent.
+    fn dynamic_intent_with_registered_row_dispatches_action() {
+        // Given a table with an action row attached.
         let routes = KeyRoutes::new();
-        routes.attach_builtin(&Intent::NoOp, stub_action, "stub");
+        routes.attach(row("poke", "<enter>"));
 
-        // When looking up the action for that intent (data variants
-        // must match by discriminant, not payload).
-        let result = routes.action_for(&Intent::NoOp);
+        // When dispatching a dynamic intent carrying the row's action.
+        let result = routes.action_for(&dynamic_intent("poke"));
 
-        // Then the action produced the stub message.
-        let result = result.expect("bound intent resolves");
-        assert_eq!(result.message_names, vec![std::any::type_name::<StubMsg>()]);
+        // Then the row's action ran (empty result, no error).
+        assert!(result.is_some());
     }
 
     #[rstest::rstest]
     #[test]
-    fn unbound_key_is_noop() {
-        // Given a table with no row for quit.
+    fn dynamic_intent_without_row_is_inert() {
+        // Given a table with no matching row.
         let routes = KeyRoutes::new();
 
-        // When looking up the action for Intent::Quit.
-        let result = routes.action_for(&Intent::Quit);
+        // When dispatching an unregistered dynamic intent.
+        let result = routes.action_for(&dynamic_intent("missing"));
 
-        // Then nothing resolves and the handler falls through.
+        // Then nothing resolves — the handler will treat it as inert.
         assert!(result.is_none());
     }
 
     #[rstest::rstest]
     #[test]
-    fn guest_route_row_targets_plugin_coordinator() {
-        // Given a table with a guest row attached.
+    fn static_intents_never_reach_the_route_table() {
+        // Given a table with rows attached.
         let routes = KeyRoutes::new();
-        routes.attach_guest("dashboard", "ctrl+s", "my-plugin", "save");
+        routes.attach(row("poke", "<enter>"));
 
-        // When looking up the guest row by scope and key.
-        let row = routes.guest_row("dashboard", "ctrl+s");
+        // When dispatching a static intent.
+        let result = routes.action_for(&Intent::Quit);
 
-        // Then the row carries the plugin and the coordinator-addressed
-        // action.
-        let row = row.expect("guest row resolves");
-        let RouteRow::Guest {
-            scope,
-            key,
-            plugin,
-            action,
-        } = row
-        else {
-            unreachable!("attached row should be a guest row");
-        };
-        assert_eq!(scope, "dashboard");
-        assert_eq!(key, "ctrl+s");
-        assert_eq!(plugin, "my-plugin");
-        assert_eq!(action, "save");
+        // Then nothing resolves (static intents flow through built-in arms).
+        assert!(result.is_none());
+    }
+
+    #[rstest::rstest]
+    #[test]
+    fn input_hook_intercepts_intents_for_its_scope() {
+        // Given a table with a hook registered for the scope.
+        let routes = KeyRoutes::new();
+        routes.register_input_hook(
+            &scope(),
+            std::sync::Arc::new(|intent: &Intent| {
+                if matches!(intent, Intent::DeleteGrapheme) {
+                    Some(IntentResult::empty())
+                } else {
+                    None
+                }
+            }),
+        );
+
+        // When looking up the hook.
+        let hook = routes.input_hook(&scope()).expect("hook registered");
+
+        // Then the hook serves the editing intent and declines others.
+        assert!(hook(&Intent::DeleteGrapheme).is_some());
+        assert!(hook(&Intent::Quit).is_none());
+    }
+
+    #[rstest::rstest]
+    #[test]
+    fn hook_scopes_enumerates_registered_scopes() {
+        // Given a table with one hook registered.
+        let routes = KeyRoutes::new();
+        routes.register_input_hook(&scope(), std::sync::Arc::new(|_: &Intent| None));
+
+        // When enumerating hook scopes.
+        let scopes = routes.hook_scopes();
+
+        // Then the registered scope is listed.
+        assert_eq!(scopes, vec![scope()]);
     }
 }

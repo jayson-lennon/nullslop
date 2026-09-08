@@ -30,10 +30,13 @@
 )]
 
 pub mod cell;
+pub mod slice_scope;
 pub mod slices;
 pub mod view;
 
 pub use cell::TypedCell;
+pub use slice_scope::DynamicIntent;
+pub use slice_scope::SliceScopeId;
 pub use slices::Slices;
 pub use slices::SlotTaken;
 pub use slices::SlotKey;

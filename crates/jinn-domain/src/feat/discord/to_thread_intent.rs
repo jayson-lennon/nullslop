@@ -17,21 +17,18 @@
 
 use crate::common::app_state::AppState;
 use crate::common::slices::Slices;
-use crate::feat::dashboard::ActorLifecycle;
-use crate::feat::dashboard::dashboard_slot;
 use crate::feat::discord::protocol::CreateThreadForSession;
+use crate::feat::discord::status_actor::ConnectionState;
+use crate::feat::discord::status_actor::discord_connection_slot;
 use crate::feat::session::chat_entry::ChatEntry;
 use crate::protocol::IntentResult;
-
-/// Dashboard actor name for the discord gateway task.
-const DISCORD_ACTOR_NAME: &str = "discord";
 
 /// Handle `Intent::ToDiscordThread`.
 ///
 /// Precondition chain (first failure wins):
 /// 1. Active session has a title (else "send a message first").
 /// 2. `[discord] enabled = true`.
-/// 3. The gateway dashboard entry is `Running` (i.e. `Connected`).
+/// 3. The gateway is connected (discord's own connection cell says so).
 /// 4. `[discord] forum_channel` is set.
 ///
 /// On success, emits [`CreateThreadForSession`] with the session id and title.
@@ -62,10 +59,10 @@ pub fn handle_to_discord_thread(state: &mut AppState, slices: &Slices) -> Intent
         return IntentResult::empty();
     }
 
-    // Precondition 3: the gateway task is connected. We read the dashboard
-    // slice entry's lifecycle (fed by DiscordStatusActor republishing its
-    // gateway status); the dashboard actor marks it `Running` on
-    // `DiscordStatusUpdate::Connected`.
+    // Precondition 3: the gateway task is connected. Discord owns this
+    // fact: its status actor folds `DiscordStatusUpdate::Connected` into
+    // the discord connection cell, which we read here. A removed
+    // dashboard cannot degrade this gate.
     if !discord_is_connected(slices) {
         push_error(
             state,
@@ -81,22 +78,16 @@ pub fn handle_to_discord_thread(state: &mut AppState, slices: &Slices) -> Intent
     IntentResult::new_message(CreateThreadForSession { session_id, title })
 }
 
-/// Returns `true` when the discord dashboard-slice entry is `Running`
-/// (connected). Resolves the slice through the [`Slices`] facade; an
+/// Returns `true` when discord's own connection cell reports the bot as
+/// connected. Resolves the slice through the [`Slices`] facade; an
 /// unregistered or mistyped slot reads as "not connected" — the caller
 /// pushes its own error, so no separate failure surface is needed.
 fn discord_is_connected(slices: &Slices) -> bool {
-    let dashboard_slot = dashboard_slot();
-    let Some(dashboard) = slices.reader::<crate::feat::dashboard::DashboardState>(&dashboard_slot)
-    else {
+    let connection_slot = discord_connection_slot();
+    let Some(connection) = slices.reader::<ConnectionState>(&connection_slot) else {
         return false;
     };
-    dashboard
-        .read()
-        .actors()
-        .iter()
-        .find(|e| e.name == DISCORD_ACTOR_NAME)
-        .is_some_and(|e| e.lifecycle == ActorLifecycle::Running)
+    connection.read().connected
 }
 
 /// Push an error `ChatEntry` into the active session's history.
@@ -117,14 +108,15 @@ mod tests {
     use super::handle_to_discord_thread;
     use crate::common::app_state::AppState;
     use crate::common::slices::Slices;
-    use crate::feat::dashboard::DashboardState;
-    use crate::feat::dashboard::dashboard_slot;
+    use crate::feat::discord::ConnectionState;
+    use crate::feat::discord::discord_connection_slot;
     use crate::feat::session::chat_entry::ChatEntryKind;
 
     /// Build the state + slices with the happy-path preconditions: a titled
     /// session, discord enabled + connected. (The gateway owns
     /// `forum_channel` validation, so the intent handler never reads it.)
-    /// The discord connectivity is seeded into the dashboard slice cell.
+    /// The discord connectivity is seeded into discord's own connection
+    /// cell — the same cell the status actor folds and this handler reads.
     fn happy_state() -> (AppState, Slices) {
         let mut state = AppState::default();
         state
@@ -133,9 +125,15 @@ mod tests {
         state.frontend.preferences.discord.enabled = true;
         let slices = Slices::new();
         let cell = slices
-            .register(dashboard_slot(), DashboardState::new())
+            .register(
+                discord_connection_slot(),
+                ConnectionState {
+                    connected: true,
+                    detail: None,
+                },
+            )
             .expect("fresh registry");
-        cell.update(|d| d.mark_running("discord", None));
+        cell.update(|c| c.connected = true);
         (state, slices)
     }
 
@@ -176,9 +174,15 @@ mod tests {
         state.frontend.preferences.discord.enabled = true;
         let slices = Slices::new();
         let cell = slices
-            .register(dashboard_slot(), DashboardState::new())
+            .register(
+                discord_connection_slot(),
+                ConnectionState {
+                    connected: true,
+                    detail: None,
+                },
+            )
             .expect("fresh registry");
-        cell.update(|d| d.mark_running("discord", None));
+        cell.update(|c| c.connected = true);
 
         // When handling ToDiscordThread.
         let result = handle_to_discord_thread(&mut state, &slices);
@@ -205,13 +209,13 @@ mod tests {
 
     #[rstest::rstest]
     fn bot_not_connected_pushes_error_and_emits_nothing() {
-        // Given the discord dashboard-slice entry is not Running.
+        // Given discord's own connection cell reports disconnected.
         let (mut state, slices) = happy_state();
-        let dashboard_slot = dashboard_slot();
+        let connection_slot = discord_connection_slot();
         let cell = slices
-            .reader::<DashboardState>(&dashboard_slot)
+            .reader::<ConnectionState>(&connection_slot)
             .expect("seeded");
-        cell.update(|d| d.mark_dead("discord", None));
+        cell.update(|c| c.connected = false);
 
         // When handling ToDiscordThread.
         let result = handle_to_discord_thread(&mut state, &slices);

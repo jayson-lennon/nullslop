@@ -71,7 +71,8 @@ fn render_provider_picker_shows_telescope_layout() {
     terminal
         .draw(|frame| {
             let area = frame.area();
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             render_provider_picker(frame, area, &ctx);
         })
         .unwrap();
@@ -102,7 +103,8 @@ fn render_provider_picker_uses_dark_gray_border() {
     terminal
         .draw(|frame| {
             let area = frame.area();
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             render_provider_picker(frame, area, &ctx);
         })
         .unwrap();
@@ -133,7 +135,8 @@ fn render_provider_picker_no_active_marker_for_active_model() {
     terminal
         .draw(|frame| {
             let area = frame.area();
-            let ctx = RenderCtx::new(&state);
+            let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
             render_provider_picker(frame, area, &ctx);
         })
         .unwrap();

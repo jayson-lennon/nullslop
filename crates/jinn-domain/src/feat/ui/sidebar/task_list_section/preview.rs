@@ -414,7 +414,8 @@ mod tests {
         let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
         terminal
             .draw(|f| {
-                let ctx = RenderCtx::new(app);
+                let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(app, &slices);
                 render_task_list_preview_for_state(f, sidebar_rect(), frame_area(), &ctx);
             })
             .unwrap();

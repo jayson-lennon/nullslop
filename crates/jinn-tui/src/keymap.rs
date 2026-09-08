@@ -94,11 +94,12 @@ fn add_picker_base(b: &mut ratatui_which_key::ScopeBuilder<KeyEvent, Scope, Inte
         });
 }
 
-/// Registers the would-be-global overlay/quake toggles on a non-terminal
+/// Registers the would-be-global terminal toggle on a non-terminal
 /// scope. Globals pierce capture mode (globals beat catch-alls), which used
-/// to strand the terminal control flag on `User`; keeping these as scope
-/// bindings makes capture mode hermetic while preserving the toggles
-/// everywhere else.
+/// to strand the terminal control flag on `User`; keeping this as a scope
+/// binding makes capture mode hermetic while preserving the toggle
+/// everywhere else. (The quake-bar open key is generated from the
+/// slice's route rows — see `keymap_gen`.)
 fn add_terminal_toggles(
     b: &mut ratatui_which_key::ScopeBuilder<KeyEvent, Scope, Intent, KeyCategory>,
 ) {
@@ -106,8 +107,7 @@ fn add_terminal_toggles(
         "<M-t>",
         Intent::ToggleTerminalOverlay { session_id: None },
         KeyCategory::General,
-    )
-    .bind("<M-`>", Intent::OpenQuakeBar, KeyCategory::General);
+    );
 }
 
 /// Builds and returns the full keymap with all scope bindings.
@@ -117,6 +117,30 @@ pub fn init() -> Keymap<KeyEvent, Scope, Intent, KeyCategory> {
     init_with_control_toggle(
         jinn_domain::feat::interactive_term::prefs::DEFAULT_CONTROL_TOGGLE_KEY,
     )
+}
+
+/// Builds the full keymap including slice route rows, mirroring the
+/// runtime composition order (`init` + `bind_route_rows`). Tests that
+/// exercise slice keys (quake open/close, dashboard rows) must query
+/// this — `init` alone carries no slice bindings, by design.
+#[must_use]
+pub fn init_with_slices() -> Keymap<KeyEvent, Scope, Intent, KeyCategory> {
+    let routes = jinn_domain::feat::composition_routes();
+    let mut keymap = init();
+    crate::keymap_gen::bind_route_rows(&routes, &mut keymap);
+    // The `<M-t>` overlay toggle is per-scope chrome (never a global: it
+    // must not pierce terminal capture). Dynamic scopes are non-terminal
+    // by construction, so every registered slice scope gets it too —
+    // mirroring what `add_terminal_toggles` does for static scopes.
+    for scope in crate::keymap_gen::dynamic_scopes(&routes) {
+        keymap.bind(
+            "<M-t>",
+            Intent::ToggleTerminalOverlay { session_id: None },
+            KeyCategory::General,
+            Scope::Dynamic(scope),
+        );
+    }
+    keymap
 }
 
 /// Builds the keymap with a configured terminal control-toggle binding.
@@ -426,20 +450,6 @@ pub fn init_with_control_toggle(control_toggle: &str) -> Keymap<KeyEvent, Scope,
             add_picker_base(b);
         });
 
-    // Dashboard scope - service status overview.
-    keymap.scope(Scope::Dashboard, |b| {
-        add_terminal_toggles(b);
-        b
-        .bind("<Tab>", Intent::SwitchTab, KeyCategory::General)
-        .bind("j", Intent::DashboardSelectDown, KeyCategory::Navigation)
-        .bind("k", Intent::DashboardSelectUp, KeyCategory::Navigation)
-        .bind("g", Intent::DashboardSelectFirst, KeyCategory::Navigation)
-        .bind("G", Intent::DashboardSelectLast, KeyCategory::Navigation)
-        .bind("q", Intent::Quit, KeyCategory::General)
-        .bind("<esc>", Intent::SwitchTab, KeyCategory::General)
-        .bind("?", Intent::ToggleWhichkey, KeyCategory::General);
-    });
-
     // TerminalView scope — watching an interactive_term session. Passive:
     // nothing forwards to the pty. The configured toggle key enters control
     // mode; `<M-t>` toggles the overlay closed (view mode holds no user
@@ -597,34 +607,6 @@ pub fn init_with_control_toggle(control_toggle: &str) -> Keymap<KeyEvent, Scope,
             });
     });
 
-    // Quake Bar scope — the global overlay console. Captures every keystroke;
-    // only <esc>/<M-`> dismiss it, and <M-t> jumps to the terminal overlay.
-    // The opening <M-`> keybind lives on every non-terminal scope (see
-    // add_terminal_toggles) instead of as a global binding: globals pierce
-    // the terminal scopes, which would strand the terminal control flag.
-    keymap.scope(Scope::QuakeBar, |b| {
-        add_terminal_toggles(b);
-        b.bind("<esc>", Intent::CloseQuakeBar, KeyCategory::General)
-            .bind("<M-`>", Intent::CloseQuakeBar, KeyCategory::General)
-            .bind("<enter>", Intent::SubmitQuakeBar, KeyCategory::Input)
-            .bind("<pgup>", Intent::QuakeBarScrollUp, KeyCategory::Navigation)
-            .bind("<pgdn>", Intent::QuakeBarScrollDown, KeyCategory::Navigation)
-            .bind("<backspace>", Intent::DeleteGrapheme, KeyCategory::Input)
-            .bind("<delete>", Intent::DeleteGraphemeForward, KeyCategory::Input)
-            .bind("<left>", Intent::MoveCursorLeft, KeyCategory::Input)
-            .bind("<right>", Intent::MoveCursorRight, KeyCategory::Input)
-            .bind("<home>", Intent::MoveCursorToStart, KeyCategory::Input)
-            .bind("<end>", Intent::MoveCursorToEnd, KeyCategory::Input)
-            .bind("<c-c>", Intent::CtrlClear, KeyCategory::General)
-            .catch_all(|key: KeyEvent| {
-                if let Key::Char(c) = key.key {
-                    Some(Intent::InsertChar { ch: c })
-                } else {
-                    None
-                }
-            });
-    });
-
     // No global bindings by design: globals survive every scope's catch-all
     // and would pierce TerminalControl's forwarding catch-all (stranding the
     // control flag on User) and TerminalView (popping the overlay). The two
@@ -678,7 +660,7 @@ mod tests {
         let scope = scope_for_focus(&jinn_domain::FocusScope::Picker { kind });
 
         // Then that scope has at least one binding group with a binding.
-        let groups = keymap.bindings_for_scope(scope);
+        let groups = keymap.bindings_for_scope(scope.clone());
         let binding_count: usize = groups.iter().map(|g| g.bindings.len()).sum();
         assert!(
             binding_count > 0,
@@ -708,13 +690,13 @@ mod tests {
         for scope in [
             Scope::Normal,
             Scope::Input,
-            Scope::Dashboard,
+            Scope::Dynamic(jinn_domain::feat::dashboard::dashboard_scope()),
             Scope::SidebarSessions,
-            Scope::QuakeBar,
+            Scope::Dynamic(jinn_domain::feat::quake_bar::quake_scope()),
         ] {
-            // Given the default keymap starting in `scope`.
-            let keymap = init();
-            let mut wk = WhichKeyInstance::new(keymap, scope);
+            // Given the default keymap (plus slice rows) starting in `scope`.
+            let keymap = init_with_slices();
+            let mut wk = WhichKeyInstance::new(keymap, scope.clone());
 
             // When pressing <M-t>.
             let intent = wk.handle_key(alt_t.clone());
@@ -742,7 +724,7 @@ mod tests {
         use jinn_domain::{Key, KeyEvent, Modifiers};
 
         let keymap = init();
-        let mut wk = WhichKeyInstance::new(keymap, scope);
+        let mut wk = WhichKeyInstance::new(keymap, scope.clone());
 
         // When pressing <M-t>.
         let alt_t = KeyEvent {
@@ -775,7 +757,7 @@ mod tests {
 
         // Then likewise no quake intent fires.
         assert!(
-            !matches!(intent, Some(Intent::OpenQuakeBar)),
+            !matches!(intent, Some(Intent::Dynamic(ref d)) if d.action == "open"),
             "{scope:?}: <M-`> must not open the quake bar; got {intent:?}"
         );
     }
@@ -788,7 +770,7 @@ mod tests {
     #[rstest::rstest]
     #[case(Scope::Normal)]
     #[case(Scope::Input)]
-    #[case(Scope::Dashboard)]
+    #[case(Scope::Dynamic(jinn_domain::feat::dashboard::dashboard_scope()))]
     #[case(Scope::SidebarPersona)]
     #[case(Scope::SidebarPins)]
     #[case(Scope::SidebarSessions)]
@@ -814,15 +796,16 @@ mod tests {
     #[case(Scope::PrunerAccumulationInput)]
     #[case(Scope::CwdInput)]
     #[case(Scope::ProjectAddInput)]
-    #[case(Scope::QuakeBar)]
+    #[case(Scope::Dynamic(jinn_domain::feat::quake_bar::quake_scope()))]
     #[case(Scope::TerminalView)]
     fn alt_t_resolves_in_every_non_terminal_scope(#[case] scope: Scope) {
         use crate::app::WhichKeyInstance;
         use jinn_domain::{Key, KeyEvent, Modifiers};
 
-        // Given the default keymap queried in a non-terminal scope.
-        let keymap = init();
-        let mut wk = WhichKeyInstance::new(keymap, scope);
+        // Given the default keymap (plus slice rows) queried in a
+        // non-terminal scope.
+        let keymap = init_with_slices();
+        let mut wk = WhichKeyInstance::new(keymap, scope.clone());
 
         // When pressing <M-t>.
         let alt_t = KeyEvent {
@@ -854,7 +837,7 @@ mod tests {
     #[rstest::rstest]
     #[case(Scope::Normal)]
     #[case(Scope::Input)]
-    #[case(Scope::Dashboard)]
+    #[case(Scope::Dynamic(jinn_domain::feat::dashboard::dashboard_scope()))]
     #[case(Scope::SidebarPersona)]
     #[case(Scope::SidebarPins)]
     #[case(Scope::SidebarSessions)]
@@ -879,14 +862,15 @@ mod tests {
     #[case(Scope::PrunerAccumulationInput)]
     #[case(Scope::CwdInput)]
     #[case(Scope::ProjectAddInput)]
-    #[case(Scope::QuakeBar)]
+    #[case(Scope::Dynamic(jinn_domain::feat::quake_bar::quake_scope()))]
     fn quake_backtick_resolves_in_every_non_terminal_scope(#[case] scope: Scope) {
         use crate::app::WhichKeyInstance;
         use jinn_domain::{Key, KeyEvent, Modifiers};
 
-        // Given the default keymap queried in a non-terminal scope.
-        let keymap = init();
-        let mut wk = WhichKeyInstance::new(keymap, scope);
+        // Given the default keymap (plus slice rows) queried in a
+        // non-terminal scope.
+        let keymap = init_with_slices();
+        let mut wk = WhichKeyInstance::new(keymap, scope.clone());
 
         // When pressing <M-`>.
         let alt_backtick = KeyEvent {
@@ -900,17 +884,19 @@ mod tests {
         let intent = wk.handle_key(alt_backtick);
 
         // Then it resolves (QuakeBar binds <M-`> to *close*, the rest open).
-        let expected_close = scope == Scope::QuakeBar;
-        match intent {
-            Some(Intent::OpenQuakeBar) if !expected_close => {}
-            Some(Intent::CloseQuakeBar) if expected_close => {}
-            other => panic!(
-                "{scope:?}: <M-`> must resolve to {} (got {other:?})",
-                if expected_close {
-                    "CloseQuakeBar"
-                } else {
-                    "OpenQuakeBar"
-                },
+        let quake_scope = jinn_domain::feat::quake_bar::quake_scope();
+        let expected_close = matches!(&scope, Scope::Dynamic(id) if *id == quake_scope);
+        let resolved = intent.expect("{scope:?}: <M-`> must resolve; got None");
+        match &resolved {
+            Intent::Dynamic(d) if d.action == "close" => {
+                assert!(expected_close, "{scope:?}: got close, expected open");
+            }
+            Intent::Dynamic(d) if d.action == "open" => {
+                assert!(!expected_close, "{scope:?}: got open, expected close");
+            }
+            other => assert!(
+                false,
+                "{scope:?}: expected the quake open/close action, got {other:?}"
             ),
         }
     }
@@ -1101,7 +1087,7 @@ mod tests {
         use crate::app::WhichKeyInstance;
         use jinn_domain::{Key, KeyEvent, Modifiers};
 
-        let keymap = init();
+        let keymap = init_with_slices();
         let mut wk = WhichKeyInstance::new(keymap, Scope::Input);
 
         // When pressing <M-`> (Alt+backtick).
@@ -1115,14 +1101,14 @@ mod tests {
         };
         let intent = wk.handle_key(alt_backtick);
 
-        // Then it resolves to OpenQuakeBar, NOT a literal InsertChar('`') —
+        // Then it resolves to the quake opener, NOT a literal InsertChar('`') —
         // the scope binding beats the Input catch-all.
         let intent = intent.expect(
             "<M-`> in Input scope must fire an intent; got None (scope binding missing, catch-all regression)",
         );
         assert!(
-            matches!(intent, Intent::OpenQuakeBar),
-            "<M-`> must resolve to OpenQuakeBar, not InsertChar; got {intent:?}",
+            matches!(intent, Intent::Dynamic(ref d) if d.action == "open"),
+            "<M-`> must resolve to the quake opener, not InsertChar; got {intent:?}",
         );
     }
 
@@ -1133,8 +1119,8 @@ mod tests {
         use crate::app::WhichKeyInstance;
         use jinn_domain::{Key, KeyEvent, Modifiers};
 
-        let keymap = init();
-        let mut wk = WhichKeyInstance::new(keymap, Scope::QuakeBar);
+        let keymap = init_with_slices();
+        let mut wk = WhichKeyInstance::new(keymap, Scope::Dynamic(jinn_domain::feat::quake_bar::quake_scope()));
 
         // When pressing ESC.
         let esc = KeyEvent {
@@ -1147,11 +1133,11 @@ mod tests {
         };
         let intent = wk.handle_key(esc);
 
-        // Then it resolves to CloseQuakeBar (which pops the quake bar scope).
+        // Then it resolves to the quake close action (which pops the quake bar scope).
         let intent = intent.expect("ESC in QuakeBar scope must fire an intent");
         assert!(
-            matches!(intent, Intent::CloseQuakeBar),
-            "ESC must resolve to CloseQuakeBar; got {intent:?}",
+            matches!(intent, Intent::Dynamic(ref d) if d.action == "close"),
+            "ESC must resolve to the quake close action; got {intent:?}",
         );
     }
 
@@ -1162,8 +1148,8 @@ mod tests {
         use crate::app::WhichKeyInstance;
         use jinn_domain::{Key, KeyEvent, Modifiers};
 
-        let keymap = init();
-        let mut wk = WhichKeyInstance::new(keymap, Scope::QuakeBar);
+        let keymap = init_with_slices();
+        let mut wk = WhichKeyInstance::new(keymap, Scope::Dynamic(jinn_domain::feat::quake_bar::quake_scope()));
 
         // When pressing <M-`> (the scoped close binding, overriding the global opener).
         let meta_backtick = KeyEvent {
@@ -1176,12 +1162,12 @@ mod tests {
         };
         let intent = wk.handle_key(meta_backtick);
 
-        // Then it resolves to CloseQuakeBar, making <M-`> a toggle (specific-scope-wins
-        // over the global OpenQuakeBar).
+        // Then it resolves to close, making <M-`> a toggle (specific-scope-wins
+        // over the global opener).
         let intent = intent.expect("<M-`> in QuakeBar scope must fire an intent");
         assert!(
-            matches!(intent, Intent::CloseQuakeBar),
-            "<M-`> in QuakeBar scope must resolve to CloseQuakeBar (toggle); got {intent:?}",
+            matches!(intent, Intent::Dynamic(ref d) if d.action == "close"),
+            "<M-`> in QuakeBar scope must resolve to close (toggle); got {intent:?}",
         );
     }
 
@@ -1192,8 +1178,8 @@ mod tests {
         use crate::app::WhichKeyInstance;
         use jinn_domain::{Key, KeyEvent, Modifiers};
 
-        let keymap = init();
-        let mut wk = WhichKeyInstance::new(keymap, Scope::QuakeBar);
+        let keymap = init_with_slices();
+        let mut wk = WhichKeyInstance::new(keymap, Scope::Dynamic(jinn_domain::feat::quake_bar::quake_scope()));
 
         // When pressing a plain printable char.
         let key_x = KeyEvent {
@@ -1206,11 +1192,13 @@ mod tests {
         };
         let intent = wk.handle_key(key_x);
 
-        // Then it resolves to InsertChar('x') (full keystroke capture).
-        let intent = intent.expect("printable char in QuakeBar scope must fire an intent");
+        // Then which-key itself resolves nothing: the quake bar's typing
+        // capture is the slice's input hook, consulted by the intent
+        // handler (see feat::quake_bar::intent tests), not a keymap
+        // catch-all — so the keymap must not synthesize an intent here.
         assert!(
-            matches!(intent, Intent::InsertChar { ch: 'x' }),
-            "printable char must route to InsertChar; got {intent:?}",
+            intent.is_none(),
+            "printable char must not resolve in the keymap; capture is the slice input hook; got {intent:?}",
         );
     }
 
@@ -1221,8 +1209,8 @@ mod tests {
         use crate::app::WhichKeyInstance;
         use jinn_domain::{Key, KeyEvent, Modifiers};
 
-        let keymap = init();
-        let mut wk = WhichKeyInstance::new(keymap, Scope::QuakeBar);
+        let keymap = init_with_slices();
+        let mut wk = WhichKeyInstance::new(keymap, Scope::Dynamic(jinn_domain::feat::quake_bar::quake_scope()));
 
         // When pressing PageUp.
         let pgup = KeyEvent {
@@ -1235,11 +1223,11 @@ mod tests {
         };
         let intent = wk.handle_key(pgup);
 
-        // Then it resolves to QuakeBarScrollUp (so the log actually scrolls).
+        // Then it resolves to the quake scroll-up action (so the log actually scrolls).
         let intent = intent.expect("PageUp in QuakeBar scope must fire an intent");
         assert!(
-            matches!(intent, Intent::QuakeBarScrollUp),
-            "PageUp must resolve to QuakeBarScrollUp; got {intent:?}",
+            matches!(intent, Intent::Dynamic(ref d) if d.action == "scroll-up"),
+            "PageUp must resolve to the quake scroll-up action; got {intent:?}",
         );
     }
 
@@ -2067,7 +2055,9 @@ mod leak_check {
             jinn_domain::Intent,
             crate::keymap::KeyCategory,
         > = init();
-        let groups = keymap.bindings_for_scope(Scope::Dashboard);
+        let groups = keymap.bindings_for_scope(Scope::Dynamic(
+            jinn_domain::feat::dashboard::dashboard_scope(),
+        ));
         let all_desc: Vec<&str> = groups
             .iter()
             .flat_map(|g| g.bindings.iter().map(|b| b.description.as_str()))

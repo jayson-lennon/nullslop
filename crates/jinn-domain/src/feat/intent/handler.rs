@@ -31,7 +31,7 @@
 
 use crate::AppState;
 
-use crate::protocol::{PickerKind, PinPosition};
+use crate::protocol::{PickerKind, PinPosition, ScopeSignal};
 
 use crate::Intent;
 use crate::feat;
@@ -48,12 +48,83 @@ use crate::IntentResult;
 /// (e.g., opening an external editor, toggling a popup).
 pub struct IntentHandler;
 
-/// Fallback for dashboard-selection intents when no route row serves them
-/// (empty route table, e.g. minimal test wiring). The handler itself writes
-/// nothing: navigation is owned by the dashboard actor via `DashboardNav`.
-fn unhandled_dashboard_select() -> IntentResult {
-    tracing::debug!("dashboard select intent arrived with no route row attached");
-    IntentResult::empty()
+/// Applies a route result's scope signal to the scope stack.
+///
+/// The handler is the exempt single-writer of `scope_stack`; slices
+/// request transitions as data ([`ScopeSignal`]) and this is where they
+/// land. Runs before the result's messages publish (see
+/// [`IntentResult::scope_signal`]).
+fn apply_scope_signal(result: &mut IntentResult, state: &mut AppState) {
+    use crate::common::app_state::FocusScope;
+    if let Some(signal) = result.scope_signal.take() {
+        match signal {
+            ScopeSignal::Push(id) => state.frontend.scope_stack.push(FocusScope::Dynamic(id)),
+            ScopeSignal::PopIf(id) => {
+                if matches!(state.frontend.scope_stack.current(), FocusScope::Dynamic(cur) if *cur == id)
+                {
+                    state.frontend.scope_stack.pop();
+                }
+            }
+        }
+    }
+}
+
+/// Consults the active dynamic scope's registered input hook.
+///
+/// A hit means the keystroke belonged to the slice's own input surface:
+/// the hook performed the synchronous write and the intent is consumed.
+/// Returns `None` outside dynamic scopes or when no hook is registered
+/// (or the hook declines the intent) — the caller falls through to the
+/// built-in arms.
+fn try_slice_input_hook(
+    intent: &Intent,
+    state: &mut AppState,
+    routes: &crate::common::slices::key_routes::KeyRoutes,
+) -> Option<IntentResult> {
+    use crate::common::app_state::FocusScope;
+    let FocusScope::Dynamic(scope) = state.frontend.scope_stack.current() else {
+        return None;
+    };
+    let hook = routes.input_hook(scope)?;
+    hook(intent)
+}
+
+/// Resolves the base scope after a `<Tab>` switch, walking the
+/// registered tab scopes.
+///
+/// Tabs are declared by slices (tab descriptors registered at
+/// activation); composition keeps the ordered list on `Slices`. With no
+/// dynamic tab registered, `<Tab>` is a no-op round-trip to Normal —
+/// the chat tab is the only tab.
+fn next_tab_base(
+    state: &AppState,
+    slices: &crate::common::slices::Slices,
+) -> crate::common::app_state::FocusScope {
+    use crate::common::app_state::FocusScope;
+
+    // The chat tab (Normal) is always first in the cycle, so the walk
+    // is: Normal → tab[0] → … → tab[n-1] → Normal.
+    let tabs = tab_scopes(slices);
+    if tabs.is_empty() {
+        return FocusScope::Normal;
+    }
+    let current = state.frontend.scope_stack.base();
+    let position = match current {
+        FocusScope::Dynamic(id) => tabs.iter().position(|tab| tab == id),
+        _ => None,
+    };
+    match position {
+        // Currently on a dynamic tab: advance, wrapping back to chat.
+        Some(i) if i + 1 < tabs.len() => FocusScope::Dynamic(tabs[i + 1].clone()),
+        Some(_) => FocusScope::Normal,
+        // On chat (or any other base): enter the first dynamic tab.
+        None => FocusScope::Dynamic(tabs[0].clone()),
+    }
+}
+
+/// The registered tab scope ids, in tab order.
+fn tab_scopes(slices: &crate::common::slices::Slices) -> Vec<jinn_slices::SliceScopeId> {
+    slices.tab_scopes()
 }
 
 impl IntentHandler {
@@ -93,6 +164,14 @@ impl IntentHandler {
     }
 
     /// Internal intent dispatch — separated from `handle` to allow post-processing.
+    ///
+    /// Dispatch order:
+    /// 1. Slice route rows (dynamic intents + globally-toggled slice
+    ///    actions). A hit applies any scope signal, then returns.
+    /// 2. Slice input hooks: while a dynamic scope with a registered
+    ///    hook is active, editing intents route to the hook (sync write
+    ///    of the slice's own state — the typing carve-out).
+    /// 3. Built-in arms.
     #[expect(
         clippy::too_many_lines,
         reason = "exhaustive match on all Intent variants"
@@ -103,9 +182,23 @@ impl IntentHandler {
         slices: &crate::common::slices::Slices,
         routes: &crate::common::slices::key_routes::KeyRoutes,
     ) -> IntentResult {
-        // Feature-registered routes go first: a bound intent is delegated
-        // to its feature's message and never reaches the built-in arms.
-        if let Some(result) = routes.action_for(intent) {
+        // Slice-registered routes go first: a dynamic intent is
+        // delegated to its slice's action and never reaches the
+        // built-in arms. An unregistered dynamic intent resolves to
+        // None and falls through to the sweep-reset guard below, which
+        // treats it like any other non-x action.
+        if let Some(mut result) = routes.action_for(intent) {
+            // Scope transitions apply before the messages publish so a
+            // slice that opens itself is on the stack before any bus
+            // subscriber could observe a message.
+            apply_scope_signal(&mut result, state);
+            return result;
+        }
+
+        // Slice input hooks: the active dynamic scope's synchronous
+        // editing surface. A hit means the keystroke belonged to the
+        // slice (typing carve-out), so the intent is consumed here.
+        if let Some(result) = try_slice_input_hook(intent, state, routes) {
             return result;
         }
 
@@ -289,74 +382,6 @@ impl IntentHandler {
             {
                 // ESC cancels project-add input - pop scope, clear state.
                 feat::project_add_input::intent::handle_project_add_input_leave(state)
-            }
-
-            // The quake bar captures ALL keystrokes while open; these guards
-            // route editing intents to the quake bar instead of chat input.
-            Intent::InsertChar { ch }
-                if matches!(
-                    state.frontend.scope_stack.current(),
-                    crate::common::app_state::FocusScope::QuakeBar
-                ) =>
-            {
-                feat::quake_bar::intent::handle_insert_char(state, *ch)
-            }
-            Intent::DeleteGrapheme
-                if matches!(
-                    state.frontend.scope_stack.current(),
-                    crate::common::app_state::FocusScope::QuakeBar
-                ) =>
-            {
-                feat::quake_bar::intent::handle_delete(state)
-            }
-            Intent::DeleteGraphemeForward
-                if matches!(
-                    state.frontend.scope_stack.current(),
-                    crate::common::app_state::FocusScope::QuakeBar
-                ) =>
-            {
-                feat::quake_bar::intent::handle_delete_forward(state)
-            }
-            Intent::MoveCursorLeft
-                if matches!(
-                    state.frontend.scope_stack.current(),
-                    crate::common::app_state::FocusScope::QuakeBar
-                ) =>
-            {
-                feat::quake_bar::intent::handle_cursor_left(state)
-            }
-            Intent::MoveCursorRight
-                if matches!(
-                    state.frontend.scope_stack.current(),
-                    crate::common::app_state::FocusScope::QuakeBar
-                ) =>
-            {
-                feat::quake_bar::intent::handle_cursor_right(state)
-            }
-            Intent::MoveCursorToStart
-                if matches!(
-                    state.frontend.scope_stack.current(),
-                    crate::common::app_state::FocusScope::QuakeBar
-                ) =>
-            {
-                feat::quake_bar::intent::handle_cursor_to_start(state)
-            }
-            Intent::MoveCursorToEnd
-                if matches!(
-                    state.frontend.scope_stack.current(),
-                    crate::common::app_state::FocusScope::QuakeBar
-                ) =>
-            {
-                feat::quake_bar::intent::handle_cursor_to_end(state)
-            }
-            Intent::EnterNormalMode
-                if matches!(
-                    state.frontend.scope_stack.current(),
-                    crate::common::app_state::FocusScope::QuakeBar
-                ) =>
-            {
-                // ESC closes the quake bar overlay.
-                feat::quake_bar::intent::handle_close(state)
             }
 
             // Editing intents are no-ops when the active session's input box is disabled.
@@ -730,11 +755,13 @@ impl IntentHandler {
                 feat::project_add_input::intent::handle_project_add_input_leave(state)
             }
 
-            Intent::OpenQuakeBar => feat::quake_bar::intent::handle_open(state),
-            Intent::CloseQuakeBar => feat::quake_bar::intent::handle_close(state),
-            Intent::SubmitQuakeBar => feat::quake_bar::intent::handle_submit(state),
-            Intent::QuakeBarScrollUp => feat::quake_bar::intent::handle_scroll_up(state),
-            Intent::QuakeBarScrollDown => feat::quake_bar::intent::handle_scroll_down(state),
+            Intent::Dynamic(_) => {
+                // Unregistered dynamic intents are inert by construction:
+                // a slice that never attached a route row for this action
+                // must not fall into a built-in arm.
+                tracing::debug!("dynamic intent arrived with no route row attached");
+                IntentResult::empty()
+            }
             Intent::TaskListPreviewScrollUp => {
                 feat::ui::sidebar::task_list_section::handle_preview_scroll_up(state)
             }
@@ -746,12 +773,16 @@ impl IntentHandler {
                 crate::feat::navigation::intent::handle_change_cwd(state, *root)
             }
 
-            // ── Dashboard tab ──
+            // ── Tabs ──
             Intent::SwitchTab => {
-                // Tab cycle: Normal ↔ Dashboard. The terminal is an overlay
-                // (<M-t>), not a tab: switching tabs with the overlay open
-                // closes it first (Esc semantics). While the user holds
-                // control, Tab is inert — handback is the only exit.
+                // Tab cycle across the registered tab scopes: the
+                // composition-owned helper resolves the next base scope
+                // from the slices' tab registry (chat when no dynamic
+                // tab is registered). The terminal is an overlay
+                // (<M-t>), not a tab: switching tabs with the overlay
+                // open closes it first (Esc semantics). While the user
+                // holds control, Tab is inert — handback is the only
+                // exit.
                 match state.frontend.scope_stack.current() {
                     crate::common::app_state::FocusScope::TerminalView => {
                         state.frontend.scope_stack.pop();
@@ -762,24 +793,10 @@ impl IntentHandler {
                     }
                     _ => {}
                 }
-                let new_base = match state.frontend.scope_stack.base() {
-                    crate::common::app_state::FocusScope::Dashboard => {
-                        crate::common::app_state::FocusScope::Normal
-                    }
-                    _ => crate::common::app_state::FocusScope::Dashboard,
-                };
+                let new_base = next_tab_base(state, slices);
                 state.frontend.scope_stack.swap_base(new_base);
                 IntentResult::empty()
             }
-            // Dashboard navigation is feature-routed: the dashboard feature's
-            // rows in `KeyRoutes` map these intents to `DashboardNav`
-            // messages for the dashboard actor. This arm is the unbound
-            // fallback (empty table / test wiring) — the handler itself
-            // writes nothing.
-            Intent::DashboardSelectUp
-            | Intent::DashboardSelectDown
-            | Intent::DashboardSelectFirst
-            | Intent::DashboardSelectLast => unhandled_dashboard_select(),
             Intent::ToDiscordThread => {
                 feat::discord::to_thread_intent::handle_to_discord_thread(state, slices)
             }
@@ -1909,28 +1926,41 @@ mod tests {
     }
 
     #[rstest::rstest]
-    fn switch_tab_reverts_to_dashboard_and_normal() {
-        // Given default (Normal) state.
+    fn switch_tab_with_no_registered_tab_stays_normal() {
+        // Given default (Normal) state and no dynamic tab registered.
+        let mut state = AppState::default();
+
+        // When switching tabs.
+        IntentHandler::handle(
+            &Intent::SwitchTab,
+            &mut state,
+            &empty_slices(),
+            &empty_routes(),
+        );
+
+        // Then the base is Normal (chat is the only tab).
+        assert_eq!(state.frontend.scope_stack.base(), &FocusScope::Normal);
+    }
+
+    #[rstest::rstest]
+    fn switch_tab_cycles_through_registered_tabs() {
+        // Given a slices registry with one dynamic tab registered.
+        let slices = crate::common::slices::Slices::new();
+        let tab = jinn_slices::SliceScopeId::new("dashboard", "tab");
+        slices.register_tab_scope(
+            tab.clone(),
+            jinn_slices::SlotKey::builtin("dashboard", "tab"),
+        );
         let mut state = AppState::default();
 
         // When switching tabs twice.
-        IntentHandler::handle(
-            &Intent::SwitchTab,
-            &mut state,
-            &empty_slices(),
-            &empty_routes(),
-        );
-        // Then the base is Dashboard.
-        assert_eq!(state.frontend.scope_stack.base(), &FocusScope::Dashboard);
+        IntentHandler::handle(&Intent::SwitchTab, &mut state, &slices, &empty_routes());
+        // Then the base is the registered tab.
+        assert_eq!(state.frontend.scope_stack.base(), &FocusScope::Dynamic(tab.clone()));
 
         // When switching tabs again.
-        IntentHandler::handle(
-            &Intent::SwitchTab,
-            &mut state,
-            &empty_slices(),
-            &empty_routes(),
-        );
-        // Then the base is Normal (no Terminal tab in the cycle).
+        IntentHandler::handle(&Intent::SwitchTab, &mut state, &slices, &empty_routes());
+        // Then the cycle wraps to Normal.
         assert_eq!(state.frontend.scope_stack.base(), &FocusScope::Normal);
     }
 

@@ -80,7 +80,8 @@ mod tests {
         let mut terminal = Terminal::new(TestBackend::new(60, 20)).expect("terminal");
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
                 render_reasoning_effort_picker(frame, area, &ctx);
             })
             .expect("draw");

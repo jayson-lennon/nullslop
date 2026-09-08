@@ -227,7 +227,8 @@ mod tests {
             let mut terminal = Terminal::new(backend).expect("terminal");
             terminal
                 .draw(|frame| {
-                    let ctx = RenderCtx::new(state);
+                    let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(state, &slices);
                     render_skill_picker(frame, area, &ctx);
                 })
                 .expect("draw");
@@ -285,7 +286,8 @@ mod tests {
             let mut terminal = Terminal::new(backend).expect("terminal");
             terminal
                 .draw(|frame| {
-                    let ctx = RenderCtx::new(&state);
+                    let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
                     render_skill_picker(frame, area, &ctx);
                 })
                 .expect("draw");
@@ -341,7 +343,8 @@ mod tests {
             let mut terminal = Terminal::new(backend).expect("terminal");
             terminal
                 .draw(|frame| {
-                    let ctx = RenderCtx::new(state);
+                    let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(state, &slices);
                     render_skill_picker(frame, area, &ctx);
                 })
                 .expect("draw");
@@ -405,7 +408,8 @@ mod tests {
             let mut terminal = Terminal::new(backend).expect("terminal");
             terminal
                 .draw(|frame| {
-                    let ctx = RenderCtx::new(state);
+                    let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(state, &slices);
                     render_skill_picker(frame, area, &ctx);
                 })
                 .expect("draw");
@@ -454,7 +458,8 @@ mod tests {
         let mut terminal = Terminal::new(backend).expect("terminal");
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
                 let area = Rect::new(0, 0, 100, 30);
                 render_project_picker(frame, area, &ctx);
             })
@@ -536,7 +541,8 @@ mod tests {
         let mut terminal = Terminal::new(backend).expect("terminal");
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
                 let area = Rect::new(0, 0, 100, 30);
                 render_skill_picker(frame, area, &ctx);
             })

@@ -125,7 +125,7 @@ impl ActorSystemBuilder {
         Services,
         Option<kanal::AsyncReceiver<jinn_domain::feat::discord::BridgeEvent>>,
         Option<kanal::AsyncReceiver<jinn_domain::feat::discord::GatewayRequest>>,
-        kanal::Sender<jinn_domain::feat::dashboard::status_actor::DiscordStatusUpdate>,
+        kanal::Sender<jinn_domain::feat::discord::DiscordStatusUpdate>,
     ) {
         let ActorSystemBuilderArgs {
             handle,
@@ -181,7 +181,7 @@ impl ActorSystemBuilder {
 
         let root = jinn_domain::common::root_supervisor::RootSupervisor::spawn_root().await;
 
-        let services = Services {
+        let mut services = Services {
             paths: paths.clone(),
             handle: handle.clone(),
             llm_service: llm_service.clone(),
@@ -241,17 +241,30 @@ impl ActorSystemBuilder {
 
         // ── Discord status actor ───────────────────────────────────────
         // A pure translator: drains the gateway kanal channel and
-        // republishes DiscordStatusUpdate on the bus. The DashboardActor
-        // above consumes it. Spawned after the dashboard actor so its
-        // publications are not missed.
+        // republishes DiscordStatusUpdate on the bus, folding the
+        // authoritative connection fact into discord's own cell. The
+        // DashboardActor above consumes the event for display only.
+        // Spawned after the dashboard actor so its publications are not
+        // missed.
         let (discord_status_tx, discord_status_rx) =
-            kanal::unbounded::<jinn_domain::feat::dashboard::status_actor::DiscordStatusUpdate>();
+            kanal::unbounded::<jinn_domain::feat::discord::DiscordStatusUpdate>();
+        let connection_cell = services
+            .slices
+            .register(
+                jinn_domain::feat::discord::discord_connection_slot(),
+                jinn_domain::feat::discord::ConnectionState {
+                    connected: false,
+                    detail: None,
+                },
+            )
+            .expect("discord connection slot is registered exactly once at wiring");
         let _discord_status =
-            jinn_domain::feat::dashboard::status_actor::DiscordStatusActor::supervise(
+            jinn_domain::feat::discord::DiscordStatusActor::supervise(
                 &root,
-                jinn_domain::feat::dashboard::status_actor::DiscordStatusActorDeps {
+                jinn_domain::feat::discord::DiscordStatusActorDeps {
                     deps: actor_deps.clone(),
                     status_rx: discord_status_rx.to_async(),
+                    cell: connection_cell,
                 },
             )
             .restart_policy(kameo::supervision::RestartPolicy::Never)
@@ -351,23 +364,10 @@ jinn_domain::feat::preferences_actor::preferences_actor::PreferencesActor::super
             .await
         );
 
-        // Quake bar: owns the command log; sole subscriber of SubmitQuakeBarCommand.
-        let _quake_bar = spawn_tracked!(
-            &services.bus,
-            "quake-bar",
-            "QuakeBarActor",
-            jinn_domain::feat::quake_bar::quake_bar_actor::QuakeBarActor::supervise(
-                &root,
-                jinn_domain::feat::quake_bar::quake_bar_actor::QuakeBarActorDeps {
-                    deps: actor_deps.clone(),
-                    state: state.clone(),
-                    cap: jinn_domain::common::tcaps::mint::mint_frontend_cap(),
-                },
-            )
-            .restart_policy(kameo::supervision::RestartPolicy::Never)
-            .spawn()
-            .await
-        );
+        // Quake bar slice: activation mints the cell, spawns the actor
+        // (submit-log writer), attaches rows, and registers the input
+        // hook + overlay geometry. Composition owns exactly this call.
+        jinn_domain::feat::quake_bar::activate(&mut services);
 
         // ── Domain actors ──────────────────────────────────────────────────
 

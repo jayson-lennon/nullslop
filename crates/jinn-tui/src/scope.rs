@@ -8,7 +8,12 @@
 ///
 /// Controls which keybindings are active. Set via
 /// [`ratatui_which_key::WhichKeyState::set_scope`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+///
+/// Static variants are the composition-owned scopes. A slice's dynamic
+/// scope ([`Scope::Dynamic`]) carries its identity as data, so slices
+/// never edit this enum; their keymap bindings are generated from
+/// registered route rows.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Scope {
     /// Normal mode - navigation and commands.
     Normal,
@@ -61,8 +66,13 @@ pub enum Scope {
     RenameSessionInput,
     /// CWD input mode - typing a directory path.
     CwdInput,
-    /// Dashboard tab — service status overview.
-    Dashboard,
+
+    /// A dynamically-registered slice's scope.
+    ///
+    /// Derives `Ord` on the inner string-based id (which-key stores
+    /// catch-all handlers in a `BTreeMap<S, _>`), so the derived
+    /// ordering is required, not hand-rolled.
+    Dynamic(jinn_slices::SliceScopeId),
     /// Terminal tab — viewing an `interactive_term` session (passive).
     TerminalView,
     /// Terminal control — keys forward to the pty; handback key exits.
@@ -71,9 +81,6 @@ pub enum Scope {
     ProjectAddInput,
     /// Pruner accumulation threshold input mode - numeric input for the KV-cache gate.
     PrunerAccumulationInput,
-
-    /// Quake bar overlay - global console. Captures all keystrokes while open.
-    QuakeBar,
 
     /// Sidebar resize mode - adjusting sidebar width.
     SidebarResize,
@@ -104,7 +111,7 @@ impl std::fmt::Display for Scope {
             Self::PickerMcpServer => write!(f, "Picker(mcp-server)"),
             Self::PickerPlugin => write!(f, "Picker(plugin)"),
             Self::Input => write!(f, "Input"),
-            Self::Dashboard => write!(f, "Dashboard"),
+            Self::Dynamic(id) => write!(f, "dynamic:{id}"),
             Self::TerminalView => write!(f, "TerminalView"),
             Self::TerminalControl => write!(f, "TerminalControl"),
             Self::ArgInput => write!(f, "ArgInput"),
@@ -114,7 +121,6 @@ impl std::fmt::Display for Scope {
             Self::CwdInput => write!(f, "CwdInput"),
             Self::ProjectAddInput => write!(f, "ProjectAddInput"),
             Self::PrunerAccumulationInput => write!(f, "PrunerAccumulationInput"),
-            Self::QuakeBar => write!(f, "QuakeBar"),
         }
     }
 }
@@ -123,6 +129,14 @@ impl std::str::FromStr for Scope {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // Dynamic scopes parse first: `dynamic:<slice>:<name>` is the
+        // Display inverse and must round-trip.
+        if let Some(rest) = s.strip_prefix("dynamic:") {
+            let id = rest
+                .parse::<jinn_slices::SliceScopeId>()
+                .map_err(|()| ())?;
+            return Ok(Self::Dynamic(id));
+        }
         match s {
             "Normal" => Ok(Self::Normal),
             "SidebarPersona" => Ok(Self::SidebarPersona),
@@ -146,14 +160,12 @@ impl std::str::FromStr for Scope {
             "Picker(mcp-server)" => Ok(Self::PickerMcpServer),
             "Picker(plugin)" => Ok(Self::PickerPlugin),
             "Input" => Ok(Self::Input),
-            "Dashboard" => Ok(Self::Dashboard),
             "ArgInput" => Ok(Self::ArgInput),
             "TokenBudgetInput" => Ok(Self::TokenBudgetInput),
             "RenameSessionInput" => Ok(Self::RenameSessionInput),
             "CwdInput" => Ok(Self::CwdInput),
             "ProjectAddInput" => Ok(Self::ProjectAddInput),
             "PrunerAccumulationInput" => Ok(Self::PrunerAccumulationInput),
-            "QuakeBar" => Ok(Self::QuakeBar),
             "SidebarResize" => Ok(Self::SidebarResize),
 
             _ => Err(()),
@@ -184,15 +196,17 @@ mod tests {
 
     #[rstest::rstest]
     #[test]
-    fn dashboard_scope_round_trips() {
-        // Given the Dashboard scope variant.
+    fn dynamic_scope_round_trips() {
+        // Given a dynamic scope carrying a slice scope id.
+        let scope = Scope::Dynamic(jinn_slices::SliceScopeId::new("quake-bar", "open"));
+
         // When formatting then parsing back.
-        // Then the round-trip preserves the variant.
-        let s = Scope::Dashboard.to_string();
-        assert_eq!(s, "Dashboard");
+        let s = scope.to_string();
+        // Then the display form is the `dynamic:` prefixed key.
+        assert_eq!(s, "dynamic:quake-bar:open");
         assert_eq!(
             Scope::from_str(&s),
-            Ok(Scope::Dashboard),
+            Ok(scope),
             "Display/FromStr should round-trip"
         );
     }

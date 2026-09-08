@@ -15,21 +15,74 @@
 //! [`DashboardActor`] owns the dashboard's slice cell (registered under
 //! `dashboard:status` in the [`Slices`](crate::common::slices::Slices)
 //! facade). It subscribes to the generic lifecycle events, to
-//! [`DiscordStatusUpdate`] (republished by [`DiscordStatusActor`] from
-//! the gateway kanal channel), and to [`DashboardNav`] for keyboard
-//! navigation.
+//! [`DiscordStatusUpdate`](crate::feat::discord::DiscordStatusUpdate)
+//! (republished on the bus by discord's own status actor), and to
+//! [`DashboardNav`] for keyboard navigation.
 pub mod dashboard_actor;
 pub mod key_routes;
 pub mod nav;
-pub mod status_actor;
 pub mod view;
 
 pub use dashboard_actor::{DashboardActor, DashboardActorDeps};
 pub use key_routes::attach_dashboard_rows;
+pub use key_routes::dashboard_scope;
 pub use nav::DashboardNav;
-pub use status_actor::{DiscordStatusActor, DiscordStatusActorDeps, DiscordStatusUpdate};
+use kameo::actor::Spawn;
 use std::collections::HashMap;
 pub use view::DashboardView;
+
+/// Activates the dashboard slice: mints the cell, spawns the actor
+/// (first, waiting for startup so no lifecycle event is missed),
+/// attaches the route rows, registers the view, and declares the tab.
+///
+/// One call from composition (launch/wiring) is the slice's entire
+/// integration surface; commenting it out removes the slice with no
+/// other edits.
+///
+/// # Errors
+///
+/// Returns the view/slot pairing error if the view cannot resolve its
+/// cell — a wiring bug that must abort launch, not render blank.
+pub async fn activate(
+    services: &mut crate::Services,
+) -> Result<(), jinn_slices::view::ViewSlotError> {
+    // Mint the cell: the one write handle goes into the actor's deps;
+    // renderer and intent router resolve read handles only.
+    let cell = services
+        .slices
+        .register(dashboard_slot(), DashboardState::new())
+        .map_err(|_| jinn_slices::view::ViewSlotError {
+            key: dashboard_slot(),
+            reason: jinn_slices::view::ViewSlotErrorReason::Unregistered,
+        })?;
+
+    // Spawn FIRST — the dashboard must subscribe to lifecycle events
+    // before any other actor fires them.
+    let deps = crate::common::actor_deps::ActorDeps {
+        services: services.clone(),
+    };
+    let actor = DashboardActor::supervise(
+        &services.root_supervisor,
+        DashboardActorDeps { deps, cell },
+    )
+    .restart_policy(kameo::supervision::RestartPolicy::Never)
+    .spawn()
+    .await;
+    // Wait for subscriptions to be fully wired before any subsequent
+    // actor spawns: otherwise bus events can be missed, leaving entries
+    // stuck on "Starting".
+    actor.wait_for_startup().await;
+
+    // Route rows + view + tab declaration.
+    attach_dashboard_rows(&services.key_routes);
+    services
+        .viewport
+        .register(DashboardView::new(), &services.slices)?;
+    services
+        .slices
+        .register_tab_scope(dashboard_scope(), dashboard_slot());
+    Ok(())
+}
 
 /// The dashboard slice's slot in the [`Slices`](crate::common::slices::Slices)
 /// facade.

@@ -40,25 +40,7 @@ impl TuiAppBuilder {
     pub async fn build(self) -> TuiApp {
         let services = match self.services {
             Some(s) => s,
-            None => {
-                let services = jinn_domain::Services::new_fake().await;
-                // The test path must mint the same slice cell the real
-                // wiring does, or the dashboard view's startup pairing
-                // check (and every dashboard render) has nothing to read.
-                // A fresh registry cannot fail; on a wiring regression the
-                // pairing check in the launch path reports it instead.
-                let dashboard_cell = services.slices.register(
-                    jinn_domain::feat::dashboard::dashboard_slot(),
-                    jinn_domain::feat::dashboard::DashboardState::new(),
-                );
-                match dashboard_cell {
-                    Ok(cell) => {
-                        cell.update(|d| d.mark_running("discord", Some("Discord bot".to_owned())));
-                    }
-                    Err(_) => {}
-                }
-                services
-            }
+            None => jinn_domain::Services::new_fake().await,
         };
         let state = self.state.unwrap_or_default();
 
@@ -67,6 +49,6 @@ impl TuiAppBuilder {
             bridge: services.bridge.clone(),
         };
 
-        crate::launch::launch_for_test(core, services)
+        crate::launch::launch_for_test(core, services).await
     }
 }

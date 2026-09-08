@@ -55,9 +55,17 @@ const LOG_VIEWPORT_MAX: u16 = 10;
 const INPUT_PREFIX_CELLS: u16 = 2;
 
 /// Renders the quake bar as a full-width overlay at the top of `area`.
+///
+/// Reads the slice's cell through the render context's slices registry;
+/// the cell is seeded by `quake_state_with_*` test helpers and, in the
+/// app, by the slice's activation.
 pub fn render_quake_bar(frame: &mut Frame<'_>, area: Rect, ctx: &RenderCtx) {
     let state = ctx.state;
-    let quake = &state.frontend.quake_bar;
+    let quake = ctx
+        .slices
+        .reader::<QuakeBarState>(&crate::feat::quake_bar::state::quake_bar_slot())
+        .expect("quake bar cell registered");
+    let quake = quake.read();
     let theme = &state.frontend.theme;
 
     let bg = theme.quake_bar_bg;
@@ -166,7 +174,7 @@ pub fn render_quake_bar(frame: &mut Frame<'_>, area: Rect, ctx: &RenderCtx) {
         frame,
         quake_area,
         y,
-        quake,
+        &quake,
         bg,
         theme.focus_accent,
         theme.primary_text,
@@ -318,39 +326,56 @@ mod tests {
     )]
 
     use super::*;
-    use crate::common::app_state::{AppState, FocusScope};
+    use crate::common::app_state::AppState;
+    use crate::common::render_ctx::RenderCtx;
     use crate::feat::session::chat_entry::{ChangeSource, ContextOverride};
     use crate::protocol::ChatEntry;
+    use jinn_slices::Slices;
+    use jinn_slices::TypedCell;
     use jinn_testutil::setup_term;
 
-    fn quake_state_with_log(lines: &[&str]) -> AppState {
-        let mut state = AppState::default();
-        state.frontend.scope_stack.push(FocusScope::QuakeBar);
-        for line in lines {
-            state.frontend.quake_bar.log.push((*line).to_owned());
-        }
-        state
+    /// Test wiring: slices registry with the quake cell seeded from the
+    /// given log lines + input. Returns (state, slices) — the render fn
+    /// resolves the cell through the ctx's slices.
+    fn quake_ctx_with(lines: &[&str], input: &str) -> (Slices, TypedCell<QuakeBarState>) {
+        let slices = Slices::new();
+        let cell = slices
+            .register(
+                crate::feat::quake_bar::state::quake_bar_slot(),
+                QuakeBarState::default(),
+            )
+            .expect("fresh registry");
+        cell.update(|s| {
+            for line in lines {
+                s.log.push((*line).to_owned());
+            }
+            s.input.text.input = input.to_owned();
+            s.input.text.cursor_pos = input.len();
+        });
+        (slices, cell)
     }
 
-    fn quake_state_with_input(input: &str) -> AppState {
-        let mut state = AppState::default();
-        state.frontend.scope_stack.push(FocusScope::QuakeBar);
-        state.frontend.quake_bar.input.text.input = input.to_owned();
-        state.frontend.quake_bar.input.text.cursor_pos = input.len();
-        state
+    fn quake_state_with_log(lines: &[&str]) -> (AppState, Slices, TypedCell<QuakeBarState>) {
+        let (slices, cell) = quake_ctx_with(lines, "");
+        (AppState::default(), slices, cell)
+    }
+
+    fn quake_state_with_input(input: &str) -> (AppState, Slices) {
+        let (slices, _cell) = quake_ctx_with(&[], input);
+        (AppState::default(), slices)
     }
 
     #[rstest::rstest]
     #[test]
     fn header_session_label_is_primary_text() {
         // Given a quake-bar state.
-        let state = quake_state_with_log(&[]);
+        let (state, slices, _cell) = quake_state_with_log(&[]);
         let (mut terminal, area) = setup_term(80, 24);
 
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let ctx = RenderCtx::new(&state, &slices);
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -375,13 +400,13 @@ mod tests {
     #[test]
     fn header_separator_equals_are_muted_text() {
         // Given a quake-bar state.
-        let state = quake_state_with_log(&[]);
+        let (state, slices, _cell) = quake_state_with_log(&[]);
         let (mut terminal, area) = setup_term(80, 24);
 
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let ctx = RenderCtx::new(&state, &slices);
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -406,13 +431,13 @@ mod tests {
     #[test]
     fn session_row_shows_pending_prune_tokens() {
         // Given a quake-bar state.
-        let state = quake_state_with_log(&[]);
+        let (state, slices, _cell) = quake_state_with_log(&[]);
         let (mut terminal, area) = setup_term(80, 24);
 
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let ctx = RenderCtx::new(&state, &slices);
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -434,7 +459,7 @@ mod tests {
     fn session_row_shows_pruned_prune_tokens() {
         // Given a quake-bar state whose active session has a worker-pruned
         // entry with a computed token count.
-        let mut state = quake_state_with_log(&[]);
+        let (mut state, slices, _cell) = quake_state_with_log(&[]);
         let mut entry = ChatEntry::user("big");
         entry.apply_context_override(
             ContextOverride::ForcedExclude,
@@ -449,7 +474,7 @@ mod tests {
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let ctx = RenderCtx::new(&state, &slices);
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -470,13 +495,13 @@ mod tests {
     #[test]
     fn lifecycle_row_shows_none_for_blank_session() {
         // Given a quake-bar state with a blank-lifecycle active session.
-        let state = quake_state_with_log(&[]);
+        let (state, slices, _cell) = quake_state_with_log(&[]);
         let (mut terminal, area) = setup_term(80, 24);
 
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let ctx = RenderCtx::new(&state, &slices);
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -498,8 +523,7 @@ mod tests {
     fn lifecycle_row_shows_name_and_state_for_named_session() {
         // Given a quake-bar state whose active session has a named lifecycle
         // advanced to SetupRan.
-        let mut state = AppState::default();
-        state.frontend.scope_stack.push(FocusScope::QuakeBar);
+        let (mut state, slices, _cell) = quake_state_with_log(&[]);
         {
             let session = state.active_session_mut();
             session.set_lifecycle_name(Some("fossil branch".to_owned()));
@@ -510,7 +534,7 @@ mod tests {
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let ctx = RenderCtx::new(&state, &slices);
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -531,13 +555,13 @@ mod tests {
     #[test]
     fn lifecycle_row_uses_primary_text() {
         // Given a quake-bar state.
-        let state = quake_state_with_log(&[]);
+        let (state, slices, _cell) = quake_state_with_log(&[]);
         let (mut terminal, area) = setup_term(80, 24);
 
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let ctx = RenderCtx::new(&state, &slices);
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -561,13 +585,13 @@ mod tests {
     #[test]
     fn input_prefix_is_focus_accent_yellow() {
         // Given a quake-bar state with some input.
-        let state = quake_state_with_input("hi");
+        let (state, slices) = quake_state_with_input("hi");
         let (mut terminal, area) = setup_term(80, 24);
 
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let ctx = RenderCtx::new(&state, &slices);
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -590,13 +614,13 @@ mod tests {
     #[test]
     fn bright_divider_uses_lightened_background() {
         // Given a quake-bar state.
-        let state = quake_state_with_log(&[]);
+        let (state, slices, _cell) = quake_state_with_log(&[]);
         let (mut terminal, area) = setup_term(80, 24);
 
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let ctx = RenderCtx::new(&state, &slices);
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -618,13 +642,13 @@ mod tests {
     #[test]
     fn muted_divider_uses_muted_text() {
         // Given a quake-bar state.
-        let state = quake_state_with_log(&[]);
+        let (state, slices, _cell) = quake_state_with_log(&[]);
         let (mut terminal, area) = setup_term(80, 24);
 
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let ctx = RenderCtx::new(&state, &slices);
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -645,13 +669,13 @@ mod tests {
     #[test]
     fn overlay_spans_full_width_with_quake_bar_background() {
         // Given a quake-bar state.
-        let state = quake_state_with_log(&[]);
+        let (state, slices, _cell) = quake_state_with_log(&[]);
         let (mut terminal, area) = setup_term(60, 24);
 
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let ctx = RenderCtx::new(&state, &slices);
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -680,13 +704,13 @@ mod tests {
     #[test]
     fn command_log_lines_render_below_bright_divider() {
         // Given a quake-bar state with a logged line.
-        let state = quake_state_with_log(&["hello world"]);
+        let (state, slices, _cell) = quake_state_with_log(&["hello world"]);
         let (mut terminal, area) = setup_term(80, 24);
 
         // When rendering.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let ctx = RenderCtx::new(&state, &slices);
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -707,9 +731,10 @@ mod tests {
     #[test]
     fn scroll_up_changes_which_log_line_is_visible() {
         // Given a quake bar with a full 20-line log, pinned to the bottom.
-        let mut state = quake_state_with_log(&[]);
+        let (state, slices, cell) = quake_state_with_log(&[]);
         for i in 0..20 {
-            state.frontend.quake_bar.log.push(format!("line-{i}"));
+            let line = format!("line-{i}");
+            cell.update(|s| s.log.push(line));
         }
         // Short terminal so the log viewport (height 12 - FIXED_ROWS 7 = 5)
         // is smaller than the 20-line log, making scroll observable.
@@ -718,7 +743,7 @@ mod tests {
         // Snapshot the last visible log line before scrolling.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let ctx = RenderCtx::new(&state, &slices);
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();
@@ -731,12 +756,17 @@ mod tests {
             .collect();
 
         // When scrolling up once.
-        state.frontend.quake_bar.log.scroll_up();
+        {
+            let cell = slices
+                .reader::<QuakeBarState>(&crate::feat::quake_bar::state::quake_bar_slot())
+                .expect("seeded");
+            cell.update(|s| s.log.scroll_up());
+        }
 
         // Then the rendered bottom log line changes (the window moved up).
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let ctx = RenderCtx::new(&state, &slices);
                 render_quake_bar(frame, area, &ctx);
             })
             .unwrap();

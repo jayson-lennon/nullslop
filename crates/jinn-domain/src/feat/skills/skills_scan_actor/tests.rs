@@ -345,7 +345,8 @@ fn draw_picker(state: &State) -> String {
     let read = state.read();
     terminal
         .draw(|frame| {
-            let ctx = crate::common::render_ctx::RenderCtx::new(&read);
+            let slices = jinn_slices::Slices::new();
+            let ctx = crate::common::render_ctx::RenderCtx::new(&read, &slices);
             render_skill_picker(frame, area, &ctx);
         })
         .expect("draw");

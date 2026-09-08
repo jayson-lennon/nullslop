@@ -8,6 +8,7 @@ jinn-domain = { workspace = true }
 jinn-slices = { workspace = true }
 
 wherror = { workspace = true }
+futures = { workspace = true }
 error-stack = { workspace = true }
 ratatui = { workspace = true }
 crossterm = { workspace = true }

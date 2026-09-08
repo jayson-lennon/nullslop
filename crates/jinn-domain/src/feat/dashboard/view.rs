@@ -204,4 +204,27 @@ mod tests {
         // Then the placeholder is drawn.
         assert!(buffer_string(&terminal).contains("No services"));
     }
+
+    #[rstest::rstest]
+    #[test]
+    fn clamp_scroll_keeps_selected_visible() {
+        // Given a dashboard with 5 actors, selection at index 4, viewport 3.
+        let mut state = DashboardState::new();
+        for name in ["a", "b", "c", "d", "e"] {
+            state.mark_running(name, None);
+        }
+        state.select_last(); // index 4
+        assert_eq!(state.selected_index(), 4);
+
+        // When clamping with viewport 3.
+        state.clamp_scroll(3);
+
+        // Then scroll_offset puts index 4 within the visible window.
+        let visible_start = state.scroll_offset() as usize;
+        let visible_end = visible_start + 3;
+        assert!(
+            (visible_start..visible_end).contains(&4),
+            "selected index should be within visible window {visible_start}..{visible_end}"
+        );
+    }
 }

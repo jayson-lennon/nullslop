@@ -2872,6 +2872,7 @@ dependencies = [
  "dialoguer",
  "dirs",
  "error-stack",
+ "futures",
  "jinn-domain",
  "jinn-selection-widget",
  "jinn-slices",

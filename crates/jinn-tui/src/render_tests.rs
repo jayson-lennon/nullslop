@@ -283,7 +283,9 @@ async fn render_in_dashboard(
         .write_test_no_cap()
         .frontend
         .scope_stack
-        .swap_base(FocusScope::Dashboard);
+        .swap_base(FocusScope::Dynamic(
+            jinn_domain::feat::dashboard::dashboard_scope(),
+        ));
     let (mut terminal, _area) = setup_term(width, height);
     terminal
         .draw(|frame| {
@@ -363,6 +365,173 @@ async fn dashboard_content_fills_full_width() {
         rightmost.symbol(),
         " ",
         "rightmost column should be reset/blank, not sidebar or border content",
+    );
+}
+
+/// Writes into the dashboard slice cell through the app registry.
+fn write_dashboard(app: &crate::TuiApp, f: impl FnOnce(&mut jinn_domain::feat::dashboard::DashboardState)) {
+    let cell: jinn_domain::common::slices::TypedCell<jinn_domain::feat::dashboard::DashboardState> = app
+        .services
+        .slices
+        .reader(&jinn_domain::feat::dashboard::dashboard_slot())
+        .expect("test builder registers the dashboard slot");
+    cell.update(f);
+}
+
+/// Collects the entire terminal buffer into a single string for substring
+/// assertions.
+fn buffer_string(terminal: &ratatui::Terminal<ratatui::backend::TestBackend>) -> String {
+    terminal
+        .backend()
+        .buffer()
+        .content()
+        .iter()
+        .map(ratatui::buffer::Cell::symbol)
+        .collect()
+}
+
+#[rstest::rstest]
+#[tokio::test]
+async fn dashboard_tab_shows_actor_name_and_lifecycle() {
+    // Given a dashboard with one running actor.
+    let mut app = render_test_app().await;
+    app.core
+        .state
+        .write_test_no_cap()
+        .frontend
+        .scope_stack
+        .swap_base(FocusScope::Dynamic(
+            jinn_domain::feat::dashboard::dashboard_scope(),
+        ));
+    write_dashboard(&app, |d| {
+        d.mark_running("discord", Some("Discord bot".to_owned()));
+    });
+    let (mut terminal, _area) = setup_term(80, 24);
+
+    // When rendering.
+    terminal.draw(|frame| app.render(frame)).unwrap();
+
+    // Then the buffer contains "discord" and "Running".
+    let buf_str = buffer_string(&terminal);
+    assert!(buf_str.contains("discord"), "dashboard should show name");
+    // And the lifecycle column reads "Running".
+    assert!(
+        buf_str.contains("Running"),
+        "dashboard should show lifecycle"
+    );
+}
+
+#[rstest::rstest]
+#[tokio::test]
+async fn dashboard_tab_shows_status_message_for_discord() {
+    // Given a dashboard with discord in a connected state.
+    let mut app = render_test_app().await;
+    app.core
+        .state
+        .write_test_no_cap()
+        .frontend
+        .scope_stack
+        .swap_base(FocusScope::Dynamic(
+            jinn_domain::feat::dashboard::dashboard_scope(),
+        ));
+    write_dashboard(&app, |d| {
+        d.mark_running("discord", None);
+        d.set_status_message("discord", Some("Connected".to_owned()));
+    });
+    let (mut terminal, _area) = setup_term(80, 24);
+
+    // When rendering.
+    terminal.draw(|frame| app.render(frame)).unwrap();
+
+    // Then the buffer contains "Connected".
+    let buf_str = buffer_string(&terminal);
+    assert!(
+        buf_str.contains("Connected"),
+        "dashboard should show status message"
+    );
+}
+
+#[rstest::rstest]
+#[tokio::test]
+async fn dashboard_tab_shows_empty_placeholder_when_no_actors() {
+    // Given a dashboard cell with no actor rows.
+    let mut app = render_test_app().await;
+    app.core
+        .state
+        .write_test_no_cap()
+        .frontend
+        .scope_stack
+        .swap_base(FocusScope::Dynamic(
+            jinn_domain::feat::dashboard::dashboard_scope(),
+        ));
+    write_dashboard(&app, jinn_domain::feat::dashboard::DashboardState::clear);
+    let (mut terminal, _area) = setup_term(80, 24);
+
+    // When rendering.
+    terminal.draw(|frame| app.render(frame)).unwrap();
+
+    // Then the buffer contains the placeholder.
+    let buf_str = buffer_string(&terminal);
+    assert!(
+        buf_str.contains("No services"),
+        "empty dashboard should show placeholder"
+    );
+}
+
+#[rstest::rstest]
+#[tokio::test]
+async fn dashboard_tab_shows_selection_marker_on_selected_entry() {
+    // Given a dashboard with two actors, second selected.
+    let mut app = render_test_app().await;
+    app.core
+        .state
+        .write_test_no_cap()
+        .frontend
+        .scope_stack
+        .swap_base(FocusScope::Dynamic(
+            jinn_domain::feat::dashboard::dashboard_scope(),
+        ));
+    write_dashboard(&app, |d| {
+        d.mark_running("alpha", None);
+        d.mark_running("beta", None);
+        d.select_next(); // select beta (index 1)
+    });
+    let (mut terminal, _area) = setup_term(80, 24);
+
+    // When rendering.
+    terminal.draw(|frame| app.render(frame)).unwrap();
+
+    // Then the buffer contains the selection marker ▸.
+    let buf_str = buffer_string(&terminal);
+    assert!(buf_str.contains('▸'), "selected entry should have marker");
+}
+
+#[rstest::rstest]
+#[tokio::test]
+async fn dashboard_tab_has_no_em_dash_separator() {
+    // Given a dashboard with an actor that has a description.
+    let mut app = render_test_app().await;
+    app.core
+        .state
+        .write_test_no_cap()
+        .frontend
+        .scope_stack
+        .swap_base(FocusScope::Dynamic(
+            jinn_domain::feat::dashboard::dashboard_scope(),
+        ));
+    write_dashboard(&app, |d| {
+        d.mark_running("discord", Some("Discord bot".to_owned()));
+    });
+    let (mut terminal, _area) = setup_term(80, 24);
+
+    // When rendering.
+    terminal.draw(|frame| app.render(frame)).unwrap();
+
+    // Then the buffer contains no em-dash characters.
+    let buf_str = buffer_string(&terminal);
+    assert!(
+        !buf_str.contains('\u{2014}'),
+        "dashboard should not contain em-dashes"
     );
 }
 

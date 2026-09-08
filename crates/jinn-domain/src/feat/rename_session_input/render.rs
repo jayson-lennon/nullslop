@@ -117,7 +117,8 @@ mod tests {
         // When rendering the popup.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
                 render_rename_session_input(frame, area, &ctx);
             })
             .unwrap();
@@ -163,7 +164,8 @@ mod tests {
         // When rendering the popup.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
                 render_rename_session_input(frame, area, &ctx);
             })
             .unwrap();
@@ -203,7 +205,8 @@ mod tests {
         // When rendering the popup.
         terminal
             .draw(|frame| {
-                let ctx = RenderCtx::new(&state);
+                let slices = jinn_slices::Slices::new();
+                let ctx = RenderCtx::new(&state, &slices);
                 render_rename_session_input(frame, area, &ctx);
             })
             .unwrap();

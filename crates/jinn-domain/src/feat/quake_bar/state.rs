@@ -1,6 +1,31 @@
 //! Quake bar state — the global overlay console.
+//!
+//! The payload lives in the slice's own cell (see
+//! [`quake_bar_slot`]), not in `FrontendState`: the actor (log writer)
+//! and the intent-handler input hook (input writer) share the one write
+//! handle minted at activation, and the renderer resolves read handles
+//! through the registry.
 
 use crate::common::line_input::LineInput;
+use jinn_slices::SliceScopeId;
+use jinn_slices::SlotKey;
+
+/// The quake bar's slot in the [`Slices`](jinn_slices::Slices) registry.
+///
+/// Canonical key shared by activation (which mints the cell), the
+/// renderer (which resolves a read handle), and tests.
+#[must_use]
+pub fn quake_bar_slot() -> SlotKey {
+    SlotKey::builtin("quake-bar", "state")
+}
+
+/// The quake bar overlay's dynamic focus scope.
+///
+/// Pushed by the open action's scope signal; popped by close.
+#[must_use]
+pub fn quake_scope() -> SliceScopeId {
+    SliceScopeId::new("quake-bar", "open")
+}
 
 /// Maximum number of lines retained in the command log.
 ///
@@ -98,18 +123,21 @@ impl CommandLog {
     }
 }
 
-/// Aggregate quake bar state.
+/// Aggregate quake bar state — the slice's cell payload.
 ///
 /// Two writers, two fields — never cross the streams:
-/// - [`QuakeBarState::input`] — written ONLY by the `IntentHandler`
-///   (synchronous char editing, mirroring `cwd_input`).
+/// - [`QuakeBarState::input`] — written ONLY by the intent-handler
+///   input hook (synchronous char editing, via the shared cell handle).
 /// - [`QuakeBarState::log`] — written ONLY by the [`QuakeBarActor`]
 ///   (the command log; submit routes through
 ///   [`SubmitQuakeBarCommand`](super::command::SubmitQuakeBarCommand) so the
 ///   actor is the single mutator).
+///
+/// Both writers hold clones of the one handle minted at activation —
+/// the handle is singular per slice even though two clones exist.
 #[derive(Debug, Clone, Default)]
 pub struct QuakeBarState {
-    /// The 1-line command input. OWNER: IntentHandler.
+    /// The 1-line command input. OWNER: IntentHandler (input hook).
     pub input: QuakeBarInput,
     /// The persistent command log. OWNER: QuakeBarActor.
     pub log: CommandLog,

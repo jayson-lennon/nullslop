@@ -36,8 +36,10 @@ pub enum FocusScope {
     /// Pruner accumulation threshold popup - numeric input for the KV-cache gate.
     PrunerAccumulationInput,
 
-    /// Dashboard tab — service status overview (base scope, full-width).
-    Dashboard,
+    /// A dynamically-registered slice's scope. Carries its identity as
+    /// data, so slices never edit this enum. The scope the slice's
+    /// `activate()` pushed (or signaled via a route action).
+    Dynamic(jinn_slices::SliceScopeId),
 
     /// Terminal tab — viewing an `interactive_term` session (watch only; keys
     /// are not forwarded to the pty).
@@ -45,9 +47,6 @@ pub enum FocusScope {
     /// Terminal control — every key forwards to the `interactive_term` pty
     /// except the handback key (config `[interactive_term] handback_key`).
     TerminalControl,
-
-    /// Quake bar - global overlay console. Captures all keystrokes while open.
-    QuakeBar,
 
     /// Sidebar resize mode - adjusting sidebar width with h/l keys.
     SidebarResize,
@@ -59,7 +58,6 @@ impl FocusScope {
     pub fn mode(&self) -> Mode {
         match self {
             Self::Normal
-            | Self::Dashboard
             | Self::SidebarPersona
             | Self::SidebarPins
             | Self::SidebarSessions
@@ -76,7 +74,11 @@ impl FocusScope {
             | Self::CwdInput
             | Self::ProjectAddInput
             | Self::PrunerAccumulationInput
-            | Self::QuakeBar => Mode::Input,
+            // Dynamic scopes are input-capturing surfaces: a slice scope
+            // captures keystrokes (its input hook serves the editing
+            // intents), so it lights up input-focused UI like the quake
+            // bar did.
+            | Self::Dynamic(_) => Mode::Input,
             Self::Picker { .. } => Mode::Picker,
         }
     }
@@ -86,7 +88,6 @@ impl std::fmt::Display for FocusScope {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Normal => write!(f, "Normal"),
-            Self::Dashboard => write!(f, "Dashboard"),
             Self::TerminalView => write!(f, "TerminalView"),
             Self::TerminalControl => write!(f, "TerminalControl"),
             Self::Input => write!(f, "Input"),
@@ -101,7 +102,7 @@ impl std::fmt::Display for FocusScope {
             Self::CwdInput => write!(f, "CwdInput"),
             Self::ProjectAddInput => write!(f, "ProjectAddInput"),
             Self::PrunerAccumulationInput => write!(f, "PrunerAccumulationInput"),
-            Self::QuakeBar => write!(f, "QuakeBar"),
+            Self::Dynamic(id) => write!(f, "Dynamic({id})"),
             Self::SidebarResize => write!(f, "SidebarResize"),
         }
     }
