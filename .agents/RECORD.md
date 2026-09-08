@@ -61,7 +61,7 @@ Entries are added or amended **only with human approval**.
 - (context) `#name` prompt-template tokens in user text expand to the template body; both token kinds are consumed in a second expansion pass.
 - (context) `@path` tokens resolve to `file://` URIs against cwd/home when the file is a readable image; otherwise the token is left as literal text.
 - (dashboard) The dashboard tab tracks actor lifecycle (starting/running/dead) and browser-binary detection (Chrome vs bundled) for the web-fetch feature.
-- (dashboard) Dashboard state is a `Slices` cell owned by `DashboardActor`, fed by events and `DashboardNav` messages; the dashboard folds Discord's `DiscordStatusUpdate` event for display only.
+- (dashboard) Dashboard state is a `Slices` cell owned by `DashboardCanvasActor`, fed by events and `DashboardNav` messages; the dashboard folds Discord's `DiscordStatusUpdate` event for display only.
 - (slices) Render slices live in per-slice typed cells behind the `Slices` facade; registration mints exactly one write handle, held by the owning actor; the renderer and intent router hold read handles only.
 - (slices) Slice integration is a single `activate()` per slice called from composition (launch/actor-wiring); removing the call removes the slice with no other edits.
 - (keybinds) Feature keybinds are route rows carrying scope and key; keymap bindings are generated from registered rows at launch; dynamic intents and scope ids are data-carried, so an unregistered slice leaves no keymap, scope, or intent residue.
