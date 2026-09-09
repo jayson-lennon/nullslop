@@ -61,10 +61,14 @@ const INPUT_PREFIX_CELLS: u16 = 2;
 /// app, by the slice's activation.
 pub fn render_quake_bar(frame: &mut Frame<'_>, area: Rect, ctx: &RenderCtx) {
     let state = ctx.state;
+    #[expect(
+        clippy::expect_used,
+        reason = "the overlay only renders when the quake scope registered its cell"
+    )]
     let quake = ctx
         .slices
         .reader::<QuakeBarState>(&crate::feat::quake_bar::state::quake_bar_slot())
-        .expect("quake bar cell registered");
+        .expect("quake-bar overlay renders only when its cell is registered");
     let quake = quake.read();
     let theme = &state.frontend.theme;
 

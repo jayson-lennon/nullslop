@@ -45,7 +45,6 @@ use jinn_slices::TypedCell;
 /// surfaces the resolved browser backend (Chrome/Chromium/Bundled).
 const WEB_FETCH_ENTRY: &str = "web-fetch";
 
-
 /// The dashboard actor on the canvas runtime.
 ///
 /// Receives lifecycle events, [`DiscordStatusUpdate`], and
@@ -61,8 +60,10 @@ impl ServiceActor for DashboardCanvasActor {
         _args: &serde_json::Value,
     ) -> Result<Self, trouper::error_stack::Report<RegistryError>> {
         // Never called: the spawn helper injects the cell via `start_with`.
-        unreachable!(
-            "DashboardCanvasActor is spawned via start_with; start requires the typed cell"
+        Err(
+            trouper::error_stack::IntoReport::into_report(RegistryError::InvalidSpec).attach(
+                "DashboardCanvasActor is spawned via start_with; start requires the typed cell",
+            ),
         )
     }
 }
@@ -75,9 +76,14 @@ impl DashboardCanvasActor {
     /// the topic cursors are registered, so every later publish reaches
     /// the actor's inbox. This is what lets the activation sequence be
     /// spawn-then-activate-the-world without missed lifecycle events.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the topic subscriptions fail, which can only happen on a
+    /// broken actor system; the spawn-then-activate ordering relies on it.
     pub fn spawn(
         system: &std::sync::Arc<ActorSystem>,
-        cell: TypedCell<DashboardState>,
+        cell: &TypedCell<DashboardState>,
     ) -> ActorPath {
         let path = trouper::builder::spawn_service_builder::<Self>(system)
             .at(ActorPath::new("dashboard"))
@@ -92,9 +98,17 @@ impl DashboardCanvasActor {
             .handles::<DiscordStatusUpdate>()
             .handles::<DashboardNav>()
             .start();
+        #[expect(
+            clippy::expect_used,
+            reason = "subscription failure is a broken actor system, not a caller bug;                       the spawn-then-activate ordering relies on the cursor being registered"
+        )]
         system
             .subscribe(&path, &trouper_bridge::fabric_topic(), None)
             .expect("dashboard actor subscribes to the fabric topic");
+        #[expect(
+            clippy::expect_used,
+            reason = "subscription failure is a broken actor system, not a caller bug"
+        )]
         system
             .subscribe(&path, &trouper_bridge::dashboard_topic(), None)
             .expect("dashboard actor subscribes to the dashboard topic");
@@ -132,8 +146,8 @@ impl DashboardCanvasActor {
     }
 
     /// Folds a [`DashboardNav`] into the cell.
-    fn apply_nav(&self, msg: &DashboardNav) {
-        self.cell.update(|s| match *msg {
+    fn apply_nav(&self, msg: DashboardNav) {
+        self.cell.update(|s| match msg {
             DashboardNav::Up => s.select_prev(),
             DashboardNav::Down => s.select_next(),
             DashboardNav::First => s.select_first(),
@@ -174,7 +188,7 @@ impl MsgHandler<DiscordStatusUpdate> for DashboardCanvasActor {
 
 impl MsgHandler<DashboardNav> for DashboardCanvasActor {
     async fn handle(&mut self, msg: DashboardNav, _ctx: &mut MsgCtx<'_>) {
-        self.apply_nav(&msg);
+        self.apply_nav(msg);
     }
 }
 
@@ -249,8 +263,7 @@ fn apply_discord_update(dashboard: &mut DashboardState, update: &DiscordStatusUp
     };
 
     if let Some(lifecycle) = lifecycle {
-        let description =
-            with_description.then(|| update.entry_description().to_owned());
+        let description = with_description.then(|| update.entry_description().to_owned());
         match lifecycle {
             crate::feat::dashboard::ActorLifecycle::Starting => {
                 dashboard.mark_starting(name, description);
@@ -309,7 +322,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, &cell);
         cell
     }
 
@@ -347,7 +360,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, &cell);
 
         // When publishing ActorStarted on the kameo bus.
         services
@@ -375,7 +388,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, &cell);
         services
             .bus
             .publish(ActorStarted {
@@ -413,7 +426,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, &cell);
 
         // When publishing a Connecting update on the bus (as DiscordStatusActor does).
         services.bus.publish(DiscordStatusUpdate::Connecting).await;
@@ -436,7 +449,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, &cell);
 
         // When publishing a Connected update on the bus.
         services.bus.publish(DiscordStatusUpdate::Connected).await;
@@ -460,7 +473,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, &cell);
 
         // When publishing an Error update on the bus.
         services
@@ -489,7 +502,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, &cell);
 
         // When publishing an Error update as the very first message.
         services
@@ -501,9 +514,11 @@ mod tests {
 
         // Then the entry is created with the identity carried by the
         // event itself.
-        let expected = DiscordStatusUpdate::Error { message: String::new() }
-            .entry_description()
-            .to_owned();
+        let expected = DiscordStatusUpdate::Error {
+            message: String::new(),
+        }
+        .entry_description()
+        .to_owned();
         wait_for(|| {
             dashboard_entry(&cell, "discord")
                 .is_some_and(|(_, _, d)| d.as_deref() == Some(expected.as_str()))
@@ -521,7 +536,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, &cell);
 
         // When publishing BrowserBinaryVerified for a system Chrome.
         services
@@ -553,7 +568,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, &cell);
 
         // When publishing BrowserBinaryVerified for the bundled binary.
         services
@@ -588,7 +603,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, &cell);
 
         // When publishing BrowserBinaryVerified for a system Chromium with no version.
         services
@@ -623,7 +638,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, &cell);
 
         // When publishing BrowserBinaryVerified.
         services
@@ -652,7 +667,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, &cell);
         for name in ["a", "b", "c"] {
             services
                 .bus
@@ -688,7 +703,7 @@ mod tests {
         let cell = slices
             .register(dashboard_slot(), DashboardState::new())
             .expect("fresh registry");
-        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, &cell);
         services
             .bus
             .publish(ActorStarted {

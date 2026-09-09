@@ -56,15 +56,20 @@ pub mod route_ids {
 /// `activate()`; the cell handle is captured by the actions that need
 /// it (the same handle the actor holds — never a second mint).
 pub fn attach_quake_bar_rows(routes: &KeyRoutes, cell: &TypedCell<QuakeBarState>) {
+    attach_lifecycle_rows(routes);
+    attach_input_rows(routes, cell);
+}
+
+/// Binds the quake bar's open/close toggles (`<M-\`>` global, `<esc>` own-scope).
+fn attach_lifecycle_rows(routes: &KeyRoutes) {
     let scope = quake_scope();
-    let open_scope = scope.clone();
 
     // Global toggle: opens the overlay from any static scope (and other
     // slices' scopes). Skipped inside the quake scope itself, where the
     // close row binds the same key.
     routes.attach(RouteRow {
         route_id: route_ids::OPEN,
-        scope: open_scope,
+        scope: scope.clone(),
         key: "<M-`>",
         category: "general",
         site: BindSite::GlobalToggle,
@@ -108,6 +113,11 @@ pub fn attach_quake_bar_rows(routes: &KeyRoutes, cell: &TypedCell<QuakeBarState>
             }),
         },
     });
+}
+
+/// Binds the quake bar's in-overlay input rows (submit, scroll, clear).
+fn attach_input_rows(routes: &KeyRoutes, cell: &TypedCell<QuakeBarState>) {
+    let scope = quake_scope();
 
     // Submit needs the cell: it reads + clears the input buffer. The
     // handle is a clone of the one minted at activation.
@@ -159,7 +169,7 @@ pub fn attach_quake_bar_rows(routes: &KeyRoutes, cell: &TypedCell<QuakeBarState>
 
     routes.attach(RouteRow {
         route_id: route_ids::CTRL_CLEAR,
-        scope: scope,
+        scope,
         key: "<c-c>",
         category: "general",
         site: BindSite::OwnScope,
@@ -250,7 +260,11 @@ fn handle_submit(cell: &TypedCell<QuakeBarState>, _ctx: ActionCtx<'_>) -> Intent
 
 /// Scrolls the command log one line in the direction named by `action`
 /// (`scroll-up` toward older lines, `scroll-down` toward newer).
-fn handle_scroll(cell: &TypedCell<QuakeBarState>, action: &str, _ctx: ActionCtx<'_>) -> IntentResult {
+fn handle_scroll(
+    cell: &TypedCell<QuakeBarState>,
+    action: &str,
+    _ctx: ActionCtx<'_>,
+) -> IntentResult {
     cell.update(|s| match action {
         "scroll-up" => s.log.scroll_up(),
         _ => s.log.scroll_down(),
@@ -286,7 +300,6 @@ mod tests {
     use jinn_slices::Slices;
 
     use crate::feat::quake_bar::state::quake_bar_slot;
-
 
     fn wired() -> (KeyRoutes, jinn_slices::TypedCell<QuakeBarState>) {
         let slices = Slices::new();
@@ -441,13 +454,15 @@ mod tests {
         let intent = Intent::Dynamic(super::quake_intent("scroll-up", "scroll up"));
         let mut state = crate::common::app_state::AppState::default();
         let slices = Slices::new();
-        let _ = routes.action_for(
-            &intent,
-            crate::common::slices::key_routes::ActionCtx {
-                state: &mut state,
-                slices: &slices,
-            },
-        ).expect("scroll-up row");
+        let _ = routes
+            .action_for(
+                &intent,
+                crate::common::slices::key_routes::ActionCtx {
+                    state: &mut state,
+                    slices: &slices,
+                },
+            )
+            .expect("scroll-up row");
         let before = {
             let guard = cell.read();
             guard.log.visible_lines(2).to_vec()
@@ -457,13 +472,15 @@ mod tests {
         let intent = Intent::Dynamic(super::quake_intent("scroll-down", "scroll down"));
         let mut state = crate::common::app_state::AppState::default();
         let slices = Slices::new();
-        let _ = routes.action_for(
-            &intent,
-            crate::common::slices::key_routes::ActionCtx {
-                state: &mut state,
-                slices: &slices,
-            },
-        ).expect("scroll-down row");
+        let _ = routes
+            .action_for(
+                &intent,
+                crate::common::slices::key_routes::ActionCtx {
+                    state: &mut state,
+                    slices: &slices,
+                },
+            )
+            .expect("scroll-down row");
 
         // Then the visible window shifted toward the newest line.
         let after = {

@@ -213,13 +213,13 @@ fn render_base_layers(
             // slot renders nothing (blank tab — a wiring bug caught by
             // the startup pairing check, not silently here).
             let base = ctx.state.frontend.scope_stack.base();
-            if let FocusScope::Dynamic(id) = base {
-                if let Some(slot) = slices.tab_slot(id) {
-                    let cx = jinn_domain::common::slices::ViewCx {
-                        theme: &ctx.state.frontend.theme,
-                    };
-                    viewport.render_slot(frame, dash.content, &slot, &cx, slices);
-                }
+            if let FocusScope::Dynamic(id) = base
+                && let Some(slot) = slices.tab_slot(id)
+            {
+                let cx = jinn_domain::common::slices::ViewCx {
+                    theme: &ctx.state.frontend.theme,
+                };
+                viewport.render_slot(frame, dash.content, &slot, &cx, slices);
             }
         }
         AppFrameLayout::Chat(chat) => {

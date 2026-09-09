@@ -213,37 +213,37 @@ mod tests {
             (
                 SubmitQuakeBarCommand::schema_id(),
                 serde_json::to_value(&quake).unwrap(),
-                serde_json::to_value(&roundtrip(&quake)).unwrap(),
+                serde_json::to_value(roundtrip(&quake)).unwrap(),
             ),
             (
                 DashboardNav::schema_id(),
-                serde_json::to_value(&nav).unwrap(),
-                serde_json::to_value(&roundtrip(&nav)).unwrap(),
+                serde_json::to_value(nav).unwrap(),
+                serde_json::to_value(roundtrip(&nav)).unwrap(),
             ),
             (
                 ActorStarting::schema_id(),
                 serde_json::to_value(&starting).unwrap(),
-                serde_json::to_value(&roundtrip(&starting)).unwrap(),
+                serde_json::to_value(roundtrip(&starting)).unwrap(),
             ),
             (
                 ActorStarted::schema_id(),
                 serde_json::to_value(&started).unwrap(),
-                serde_json::to_value(&roundtrip(&started)).unwrap(),
+                serde_json::to_value(roundtrip(&started)).unwrap(),
             ),
             (
                 ActorShutdownCompleted::schema_id(),
                 serde_json::to_value(&shutdown).unwrap(),
-                serde_json::to_value(&roundtrip(&shutdown)).unwrap(),
+                serde_json::to_value(roundtrip(&shutdown)).unwrap(),
             ),
             (
                 BrowserBinaryVerified::schema_id(),
                 serde_json::to_value(&browser).unwrap(),
-                serde_json::to_value(&roundtrip(&browser)).unwrap(),
+                serde_json::to_value(roundtrip(&browser)).unwrap(),
             ),
             (
                 DiscordStatusUpdate::schema_id(),
                 serde_json::to_value(&discord).unwrap(),
-                serde_json::to_value(&roundtrip(&discord)).unwrap(),
+                serde_json::to_value(roundtrip(&discord)).unwrap(),
             ),
         ];
 
@@ -275,7 +275,10 @@ mod tests {
         async fn start(
             _args: &serde_json::Value,
         ) -> Result<Self, trouper::error_stack::Report<RegistryError>> {
-            unreachable!("spawned via start_with; start is never called")
+            Err(
+                trouper::error_stack::IntoReport::into_report(RegistryError::InvalidSpec)
+                    .attach("spawned via start_with; start is never called"),
+            )
         }
     }
 

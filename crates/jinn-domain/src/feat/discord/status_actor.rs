@@ -224,7 +224,7 @@ mod tests {
         // by the bridge over the harness bus.
         let services = harness.services().await;
         crate::common::trouper_bridge::spawn_kameo_to_trouper(&services).await;
-        DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
+        DashboardCanvasActor::spawn(&services.trouper_system, &cell);
 
         // When the gateway sends a Connected update down the kanal channel.
         let _ = tx.send(DiscordStatusUpdate::Connected);

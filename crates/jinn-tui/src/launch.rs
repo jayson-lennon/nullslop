@@ -178,6 +178,10 @@ pub fn load_theme(
 /// This is what [`crate::TuiAppBuilder`] delegates to so that tests still go
 /// through the single keymap-bootstrap site without requiring real on-disk
 /// prompt/theme files.
+/// # Panics
+///
+/// Panics if dashboard slice activation fails — the test harness cannot
+/// render without it.
 pub async fn launch_for_test(core: AppCore, mut services: jinn_domain::Services) -> TuiApp {
     let mut ui_registry = AppUiRegistry::new();
     jinn_domain::register_all_ui_elements(&mut ui_registry);

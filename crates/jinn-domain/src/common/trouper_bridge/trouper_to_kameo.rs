@@ -40,9 +40,8 @@ impl ServiceActor for TrouperToKameoBridgeActor {
     async fn start(
         _args: &serde_json::Value,
     ) -> Result<Self, trouper::error_stack::Report<RegistryError>> {
-        unreachable!(
-            "TrouperToKameoBridgeActor is spawned via start_with; start requires the bus handle"
-        )
+        Err(trouper::error_stack::IntoReport::into_report(RegistryError::InvalidSpec)
+            .attach("TrouperToKameoBridgeActor is spawned via start_with; start requires the bus handle"))
     }
 }
 

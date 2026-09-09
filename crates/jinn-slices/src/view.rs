@@ -241,7 +241,7 @@ mod tests {
 
     #[derive(Debug, Default)]
     struct Payload {
-        #[allow(
+        #[expect(
             dead_code,
             reason = "populated by writes; presence is what tests assert"
         )]

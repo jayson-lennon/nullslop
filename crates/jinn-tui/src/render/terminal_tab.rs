@@ -476,7 +476,7 @@ mod tests {
     ) {
         // Given a mirror whose single cell carries one terminal style.
         // When the overlay renders on a test backend.
-        let cell = rendered_cell_for_style(style).await;
+        let cell = Box::pin(rendered_cell_for_style(style)).await;
         // Then the style maps to the matching ratatui color/modifier.
         assert_style(&cell);
     }
@@ -578,7 +578,7 @@ mod tests {
     async fn border_is_gray_while_viewing() {
         // Given the overlay open in view mode (TerminalView base scope).
         // When rendering.
-        let buffer = rendered_overlay_with_scope(FocusScope::TerminalView).await;
+        let buffer = Box::pin(rendered_overlay_with_scope(FocusScope::TerminalView)).await;
         // Then the border uses the theme's unfocused (gray) color.
         assert_eq!(
             buffer[(0, 0)].fg,
@@ -599,7 +599,7 @@ mod tests {
     async fn view_mode_border_advertises_capture_yank_and_send_keys() {
         // Given the overlay open in view mode.
         // When rendering.
-        let buffer = rendered_overlay_with_scope(FocusScope::TerminalView).await;
+        let buffer = Box::pin(rendered_overlay_with_scope(FocusScope::TerminalView)).await;
 
         // Then the bottom border advertises the mode's keys: the configured
         // toggle (default `<c-g>`), overlay close, yank, and send-screen,
@@ -619,7 +619,7 @@ mod tests {
     async fn capture_mode_border_advertises_only_the_toggle() {
         // Given the overlay capturing input (TerminalControl base scope).
         // When rendering.
-        let buffer = rendered_overlay_with_scope(FocusScope::TerminalControl).await;
+        let buffer = Box::pin(rendered_overlay_with_scope(FocusScope::TerminalControl)).await;
 
         // Then the bottom border shows only the release hint — every other
         // key types into the program, so advertising them would lie.
@@ -678,7 +678,7 @@ mod tests {
     async fn hint_key_glyphs_use_the_action_accent_color() {
         // Given the overlay open in view mode.
         // When rendering.
-        let buffer = rendered_overlay_with_scope(FocusScope::TerminalView).await;
+        let buffer = Box::pin(rendered_overlay_with_scope(FocusScope::TerminalView)).await;
 
         // Then the key glyphs (e.g. the `y` of "y yank") use accent_action,
         // the same orange hotkey color as the session preview keybind bar,
@@ -696,7 +696,7 @@ mod tests {
     async fn border_is_accent_while_capturing_input() {
         // Given the overlay capturing input (TerminalControl base scope).
         // When rendering.
-        let buffer = rendered_overlay_with_scope(FocusScope::TerminalControl).await;
+        let buffer = Box::pin(rendered_overlay_with_scope(FocusScope::TerminalControl)).await;
         // Then the border uses the theme's focus accent (yellow by default).
         assert_eq!(
             buffer[(0, 0)].fg,

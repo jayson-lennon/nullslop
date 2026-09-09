@@ -171,9 +171,12 @@ fn derive_groups_from_rows(
             // forms (`S-x`) do not. Joining can also fuse tokens
             // (`<M-a>` + `b` → `<M-ab>`), so equality is checked on the
             // re-parsed sequence, not per token.
-            let notation = describe_prefix(&tokens[..n]);
+            let Some(prefix) = tokens.get(..n) else {
+                break;
+            };
+            let notation = describe_prefix(prefix);
             let reparsed = parse_key_sequence::<KeyEvent>(&notation, &plain_key('\\'));
-            if reparsed != tokens[..n] {
+            if reparsed != prefix {
                 break;
             }
             if let Some(existing) = prefixes.iter_mut().find(|(p, _)| *p == notation) {
@@ -241,19 +244,12 @@ pub fn bind_route_rows(
                     );
                     continue;
                 };
-                let display = row.display();
                 for scope in scopes {
-                    if display.is_empty() {
-                        keymap.bind(row.key, intent.clone(), category, scope);
-                    } else {
-                        keymap.bind(row.key, intent.clone(), category, scope);
-                    }
+                    keymap.bind(row.key, intent.clone(), category, scope);
                 }
             }
             RouteOutcome::Action {
-                action,
-                display,
-                run: _,
+                action, display, ..
             } => {
                 let intent = Intent::Dynamic(jinn_slices::DynamicIntent::new(
                     row.scope.clone(),
@@ -425,9 +421,9 @@ mod tests {
     fn leaf_at(
         keymap: &Keymap<KeyEvent, Scope, Intent, KeyCategory>,
         keys: &[KeyEvent],
-        scope: Scope,
+        scope: &Scope,
     ) -> Option<Intent> {
-        match keymap.navigate(keys, &scope) {
+        match keymap.navigate(keys, scope) {
             Some(ratatui_which_key::NodeResult::Leaf { action }) => Some(action),
             _ => None,
         }
@@ -436,10 +432,10 @@ mod tests {
     fn at_path(
         keymap: &Keymap<KeyEvent, Scope, Intent, KeyCategory>,
         keys: &[KeyEvent],
-        scope: Scope,
+        scope: &Scope,
     ) -> Vec<(KeyEvent, String)> {
         keymap
-            .children_at_path(keys, &scope)
+            .children_at_path(keys, scope)
             .unwrap_or_default()
             .into_iter()
             .map(|b| (b.key, b.description))
@@ -470,10 +466,10 @@ mod tests {
         bind_route_rows(&routes, &mut keymap);
 
         // Then Normal resolves the row's dynamic intent.
-        let normal = leaf_at(&keymap, &[key("z"), key("q")], Scope::Normal);
+        let normal = leaf_at(&keymap, &[key("z"), key("q")], &Scope::Normal);
         assert!(normal.is_some(), "Normal should bind the zq sequence");
         // And Input does not: the row named only Normal.
-        let input = leaf_at(&keymap, &[key("z"), key("q")], Scope::Input);
+        let input = leaf_at(&keymap, &[key("z"), key("q")], &Scope::Input);
         assert!(input.is_none(), "Input should not bind the zq sequence");
     }
 
@@ -501,10 +497,10 @@ mod tests {
         bind_route_rows(&routes, &mut keymap);
 
         // Then no scope gained the binding.
-        assert!(at_path(&keymap, &[key("z"), key("q")], Scope::Normal).is_empty());
+        assert!(at_path(&keymap, &[key("z"), key("q")], &Scope::Normal).is_empty());
         // And the dynamic scope didn't silently inherit it either.
         let dynamic = Scope::Dynamic(SliceScopeId::new("test-slice", "main"));
-        assert!(at_path(&keymap, &[key("z"), key("q")], dynamic).is_empty());
+        assert!(at_path(&keymap, &[key("z"), key("q")], &dynamic).is_empty());
     }
 
     #[rstest::rstest]
@@ -531,17 +527,16 @@ mod tests {
         bind_route_rows(&routes, &mut keymap);
 
         // Then the root shows `z` as a group named for the owning slice,
-        let root = at_path(&keymap, &[], Scope::Normal);
+        let root = at_path(&keymap, &[], &Scope::Normal);
         assert!(
             root.iter()
                 .any(|(k, d)| *k == key("z") && d == "test-slice"),
             "root should describe z as a group, got {root:?}"
         );
         // And the `z` group shows `q` as a group too.
-        let zg = at_path(&keymap, &[key("z")], Scope::Normal);
+        let zg = at_path(&keymap, &[key("z")], &Scope::Normal);
         assert!(
-            zg.iter()
-                .any(|(k, d)| *k == key("q") && d == "test-slice"),
+            zg.iter().any(|(k, d)| *k == key("q") && d == "test-slice"),
             "z group should describe q as a group, got {zg:?}"
         );
     }
@@ -572,10 +567,9 @@ mod tests {
         bind_route_rows(&routes, &mut keymap);
 
         // Then the hardcoded description survives.
-        let root = at_path(&keymap, &[], Scope::Normal);
+        let root = at_path(&keymap, &[], &Scope::Normal);
         assert!(
-            root.iter()
-                .any(|(k, d)| *k == key("z") && d == "builtin"),
+            root.iter().any(|(k, d)| *k == key("z") && d == "builtin"),
             "hardcoded group description should win, got {root:?}"
         );
     }
@@ -608,7 +602,7 @@ mod tests {
         // Then no group descriptions were derived: the root's `M-\`>`
         // binding keeps its leaf description, and no stray descriptions
         // appear for any key.
-        let root = at_path(&keymap, &[], Scope::Normal);
+        let root = at_path(&keymap, &[], &Scope::Normal);
         assert!(
             root.iter()
                 .all(|(_, d)| d != "test-slice" && d != "quake-bar"),

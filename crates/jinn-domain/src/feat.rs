@@ -58,6 +58,10 @@ pub mod web_search_actor;
 ///
 /// Test-only seam: keymap tests query [`crate::feat`] consumers like the
 /// quake toggle without standing up the actor system.
+/// # Panics
+///
+/// Panics if the detached quake cell cannot be minted (a fresh
+/// `Slices` never has it registered, so this is unreachable).
 #[must_use]
 pub fn composition_routes() -> crate::common::slices::key_routes::KeyRoutes {
     let routes = crate::common::slices::key_routes::KeyRoutes::new();
@@ -66,12 +70,16 @@ pub fn composition_routes() -> crate::common::slices::key_routes::KeyRoutes {
     // seam mints a detached one (never registered into a live `Slices`)
     // since only row *shape* matters for keymap tests.
     let slices = crate::common::slices::Slices::new();
+    #[expect(
+        clippy::expect_used,
+        reason = "test seam: a fresh Slices never has the quake cell registered"
+    )]
     let cell = slices
         .register(
             quake_bar::quake_bar_slot(),
             quake_bar::QuakeBarState::default(),
         )
-        .expect("detached quake cell");
+        .expect("fresh Slices never has the quake cell registered");
     quake_bar::attach_quake_bar_rows(&routes, &cell);
     quake_bar::register_quake_input_hook(&routes, &cell);
     // The discord row's action is capture-free (it receives the

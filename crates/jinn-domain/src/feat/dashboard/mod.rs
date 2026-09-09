@@ -61,7 +61,7 @@ pub fn activate(services: &mut crate::Services) -> Result<(), jinn_slices::view:
     // after this point cannot be missed, leaving no entries stuck on
     // "Starting". The bridge (spawned earlier in wiring) feeds the
     // topics from the kameo bus.
-    canvas_actor::DashboardCanvasActor::spawn(&services.trouper_system, cell.clone());
+    canvas_actor::DashboardCanvasActor::spawn(&services.trouper_system, &cell);
 
     // Route rows + view + tab declaration.
     attach_dashboard_rows(&services.key_routes);

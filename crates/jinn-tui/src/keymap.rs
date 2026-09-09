@@ -893,10 +893,7 @@ mod tests {
             Intent::Dynamic(d) if d.action == "open" => {
                 assert!(!expected_close, "{scope:?}: got open, expected close");
             }
-            other => assert!(
-                false,
-                "{scope:?}: expected the quake open/close action, got {other:?}"
-            ),
+            other => panic!("{scope:?}: expected the quake open/close action, got {other:?}"),
         }
     }
 

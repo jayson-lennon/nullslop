@@ -236,27 +236,18 @@ impl KeyRoutes {
     /// Matches by `(slice, action)` — the dynamic intent's identity.
     /// `None` means no row serves this intent: the handler treats the
     /// intent as inert.
-    pub fn action_for(
-        &self,
-        intent: &Intent,
-        ctx: ActionCtx<'_>,
-    ) -> Option<IntentResult> {
-        let jinn_slices::DynamicIntent {
-            slice,
-            action,
-            display: _,
-        } = match intent {
-            Intent::Dynamic(dynamic) => dynamic,
-            _ => return None,
+    pub fn action_for(&self, intent: &Intent, ctx: ActionCtx<'_>) -> Option<IntentResult> {
+        let Intent::Dynamic(jinn_slices::DynamicIntent { slice, action, .. }) = intent else {
+            return None;
         };
         let run = {
             let rows = self.rows.rows();
-            rows.into_iter().find_map(|row| match row.outcome {
+            rows.into_iter().find_map(|row| match &row.outcome {
                 RouteOutcome::Action {
                     action: row_action,
-                    display: _,
                     run,
-                } if row_action == action && row.scope == *slice => Some(run),
+                    ..
+                } if row_action == action && row.scope == *slice => Some(run.clone()),
                 _ => None,
             })
         };
@@ -463,16 +454,18 @@ mod tests {
         routes.register_input_hook(
             &scope(),
             std::sync::Arc::new(|intent: &Intent| {
-                if matches!(intent, Intent::DeleteGrapheme) {
-                    Some(IntentResult::empty())
-                } else {
-                    None
-                }
+                matches!(intent, Intent::DeleteGrapheme).then(IntentResult::empty)
             }),
         );
 
         // When looking up the hook.
-        let hook = routes.input_hook(&scope()).expect("hook registered");
+        #[expect(
+            clippy::expect_used,
+            reason = "test helper: the routes under test register their hook"
+        )]
+        let hook = routes
+            .input_hook(&scope())
+            .expect("hook registered in this test's routes");
 
         // Then the hook serves the editing intent and declines others.
         assert!(hook(&Intent::DeleteGrapheme).is_some());

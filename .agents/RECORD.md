@@ -65,6 +65,7 @@ Entries are added or amended **only with human approval**.
 - (dashboard) Dashboard state is a `Slices` cell owned by `DashboardCanvasActor`, fed by events and `DashboardNav` messages; the dashboard folds Discord's `DiscordStatusUpdate` event for display only.
 - (slices) Render slices live in per-slice typed cells behind the `Slices` facade; registration mints exactly one write handle, held by the owning actor; the renderer and intent router hold read handles only.
 - (slices) Slice integration is a single `activate()` per slice called from composition (launch/actor-wiring); removing the call removes the slice with no other edits.
+- (slices) Route rows can bind into named composition scopes via `BindSite::StaticScopes`; a slice's entry-point key (e.g. discord's `gdc`) is a slice-owned route row with no central intent variant, and which-key prefix groups derive from attached rows instead of hardcoded calls.
 - (keybinds) Feature keybinds are route rows carrying scope and key; keymap bindings are generated from registered rows at launch; dynamic intents and scope ids are data-carried, so an unregistered slice leaves no keymap, scope, or intent residue.
 - (discovery) Project discovery walks ancestors from the session cwd up to either a VCS root or `$HOME`, whichever comes first; `$HOME` is exclusive.
 - (discovery) VCS roots are detected by marker files (`.git`, `.hg`, `.fslckout`, `.fossil`, `.jj`), not by shelling out to a VCS CLI.
@@ -229,7 +230,8 @@ Entries are added or amended **only with human approval**.
 - (testing) just lint rejects bare #[test]/#[tokio::test] attributes without an accompanying rstest attribute.
 - (discord) Inbound Discord input — plain messages and every slash command — is accepted only from user IDs listed in `[discord].authorized_users`; an empty or missing list authorizes nobody (deny by default).
 - (discord) Unauthorized slash-command use gets an ephemeral refusal; unauthorized plain messages are silently dropped.
-- (discord) `DiscordStatusUpdate` and `DiscordStatusActor` live in `feat/discord`; discord maintains its own connection cell, the authority for bot-connected checks; the dashboard consumes the event for display only.
+- (discord) `DiscordStatusUpdate` and `DiscordStatusActor` live in `feat/discord`; discord maintains its own connection cell, the authority for bot-connected checks; the dashboard consumes the event for display only. Both discord actors spawn via discord's `activate()`; the event itself carries the dashboard entry's identity (`entry_name`/`entry_description`).
+- (discord) The three gateway kanal channels (bridge events, gateway requests, status updates) are created unconditionally at activate and parked in `Services`; the `[discord] enabled` gate is read once, by the `jinn_discord` frontend crate, which no-ops when disabled.
 - (subagents) Subagents are regular sessions spawned by the `task` tool: fresh history, linked to the parent, inheriting the parent's model, cwd, tools, skills, MCP servers, and a snapshot of the parent's task list; they appear in the sidebar as children marked with a subagent symbol.
 - (subagents) A subagent's task-list mutations do not propagate to its parent's list; parent and child own independent copies after spawn.
 - (subagents) The `task` tool blocks until the child session reaches Idle and forwards the child's last chat entry as its tool result; cancellations forward the cancel entry as a failure.

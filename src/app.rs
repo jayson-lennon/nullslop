@@ -511,29 +511,27 @@ impl App {
                 let intent_handler_cap =
                     jinn_domain::common::tcaps::mint::mint_intent_handler_cap();
                 let (core, services) = self.runtime.block_on(async {
-                        actor_wiring::ActorSystemBuilder::new(
-                            actor_wiring::ActorSystemBuilderArgs {
-                                handle: self.handle(),
-                                llm_service: llm_service.clone(),
-                                provider_registry: provider_registry.clone(),
-                                api_keys: resolved_api_keys.clone(),
-                                config_storage: config_storage.clone(),
-                                session_store: session_store.clone(),
-                                user_preferences_storage: user_preferences_storage.clone(),
-                                app_state_storage: app_state_storage.clone(),
-                                paths: jinn_domain::AppPaths::default(),
-                                browser_profile_override: cli.browser_profile.clone(),
-                                dump_requests: cli.dump_requests.clone(),
-                            },
-                        )
-                        .build()
-                        .await
-                    });
+                    actor_wiring::ActorSystemBuilder::new(actor_wiring::ActorSystemBuilderArgs {
+                        handle: self.handle(),
+                        llm_service: llm_service.clone(),
+                        provider_registry: provider_registry.clone(),
+                        api_keys: resolved_api_keys.clone(),
+                        config_storage: config_storage.clone(),
+                        session_store: session_store.clone(),
+                        user_preferences_storage: user_preferences_storage.clone(),
+                        app_state_storage: app_state_storage.clone(),
+                        paths: jinn_domain::AppPaths::default(),
+                        browser_profile_override: cli.browser_profile.clone(),
+                        dump_requests: cli.dump_requests.clone(),
+                    })
+                    .build()
+                    .await
+                });
 
                 // The discord frontend pulls its parked channels from
                 // `services` and no-ops when `[discord] enabled = false`.
                 jinn_discord::spawn_gateway(
-                    self.handle(),
+                    &self.handle(),
                     &core,
                     &services,
                     session_pool.clone(),
@@ -551,24 +549,22 @@ impl App {
                     jinn_domain::common::tcaps::mint::mint_intent_handler_cap();
                 let store_for_shutdown = session_store.clone();
                 let (core, _services) = self.runtime.block_on(async {
-                        actor_wiring::ActorSystemBuilder::new(
-                            actor_wiring::ActorSystemBuilderArgs {
-                                handle: self.handle(),
-                                llm_service: llm_service.clone(),
-                                provider_registry,
-                                api_keys: resolved_api_keys,
-                                config_storage,
-                                session_store,
-                                user_preferences_storage: user_preferences_storage.clone(),
-                                app_state_storage: app_state_storage.clone(),
-                                paths: jinn_domain::AppPaths::default(),
-                                browser_profile_override: cli.browser_profile.clone(),
-                                dump_requests: cli.dump_requests.clone(),
-                            },
-                        )
-                        .build()
-                        .await
-                    });
+                    actor_wiring::ActorSystemBuilder::new(actor_wiring::ActorSystemBuilderArgs {
+                        handle: self.handle(),
+                        llm_service: llm_service.clone(),
+                        provider_registry,
+                        api_keys: resolved_api_keys,
+                        config_storage,
+                        session_store,
+                        user_preferences_storage: user_preferences_storage.clone(),
+                        app_state_storage: app_state_storage.clone(),
+                        paths: jinn_domain::AppPaths::default(),
+                        browser_profile_override: cli.browser_profile.clone(),
+                        dump_requests: cli.dump_requests.clone(),
+                    })
+                    .build()
+                    .await
+                });
 
                 jinn_tui::load_compaction_prompt(
                     &core.state,

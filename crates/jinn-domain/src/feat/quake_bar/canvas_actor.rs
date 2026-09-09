@@ -37,7 +37,11 @@ impl ServiceActor for QuakeBarCanvasActor {
         _args: &serde_json::Value,
     ) -> Result<Self, trouper::error_stack::Report<RegistryError>> {
         // Never called: the spawn helper injects the cell via `start_with`.
-        unreachable!("QuakeBarCanvasActor is spawned via start_with; start requires the typed cell")
+        Err(
+            trouper::error_stack::IntoReport::into_report(RegistryError::InvalidSpec).attach(
+                "QuakeBarCanvasActor is spawned via start_with; start requires the typed cell",
+            ),
+        )
     }
 }
 
@@ -54,9 +58,13 @@ impl QuakeBarCanvasActor {
     /// A successful [`ActorSystem::subscribe`] is the ordering guarantee:
     /// the topic cursor is registered, so every later publish reaches
     /// the actor's inbox.
+    /// # Panics
+    ///
+    /// Panics if the topic subscription fails — a broken actor system;
+    /// the activation ordering relies on the cursor being registered.
     pub fn spawn(
         system: &std::sync::Arc<ActorSystem>,
-        cell: TypedCell<QuakeBarState>,
+        cell: &TypedCell<QuakeBarState>,
     ) -> ActorPath {
         let path = trouper::builder::spawn_service_builder::<Self>(system)
             .at(ActorPath::new("quake-bar"))
@@ -66,6 +74,10 @@ impl QuakeBarCanvasActor {
             })
             .handles::<SubmitQuakeBarCommand>()
             .start();
+        #[expect(
+            clippy::expect_used,
+            reason = "subscription failure is a broken actor system, not a caller bug"
+        )]
         system
             .subscribe(&path, &trouper_bridge::quake_bar_topic(), None)
             .expect("quake-bar actor subscribes to its topic");
@@ -139,7 +151,7 @@ mod tests {
         let cell = slices
             .register(quake_bar_slot(), QuakeBarState::default())
             .expect("fresh registry");
-        QuakeBarCanvasActor::spawn(&services.trouper_system, cell.clone());
+        QuakeBarCanvasActor::spawn(&services.trouper_system, &cell);
         // When a SubmitQuakeBarCommand is published on the kameo bus.
         services
             .bus

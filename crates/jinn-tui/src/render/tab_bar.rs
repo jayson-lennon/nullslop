@@ -41,7 +41,11 @@ fn tab_label(scope: &SliceScopeId) -> String {
 fn capitalize(word: &str) -> String {
     let mut chars = word.chars();
     match chars.next() {
-        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+        Some(first) => {
+            let mut label: String = first.to_uppercase().collect();
+            label.push_str(chars.as_str());
+            label
+        }
         None => String::new(),
     }
 }
@@ -66,8 +70,8 @@ fn active_tab_index(slices: &jinn_slices::Slices, ctx: &RenderCtx) -> usize {
 /// Renders the tab bar into `area`.
 pub fn render_tab_bar(frame: &mut Frame<'_>, area: Rect, ctx: &RenderCtx) {
     let theme = &ctx.state.frontend.theme;
-    let labels = tab_labels(&ctx.slices);
-    let active = active_tab_index(&ctx.slices, ctx);
+    let labels = tab_labels(ctx.slices);
+    let active = active_tab_index(ctx.slices, ctx);
 
     let mut spans = Vec::new();
     for (idx, label) in labels.iter().enumerate() {
