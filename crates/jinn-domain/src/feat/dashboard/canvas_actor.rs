@@ -45,8 +45,6 @@ use jinn_slices::TypedCell;
 /// surfaces the resolved browser backend (Chrome/Chromium/Bundled).
 const WEB_FETCH_ENTRY: &str = "web-fetch";
 
-const DISCORD_ACTOR_NAME: &str = "discord";
-const DISCORD_DESCRIPTION: &str = "Discord gateway bot [Task]";
 
 /// The dashboard actor on the canvas runtime.
 ///
@@ -221,8 +219,12 @@ fn family_display(family: BinaryFamily) -> &'static str {
 }
 
 /// Apply a discord connection status update to the dashboard state.
+///
+/// The dashboard is a generic consumer: the entry's identity (name,
+/// description) is read from the event itself, never declared here.
 fn apply_discord_update(dashboard: &mut DashboardState, update: &DiscordStatusUpdate) {
     let message = update.full_message();
+    let name = update.entry_name();
     let (lifecycle, with_description) = match update {
         DiscordStatusUpdate::Connecting => {
             // Ensure the discord entry exists with a description even
@@ -247,20 +249,21 @@ fn apply_discord_update(dashboard: &mut DashboardState, update: &DiscordStatusUp
     };
 
     if let Some(lifecycle) = lifecycle {
-        let description = with_description.then(|| DISCORD_DESCRIPTION.to_owned());
+        let description =
+            with_description.then(|| update.entry_description().to_owned());
         match lifecycle {
             crate::feat::dashboard::ActorLifecycle::Starting => {
-                dashboard.mark_starting(DISCORD_ACTOR_NAME, description);
+                dashboard.mark_starting(name, description);
             }
             crate::feat::dashboard::ActorLifecycle::Running => {
-                dashboard.mark_running(DISCORD_ACTOR_NAME, description);
+                dashboard.mark_running(name, description);
             }
             crate::feat::dashboard::ActorLifecycle::Dead => {
-                dashboard.mark_dead(DISCORD_ACTOR_NAME, description);
+                dashboard.mark_dead(name, description);
             }
         }
     }
-    dashboard.set_status_message(DISCORD_ACTOR_NAME, Some(message));
+    dashboard.set_status_message(name, Some(message));
 }
 
 #[cfg(test)]
@@ -496,10 +499,14 @@ mod tests {
             })
             .await;
 
-        // Then the entry is created with the discord description.
+        // Then the entry is created with the identity carried by the
+        // event itself.
+        let expected = DiscordStatusUpdate::Error { message: String::new() }
+            .entry_description()
+            .to_owned();
         wait_for(|| {
             dashboard_entry(&cell, "discord")
-                .is_some_and(|(_, _, d)| d.as_deref() == Some("Discord gateway bot [Task]"))
+                .is_some_and(|(_, _, d)| d.as_deref() == Some(expected.as_str()))
         })
         .await;
     }

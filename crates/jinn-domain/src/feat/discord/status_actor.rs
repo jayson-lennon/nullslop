@@ -45,6 +45,20 @@ pub enum DiscordStatusUpdate {
 impl BusMessage for DiscordStatusUpdate {}
 
 impl DiscordStatusUpdate {
+    /// The dashboard entry name for the discord gateway. Discord facts
+    /// live here, not in consumers — the dashboard folds this identity
+    /// straight from the event.
+    #[must_use]
+    pub fn entry_name(&self) -> &'static str {
+        "discord"
+    }
+
+    /// The dashboard entry description for the discord gateway.
+    #[must_use]
+    pub fn entry_description(&self) -> &'static str {
+        "Discord gateway bot [Task]"
+    }
+
     /// Renders the update into the dashboard `status_message` string.
     #[must_use]
     pub fn display_message(&self) -> &'static str {
