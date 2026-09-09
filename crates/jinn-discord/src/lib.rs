@@ -10,5 +10,7 @@ pub mod commands;
 pub mod feat;
 pub mod gateway;
 pub mod session_route;
+pub mod spawn;
 
 pub use gateway::{BotData, SpawnError};
+pub use spawn::spawn_gateway;

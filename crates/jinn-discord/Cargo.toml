@@ -24,6 +24,7 @@ error-stack = { workspace = true }
 wherror = { workspace = true }
 derive_more = { workspace = true }
 kanal = { workspace = true }
+daow = { workspace = true }
 
 [dev-dependencies]
 rstest = { workspace = true }

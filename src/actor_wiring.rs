@@ -118,15 +118,7 @@ impl ActorSystemBuilder {
         Self { args }
     }
     /// Spawn all actors via kameo, build the bus and bridge, and wait for readiness.
-    pub async fn build(
-        self,
-    ) -> (
-        AppCore,
-        Services,
-        Option<kanal::AsyncReceiver<jinn_domain::feat::discord::BridgeEvent>>,
-        Option<kanal::AsyncReceiver<jinn_domain::feat::discord::GatewayRequest>>,
-        kanal::Sender<jinn_domain::feat::discord::DiscordStatusUpdate>,
-    ) {
+    pub async fn build(self) -> (AppCore, Services) {
         let ActorSystemBuilderArgs {
             handle,
             llm_service,
@@ -207,6 +199,7 @@ impl ActorSystemBuilder {
             trouper_system: std::sync::Arc::new(trouper::system::ActorSystem::new(
                 trouper::system::SystemConfig::production(),
             )),
+            discord: jinn_domain::feat::discord::DiscordGatewayChannels::detached(),
         };
 
         let actor_deps = ActorDeps {
@@ -243,37 +236,14 @@ impl ActorSystemBuilder {
             panic!("dashboard slice activation failed: {error}");
         }
 
-        // ── Discord status actor ───────────────────────────────────────
-        // A pure translator: drains the gateway kanal channel and
-        // republishes DiscordStatusUpdate on the bus, folding the
-        // authoritative connection fact into discord's own cell. The
-        // DashboardActor above consumes the event for display only.
-        // Spawned after the dashboard actor so its publications are not
-        // missed.
-        let (discord_status_tx, discord_status_rx) =
-            kanal::unbounded::<jinn_domain::feat::discord::DiscordStatusUpdate>();
-        let connection_cell = services
-            .slices
-            .register(
-                jinn_domain::feat::discord::discord_connection_slot(),
-                jinn_domain::feat::discord::ConnectionState {
-                    connected: false,
-                    detail: None,
-                },
-            )
-            .expect("discord connection slot is registered exactly once at wiring");
-        let _discord_status = jinn_domain::feat::discord::DiscordStatusActor::supervise(
-            &root,
-            jinn_domain::feat::discord::DiscordStatusActorDeps {
-                deps: actor_deps.clone(),
-                status_rx: discord_status_rx.to_async(),
-                cell: connection_cell,
-            },
-        )
-        .restart_policy(kameo::supervision::RestartPolicy::Never)
-        .spawn()
-        .await;
-        _discord_status.wait_for_startup().await;
+        // ── Discord slice ─────────────────────────────────────────────
+        // Activation mints the connection cell, spawns the status
+        // actor (the connection authority — after the dashboard so its
+        // publications are not missed), creates the gateway kanal
+        // channels unconditionally, config-gates the bridge actor, and
+        // attaches the `gdc` route row. Slice integration is exactly
+        // this call.
+        jinn_domain::feat::discord::activate(&mut services, state.clone()).await;
 
         // Quake bar slice: activation mints the cell, spawns the actor
         // (submit-log writer), attaches rows, and registers the input
@@ -1477,40 +1447,6 @@ jinn_domain::feat::preferences_actor::preferences_actor::PreferencesActor::super
             .await
         );
 
-        // Conditionally spawned when `[discord] enabled = true` in jinn.toml.
-        // The bridge forwards bus events (turn-finished, setup-completed) onto a
-        // bounded channel that the poise gateway task drains. The gateway itself
-        // is spawned AFTER build() returns in app.rs (so it never blocks readiness).
-        let discord_cfg = user_preferences_storage.read().discord.clone();
-        let (discord_bridge_rx, discord_gateway_rx) = if discord_cfg.enabled {
-            let (tx, rx) = kanal::bounded::<jinn_domain::feat::discord::BridgeEvent>(64);
-            let async_rx = rx.to_async();
-            let (gw_tx, gw_rx) = kanal::bounded::<jinn_domain::feat::discord::GatewayRequest>(16);
-            let gw_async_rx = gw_rx.to_async();
-            let _discord_bridge = spawn_tracked!(
-                &services.bus,
-                "discord-bridge",
-                "DiscordBridgeActor",
-                jinn_domain::feat::discord::DiscordBridgeActor::supervise(
-                    &root,
-                    jinn_domain::feat::discord::DiscordBridgeActorDeps {
-                        deps: actor_deps.clone(),
-                        tx,
-                        gateway_tx: gw_tx,
-                        state: state.clone(),
-                        session_cap: jinn_domain::common::tcaps::mint::mint_session_cap(),
-                    },
-                )
-                .restart_policy(kameo::supervision::RestartPolicy::Never)
-                .spawn()
-                .await
-            );
-
-            (Some(async_rx), Some(gw_async_rx))
-        } else {
-            (None, None)
-        };
-
         // Browser binary scan: verifies the configured browser binary once at
         // startup (subscribes to EnvironmentLoaded). Not a session-scoped scan.
         let _browser_binary_scan = spawn_tracked!(
@@ -1574,12 +1510,6 @@ jinn_domain::feat::preferences_actor::preferences_actor::PreferencesActor::super
             bridge: services.bridge.clone(),
         };
 
-        (
-            core,
-            services,
-            discord_bridge_rx,
-            discord_gateway_rx,
-            discord_status_tx,
-        )
+        (core, services)
     }
 }

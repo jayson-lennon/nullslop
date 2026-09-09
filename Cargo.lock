@@ -2639,6 +2639,7 @@ dependencies = [
 name = "jinn-discord"
 version = "0.115.1"
 dependencies = [
+ "daow",
  "derive_more",
  "error-stack 0.7.1",
  "jinn-domain",

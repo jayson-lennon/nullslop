@@ -7,8 +7,10 @@
 //! lives in a separate `jinn-discord` crate so the domain never depends on
 //! serenity.
 
+pub mod activate;
 pub mod authorize;
 pub mod bridge_actor;
+pub mod channels;
 pub mod config;
 pub mod key_routes;
 pub mod message_split;
@@ -19,7 +21,9 @@ pub mod status_actor;
 pub mod thread_map;
 pub mod to_thread_intent;
 
+pub use activate::activate;
 pub use bridge_actor::{DiscordBridgeActor, DiscordBridgeActorDeps};
+pub use channels::DiscordGatewayChannels;
 pub use config::DiscordConfig;
 pub use key_routes::attach_discord_rows;
 pub use key_routes::discord_scope;

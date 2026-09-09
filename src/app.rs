@@ -510,8 +510,7 @@ impl App {
             Commands::Tui => {
                 let intent_handler_cap =
                     jinn_domain::common::tcaps::mint::mint_intent_handler_cap();
-                let (core, services, discord_rx, discord_gw_rx, discord_status_tx) =
-                    self.runtime.block_on(async {
+                let (core, services) = self.runtime.block_on(async {
                         actor_wiring::ActorSystemBuilder::new(
                             actor_wiring::ActorSystemBuilderArgs {
                                 handle: self.handle(),
@@ -531,31 +530,16 @@ impl App {
                         .await
                     });
 
-                // Spawn the Discord bot gateway task when enabled. Runs detached
-                // alongside the TUI; drives the same actor system over the bus.
-                if let Some(rx) = discord_rx {
-                    self.handle().spawn(jinn_discord::gateway::run(
-                        jinn_discord::gateway::BotData {
-                            state: core.state.clone(),
-                            bridge: core.bridge.clone(),
-                            thread_map: jinn_domain::feat::discord::DiscordThreadMap::new(
-                                session_pool.clone(),
-                            ),
-                            config: std::sync::Arc::new(
-                                user_preferences_storage.read().discord.clone(),
-                            ),
-                            services: services.clone(),
-                            intent_handler_cap,
-                        },
-                        std::env::var("DISCORD_BOT_TOKEN")
-                            .ok()
-                            .or_else(|| user_preferences_storage.read().discord.bot_token.clone())
-                            .unwrap_or_default(),
-                        rx,
-                        discord_gw_rx.expect("gw_rx present when bridge_rx is"),
-                        discord_status_tx,
-                    ));
-                }
+                // The discord frontend pulls its parked channels from
+                // `services` and no-ops when `[discord] enabled = false`.
+                jinn_discord::spawn_gateway(
+                    self.handle(),
+                    &core,
+                    &services,
+                    session_pool.clone(),
+                    &user_preferences_storage,
+                    &intent_handler_cap,
+                );
 
                 let app = jinn_tui::launch(core, services).change_context(AppError)?;
                 let runner = Runner::Tui(Box::new(app));
@@ -566,8 +550,7 @@ impl App {
                 let intent_handler_cap =
                     jinn_domain::common::tcaps::mint::mint_intent_handler_cap();
                 let store_for_shutdown = session_store.clone();
-                let (core, _services, _discord_rx, _discord_gw_rx, _discord_status_tx) =
-                    self.runtime.block_on(async {
+                let (core, _services) = self.runtime.block_on(async {
                         actor_wiring::ActorSystemBuilder::new(
                             actor_wiring::ActorSystemBuilderArgs {
                                 handle: self.handle(),

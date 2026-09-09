@@ -304,6 +304,7 @@ impl TestServices {
             trouper_system: Arc::new(trouper::system::ActorSystem::new(
                 trouper::system::SystemConfig::production(),
             )),
+            discord: crate::feat::discord::DiscordGatewayChannels::detached(),
         }
     }
 }

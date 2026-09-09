@@ -149,6 +149,12 @@ pub struct Services {
     /// by the kameo→trouper bridge. See `.plans/actor-canvas/plan.md`.
     #[debug(skip)]
     pub trouper_system: Arc<trouper::system::ActorSystem>,
+
+    /// Discord's parked gateway channels (gateway-facing rx halves +
+    /// the status sender). A detached dummy until discord's `activate`
+    /// replaces it with the live set; sends fail closed meanwhile.
+    #[debug(skip)]
+    pub discord: crate::feat::discord::DiscordGatewayChannels,
 }
 
 impl Services {
@@ -225,6 +231,7 @@ impl Services {
             trouper_system: Arc::new(trouper::system::ActorSystem::new(
                 trouper::system::SystemConfig::production(),
             )),
+            discord: crate::feat::discord::DiscordGatewayChannels::detached(),
         }
     }
 
@@ -281,6 +288,7 @@ impl Services {
             trouper_system: Arc::new(trouper::system::ActorSystem::new(
                 trouper::system::SystemConfig::production(),
             )),
+            discord: crate::feat::discord::DiscordGatewayChannels::detached(),
         }
     }
 }
