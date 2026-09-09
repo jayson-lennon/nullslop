@@ -17,6 +17,7 @@ use jinn_domain::common::slices::key_routes::RouteOutcome;
 use jinn_domain::common::slices::key_routes::RouteRow;
 use jinn_slices::SliceScopeId;
 use ratatui_which_key::Keymap;
+use ratatui_which_key::parse_key_sequence;
 
 use crate::keymap::KeyCategory;
 use crate::scope::Scope;
@@ -47,19 +48,34 @@ fn category(name: &str) -> KeyCategory {
 
 /// The keymap scope a row binds into.
 ///
-/// `OwnScope` rows bind in their slice's dynamic scope;
-/// `GlobalToggle` rows bind in every static scope (skipping the
-/// slice's own scope, where its own close row wins) and in other
-/// slices' dynamic scopes.
+/// `OwnScope` rows bind in their slice's dynamic scope; `GlobalToggle`
+/// rows bind in every static scope (skipping the slice's own scope,
+/// where its own close row wins) and in other slices' dynamic scopes;
+/// `StaticScopes` rows bind in the named composition scopes, looked up
+/// by display name.
 fn scopes_for_row<'a>(
     row: &'a RouteRow,
     tabs: &'a [SliceScopeId],
     hooks: &'a [SliceScopeId],
 ) -> Vec<Scope> {
-    let terminal_scopes = [Scope::TerminalView, Scope::TerminalControl];
     match row.site {
         BindSite::OwnScope => vec![Scope::Dynamic(row.scope.clone())],
+        BindSite::StaticScopes(names) => names
+            .iter()
+            .filter_map(|name| match name.parse::<Scope>() {
+                Ok(scope) => Some(scope),
+                Err(()) => {
+                    tracing::warn!(
+                        route = row.route_id.as_str(),
+                        scope = name,
+                        "static-scope row names an unknown scope; key unbound there"
+                    );
+                    None
+                }
+            })
+            .collect(),
         BindSite::GlobalToggle => {
+            let terminal_scopes = [Scope::TerminalView, Scope::TerminalControl];
             let mut scopes: Vec<Scope> = [
                 Scope::Normal,
                 Scope::Input,
@@ -126,6 +142,71 @@ pub fn dynamic_scopes(routes: &KeyRoutes) -> Vec<SliceScopeId> {
     scopes
 }
 
+/// Derives which-key group descriptions from row keys.
+///
+/// A multi-token sequence (e.g. `gdc` — three keys) implies a group at
+/// each proper prefix (`g`, `gd`): the prefix must describe itself or
+/// the which-key popup shows it as an undescribed node. Descriptions
+/// come from the owning slice's `feature` label. Existing descriptions
+/// win: the keymap only fills `"..."` placeholders, so hardcoded group
+/// descriptions (`g` → "general") are never clobbered — and the same
+/// prefix reached via two slices merges into one group.
+///
+/// Groups derive at keymap level (not per scope): a scoped leaf binding
+/// shadows the shared branch description in its own scope, while scopes
+/// without a scoped leaf keep the group visible.
+fn derive_groups_from_rows(
+    rows: &[RouteRow],
+    keymap: &mut Keymap<KeyEvent, Scope, Intent, KeyCategory>,
+) {
+    let mut prefixes: Vec<(String, &'static str)> = Vec::new();
+    for row in rows {
+        // The leader placeholder only matters for `<leader>` notation,
+        // which row keys never use.
+        let tokens = parse_key_sequence::<KeyEvent>(row.key, &plain_key('\\'));
+        for n in 1..tokens.len() {
+            // A prefix is only derivable when its display form re-parses
+            // to exactly the same tokens: plain chars and `<c-x>`/`<m-x>`
+            // forms round-trip; named keys (`Tab`, `Esc`) and shifted
+            // forms (`S-x`) do not. Joining can also fuse tokens
+            // (`<M-a>` + `b` → `<M-ab>`), so equality is checked on the
+            // re-parsed sequence, not per token.
+            let notation = describe_prefix(&tokens[..n]);
+            let reparsed = parse_key_sequence::<KeyEvent>(&notation, &plain_key('\\'));
+            if reparsed != tokens[..n] {
+                break;
+            }
+            if let Some(existing) = prefixes.iter_mut().find(|(p, _)| *p == notation) {
+                if existing.1 != row.feature {
+                    existing.1 = "actions";
+                }
+            } else {
+                prefixes.push((notation, row.feature));
+            }
+        }
+    }
+    for (prefix, label) in prefixes {
+        keymap.describe_group(&prefix, label);
+    }
+}
+
+/// A bare character key with no modifiers.
+fn plain_key(c: char) -> KeyEvent {
+    KeyEvent {
+        key: Key::Char(c),
+        modifiers: jinn_domain::Modifiers::none(),
+    }
+}
+
+/// Joins parsed key tokens back into display notation.
+fn describe_prefix(tokens: &[KeyEvent]) -> String {
+    let mut out = String::new();
+    for token in tokens {
+        out.push_str(&ratatui_which_key::Key::display(token));
+    }
+    out
+}
+
 /// Materializes every attached route row as keymap bindings.
 ///
 /// Called once after all slice activations, before the event loop. The
@@ -137,6 +218,7 @@ pub fn bind_route_rows(
 ) {
     let rows = routes.rows();
     let hooks = routes.hook_scopes();
+    derive_groups_from_rows(&rows, keymap);
     // Row scopes that host other slices' global toggles: every registered
     // scope (rows + hooks) except the row's own, where its OwnScope rows
     // must win.
@@ -220,6 +302,8 @@ mod tests {
     use crate::keymap::KeyCategory;
     use crate::scope::Scope;
     use jinn_domain::Intent;
+    use jinn_domain::Key;
+    use jinn_domain::KeyEvent;
     use jinn_domain::common::slices::key_routes::ActionFn;
     use jinn_domain::common::slices::key_routes::BindSite;
     use jinn_domain::common::slices::key_routes::KeyRoutes;
@@ -333,5 +417,203 @@ mod tests {
         assert_eq!(category("general"), KeyCategory::General);
         // And an unknown hint falls back to General.
         assert_eq!(category("whatever"), KeyCategory::General);
+    }
+
+    fn key(notation: &str) -> KeyEvent {
+        KeyEvent::parse_notation(notation).expect("notation should parse")
+    }
+
+    fn leaf_at(
+        keymap: &Keymap<KeyEvent, Scope, Intent, KeyCategory>,
+        keys: &[KeyEvent],
+        scope: Scope,
+    ) -> Option<Intent> {
+        match keymap.navigate(keys, &scope) {
+            Some(ratatui_which_key::NodeResult::Leaf { action }) => Some(action),
+            _ => None,
+        }
+    }
+
+    fn at_path(
+        keymap: &Keymap<KeyEvent, Scope, Intent, KeyCategory>,
+        keys: &[KeyEvent],
+        scope: Scope,
+    ) -> Vec<(KeyEvent, String)> {
+        keymap
+            .children_at_path(keys, &scope)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|b| (b.key, b.description))
+            .collect()
+    }
+
+    #[rstest::rstest]
+    #[test]
+    fn static_scope_row_binds_only_in_listed_scopes() {
+        // Given a route table with a row bound to the Normal scope only.
+        let routes = KeyRoutes::new();
+        routes.attach(RouteRow {
+            route_id: RouteId::new("test:act"),
+            scope: SliceScopeId::new("test-slice", "main"),
+            key: "zq",
+            category: "general",
+            site: BindSite::StaticScopes(&["Normal"]),
+            feature: "test-slice",
+            outcome: RouteOutcome::Action {
+                action: "act",
+                display: "test action",
+                run: ActionFn::new(|| IntentResult::empty()),
+            },
+        });
+
+        // When generating bindings into a fresh keymap.
+        let mut keymap = Keymap::new();
+        bind_route_rows(&routes, &mut keymap);
+
+        // Then Normal resolves the row's dynamic intent.
+        let normal = leaf_at(&keymap, &[key("z"), key("q")], Scope::Normal);
+        assert!(normal.is_some(), "Normal should bind the zq sequence");
+        // And Input does not: the row named only Normal.
+        let input = leaf_at(&keymap, &[key("z"), key("q")], Scope::Input);
+        assert!(input.is_none(), "Input should not bind the zq sequence");
+    }
+
+    #[rstest::rstest]
+    #[test]
+    fn static_scope_row_skips_unknown_scope_names() {
+        // Given a route table with a row naming a nonexistent scope.
+        let routes = KeyRoutes::new();
+        routes.attach(RouteRow {
+            route_id: RouteId::new("test:act"),
+            scope: SliceScopeId::new("test-slice", "main"),
+            key: "zq",
+            category: "general",
+            site: BindSite::StaticScopes(&["NoSuchScope"]),
+            feature: "test-slice",
+            outcome: RouteOutcome::Action {
+                action: "act",
+                display: "test action",
+                run: ActionFn::new(|| IntentResult::empty()),
+            },
+        });
+
+        // When generating bindings into a fresh keymap.
+        let mut keymap = Keymap::new();
+        bind_route_rows(&routes, &mut keymap);
+
+        // Then no scope gained the binding.
+        assert!(at_path(&keymap, &[key("z"), key("q")], Scope::Normal).is_empty());
+        // And the dynamic scope didn't silently inherit it either.
+        let dynamic = Scope::Dynamic(SliceScopeId::new("test-slice", "main"));
+        assert!(at_path(&keymap, &[key("z"), key("q")], dynamic).is_empty());
+    }
+
+    #[rstest::rstest]
+    #[test]
+    fn multi_key_row_describes_prefix_groups() {
+        // Given a route table with a three-key row (`zqc`).
+        let routes = KeyRoutes::new();
+        routes.attach(RouteRow {
+            route_id: RouteId::new("test:act"),
+            scope: SliceScopeId::new("test-slice", "main"),
+            key: "zqc",
+            category: "general",
+            site: BindSite::StaticScopes(&["Normal"]),
+            feature: "test-slice",
+            outcome: RouteOutcome::Action {
+                action: "act",
+                display: "test action",
+                run: ActionFn::new(|| IntentResult::empty()),
+            },
+        });
+
+        // When generating bindings into a fresh keymap.
+        let mut keymap = Keymap::new();
+        bind_route_rows(&routes, &mut keymap);
+
+        // Then the root shows `z` as a group named for the owning slice,
+        let root = at_path(&keymap, &[], Scope::Normal);
+        assert!(
+            root.iter()
+                .any(|(k, d)| *k == key("z") && d == "test-slice"),
+            "root should describe z as a group, got {root:?}"
+        );
+        // And the `z` group shows `q` as a group too.
+        let zg = at_path(&keymap, &[key("z")], Scope::Normal);
+        assert!(
+            zg.iter()
+                .any(|(k, d)| *k == key("q") && d == "test-slice"),
+            "z group should describe q as a group, got {zg:?}"
+        );
+    }
+
+    #[rstest::rstest]
+    #[test]
+    fn derived_groups_never_clobber_hardcoded_descriptions() {
+        // Given a keymap with a hardcoded `z` group ("builtin") and a
+        // route table whose row would derive `z` ("test-slice").
+        let mut keymap = Keymap::new();
+        keymap.describe_group_with_category("z", "builtin", KeyCategory::General);
+        let routes = KeyRoutes::new();
+        routes.attach(RouteRow {
+            route_id: RouteId::new("test:act"),
+            scope: SliceScopeId::new("test-slice", "main"),
+            key: "zq",
+            category: "general",
+            site: BindSite::StaticScopes(&["Normal"]),
+            feature: "test-slice",
+            outcome: RouteOutcome::Action {
+                action: "act",
+                display: "test action",
+                run: ActionFn::new(|| IntentResult::empty()),
+            },
+        });
+
+        // When generating bindings into that keymap.
+        bind_route_rows(&routes, &mut keymap);
+
+        // Then the hardcoded description survives.
+        let root = at_path(&keymap, &[], Scope::Normal);
+        assert!(
+            root.iter()
+                .any(|(k, d)| *k == key("z") && d == "builtin"),
+            "hardcoded group description should win, got {root:?}"
+        );
+    }
+
+    #[rstest::rstest]
+    #[test]
+    fn single_token_keys_never_derive_groups() {
+        // Given a route table with only single-token rows (the `<M-\`>` quake
+        // toggle and a plain `k`).
+        let routes = KeyRoutes::new();
+        routes.attach(quake_open_row());
+        routes.attach(RouteRow {
+            route_id: RouteId::new("test:act"),
+            scope: SliceScopeId::new("test-slice", "main"),
+            key: "k",
+            category: "navigation",
+            site: BindSite::StaticScopes(&["Normal"]),
+            feature: "test-slice",
+            outcome: RouteOutcome::Action {
+                action: "act",
+                display: "test action",
+                run: ActionFn::new(|| IntentResult::empty()),
+            },
+        });
+
+        // When generating bindings into a fresh keymap.
+        let mut keymap = Keymap::new();
+        bind_route_rows(&routes, &mut keymap);
+
+        // Then no group descriptions were derived: the root's `M-\`>`
+        // binding keeps its leaf description, and no stray descriptions
+        // appear for any key.
+        let root = at_path(&keymap, &[], Scope::Normal);
+        assert!(
+            root.iter()
+                .all(|(_, d)| d != "test-slice" && d != "quake-bar"),
+            "no derived group descriptions should exist, got {root:?}"
+        );
     }
 }

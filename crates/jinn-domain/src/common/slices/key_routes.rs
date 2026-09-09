@@ -12,8 +12,10 @@
 //! enums.
 //!
 //! Rows also declare *where* their key binds: a slice's own dynamic
-//! scope ([`BindSite::OwnScope`]) or every composition scope
-//! ([`BindSite::GlobalToggle`] — e.g. the key that opens the slice).
+//! scope ([`BindSite::OwnScope`]), every composition scope
+//! ([`BindSite::GlobalToggle`] — e.g. the key that opens the slice), or
+//! named static scopes only ([`BindSite::StaticScopes`] — a key that
+//! belongs to a composition context, not to the slice's scope).
 //! Composition's generator walks the rows; nothing else does.
 //!
 //! Alongside the rows, a slice may register one *input hook* per scope
@@ -67,6 +69,15 @@ pub enum BindSite {
     /// Within the slice's own scope the row is skipped, letting the
     /// slice's own binding (e.g. a close key) win.
     GlobalToggle,
+    /// Bind in the named composition (static) scopes only — for slices
+    /// whose key belongs to a static context (e.g. normal-mode command
+    /// prefixes) rather than to the slice's dynamic scope or everywhere.
+    ///
+    /// Names are `Scope` display forms (e.g. `"Normal"`); unknown names
+    /// warn and skip at generation time. The owning slice's dynamic
+    /// scope is never included — a row's scope is where its dynamic
+    /// intent resolves, not where it must be displayable.
+    StaticScopes(&'static [&'static str]),
 }
 
 /// What a row's keypress produces.
