@@ -302,7 +302,6 @@ mod tests {
     use crate::keymap::KeyCategory;
     use crate::scope::Scope;
     use jinn_domain::Intent;
-    use jinn_domain::Key;
     use jinn_domain::KeyEvent;
     use jinn_domain::common::slices::key_routes::ActionFn;
     use jinn_domain::common::slices::key_routes::BindSite;

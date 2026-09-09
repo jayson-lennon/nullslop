@@ -10,6 +10,7 @@
 pub mod authorize;
 pub mod bridge_actor;
 pub mod config;
+pub mod key_routes;
 pub mod message_split;
 pub mod protocol;
 pub mod reply;
@@ -20,6 +21,8 @@ pub mod to_thread_intent;
 
 pub use bridge_actor::{DiscordBridgeActor, DiscordBridgeActorDeps};
 pub use config::DiscordConfig;
+pub use key_routes::attach_discord_rows;
+pub use key_routes::discord_scope;
 pub use message_split::split_message;
 pub use protocol::{
     BridgeEvent, CreateThreadForSession, CreateThreadReason, DiscordThreadCreateFailed,

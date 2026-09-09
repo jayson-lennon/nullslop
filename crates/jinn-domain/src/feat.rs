@@ -74,5 +74,8 @@ pub fn composition_routes() -> crate::common::slices::key_routes::KeyRoutes {
         .expect("detached quake cell");
     quake_bar::attach_quake_bar_rows(&routes, &cell);
     quake_bar::register_quake_input_hook(&routes, &cell);
+    // The discord row's action is capture-free (it receives the
+    // handler's borrows at dispatch), so attaching needs no handles.
+    discord::attach_discord_rows(&routes);
     routes
 }

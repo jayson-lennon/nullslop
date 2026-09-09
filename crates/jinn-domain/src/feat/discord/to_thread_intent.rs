@@ -1,5 +1,5 @@
-//! Intent handler for `Intent::ToDiscordThread` ("gdc" — continue a jinn session
-//! in a Discord forum thread).
+//! Intent action for the discord slice's "gdc" route row — continue a jinn
+//! session in a Discord forum thread.
 //!
 //! This is the jinn-side entry point. It runs pure precondition checks over
 //! [`AppState`] and, only on success, emits a [`CreateThreadForSession`] bus
@@ -17,13 +17,14 @@
 
 use crate::common::app_state::AppState;
 use crate::common::slices::Slices;
+use crate::common::slices::key_routes::ActionCtx;
 use crate::feat::discord::protocol::CreateThreadForSession;
 use crate::feat::discord::status_actor::ConnectionState;
 use crate::feat::discord::status_actor::discord_connection_slot;
 use crate::feat::session::chat_entry::ChatEntry;
 use crate::protocol::IntentResult;
 
-/// Handle `Intent::ToDiscordThread`.
+/// Run the to-thread action (the `gdc` route row).
 ///
 /// Precondition chain (first failure wins):
 /// 1. Active session has a title (else "send a message first").
@@ -37,7 +38,8 @@ use crate::protocol::IntentResult;
 ///
 /// This function never returns `Err` — failures push a `ChatEntry::error`
 /// into the active session and yield an empty `IntentResult`.
-pub fn handle_to_discord_thread(state: &mut AppState, slices: &Slices) -> IntentResult {
+pub fn handle_to_discord_thread(ctx: ActionCtx<'_>) -> IntentResult {
+    let ActionCtx { state, slices } = ctx;
     // Precondition 1: title exists. The session title is `None` until the first
     // user message is sent, so this also gates the "empty session" case.
     let Some(title) = state.active_session().title().map(str::to_owned) else {
@@ -108,6 +110,7 @@ mod tests {
     use super::handle_to_discord_thread;
     use crate::common::app_state::AppState;
     use crate::common::slices::Slices;
+    use crate::common::slices::key_routes::ActionCtx;
     use crate::feat::discord::ConnectionState;
     use crate::feat::discord::discord_connection_slot;
     use crate::feat::session::chat_entry::ChatEntryKind;
@@ -137,6 +140,10 @@ mod tests {
         (state, slices)
     }
 
+    fn ctx<'a>(state: &'a mut AppState, slices: &'a Slices) -> ActionCtx<'a> {
+        ActionCtx { state, slices }
+    }
+
     fn last_entry_kind(state: &AppState) -> &ChatEntryKind {
         &state
             .active_session()
@@ -151,8 +158,8 @@ mod tests {
         // Given a session with all preconditions met.
         let (mut state, slices) = happy_state();
 
-        // When handling ToDiscordThread.
-        let result = handle_to_discord_thread(&mut state, &slices);
+        // When running the to-thread action.
+        let result = handle_to_discord_thread(ctx(&mut state, &slices));
 
         // Then exactly one CreateThreadForSession is emitted.
         assert_eq!(result.message_names.len(), 1);
@@ -184,8 +191,8 @@ mod tests {
             .expect("fresh registry");
         cell.update(|c| c.connected = true);
 
-        // When handling ToDiscordThread.
-        let result = handle_to_discord_thread(&mut state, &slices);
+        // When running the to-thread action.
+        let result = handle_to_discord_thread(ctx(&mut state, &slices));
 
         // Then no command is emitted — the gateway is never reached.
         assert!(result.message_names.is_empty());
@@ -199,8 +206,8 @@ mod tests {
         let (mut state, slices) = happy_state();
         state.frontend.preferences.discord.enabled = false;
 
-        // When handling ToDiscordThread.
-        let result = handle_to_discord_thread(&mut state, &slices);
+        // When running the to-thread action.
+        let result = handle_to_discord_thread(ctx(&mut state, &slices));
 
         // Then no command is emitted, and an error entry is pushed.
         assert!(result.message_names.is_empty());
@@ -217,8 +224,8 @@ mod tests {
             .expect("seeded");
         cell.update(|c| c.connected = false);
 
-        // When handling ToDiscordThread.
-        let result = handle_to_discord_thread(&mut state, &slices);
+        // When running the to-thread action.
+        let result = handle_to_discord_thread(ctx(&mut state, &slices));
 
         // Then no command is emitted, and an error entry is pushed.
         assert!(result.message_names.is_empty());

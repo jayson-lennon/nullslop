@@ -809,10 +809,6 @@ impl IntentHandler {
                 state.frontend.scope_stack.swap_base(new_base);
                 IntentResult::empty()
             }
-            Intent::ToDiscordThread => {
-                feat::discord::to_thread_intent::handle_to_discord_thread(state, slices)
-            }
-
             Intent::ToggleTerminalOverlay { session_id } => {
                 crate::feat::interactive_term::overlay_intent::handle_toggle_overlay(
                     state,

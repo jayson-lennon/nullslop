@@ -202,7 +202,6 @@ pub fn init_with_control_toggle(control_toggle: &str) -> Keymap<KeyEvent, Scope,
             .describe_group_with_category("g", "general", KeyCategory::General)
             .describe_group_with_category("gm", "model", KeyCategory::Model)
             .describe_group_with_category("gc", "context", KeyCategory::Context)
-            .describe_group_with_category("gd", "discord", KeyCategory::General)
             .bind("<leader>sl", Intent::OpenPicker { kind: PickerKind::SessionLifecycle }, KeyCategory::General)
             .bind("<leader>sc", Intent::OpenPicker { kind: PickerKind::CompactionModel }, KeyCategory::Model)
             .describe_group_with_category("<leader>c", "change", KeyCategory::General)
@@ -214,7 +213,6 @@ pub fn init_with_control_toggle(control_toggle: &str) -> Keymap<KeyEvent, Scope,
             .bind("gcp", Intent::OpenPrunerAccumulationInput, KeyCategory::Context)
             // Isolate selected entry: force-include its tool loop, force-exclude the rest
             .bind("gci", Intent::ChatEntryIsolateSelected, KeyCategory::Context)
-            .bind("gdc", Intent::ToDiscordThread, KeyCategory::General)
             .bind("<c-l>", Intent::SidebarFocus, KeyCategory::Navigation)
             .bind("<M-s>", Intent::SidebarFocusSessions, KeyCategory::Navigation)
             // Sidebar resize
@@ -1418,11 +1416,11 @@ mod tests {
         }
     }
     #[rstest::rstest]
-    fn gdc_resolves_to_to_discord_thread() {
-        // Given the default keymap.
+    fn gdc_binds_in_normal_scope_via_the_route_table() {
+        // Given the composed keymap (init + every slice's rows).
         use jinn_domain::{Key, KeyEvent, Modifiers};
         use ratatui_which_key::NodeResult;
-        let keymap = init();
+        let keymap = init_with_slices();
 
         // When navigating the gdc sequence (g → d → c).
         let path = [
@@ -1441,14 +1439,56 @@ mod tests {
         ];
         let result = keymap.navigate(&path, &Scope::Normal).expect("path exists");
 
-        // Then it resolves to Intent::ToDiscordThread.
+        // Then it resolves to a dynamic intent for discord's to-thread action.
         match result {
-            NodeResult::Leaf { action } => assert!(
-                matches!(action, Intent::ToDiscordThread),
-                "gdc must resolve to ToDiscordThread; got {action:?}",
-            ),
+            NodeResult::Leaf { action } => match action {
+                Intent::Dynamic(dynamic) => {
+                    assert_eq!(dynamic.slice.key(), "discord:actions");
+                    assert_eq!(dynamic.action, "to-thread");
+                }
+                other => panic!("gdc must resolve to a dynamic intent; got {other:?}"),
+            },
             other => panic!("gdc must be a leaf, got branch: {other:?}"),
         }
+        // And the `gd` prefix under `g` is a derived group labeled
+        // "discord" (root `g` keeps its hardcoded "general" label).
+        let g_key = KeyEvent {
+            key: Key::Char('g'),
+            modifiers: Modifiers::none(),
+        };
+        let g_children = keymap
+            .children_at_path(&[g_key], &Scope::Normal)
+            .expect("g group bindings");
+        let d_key = KeyEvent {
+            key: Key::Char('d'),
+            modifiers: Modifiers::none(),
+        };
+        assert!(
+            g_children
+                .iter()
+                .any(|b| b.key == d_key && b.description == "discord"),
+            "gd group should be derived with the discord label, got {g_children:?}"
+        );
+    }
+
+    #[rstest::rstest]
+    fn gdc_is_absent_from_insert_scope() {
+        // Given the composed keymap (init + every slice's rows).
+        use jinn_domain::{Key, KeyEvent, Modifiers};
+        let keymap = init_with_slices();
+
+        // When navigating the g prefix in the Insert scope.
+        let path = [KeyEvent {
+            key: Key::Char('g'),
+            modifiers: Modifiers::none(),
+        }];
+        let result = keymap.navigate(&path, &Scope::Input);
+
+        // Then nothing resolves — the discord row must not pierce typing.
+        assert!(
+            result.is_none(),
+            "gdc must not bind in Input; typing would break"
+        );
     }
 
     #[rstest::rstest]

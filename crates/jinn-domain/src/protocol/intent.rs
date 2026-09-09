@@ -410,15 +410,6 @@ pub enum Intent {
         /// Human-readable key description for the hint line.
         label: String,
     },
-
-    // ── Discord ──────────────────────────────────────────────────
-    /// Continue the active session in a new Discord forum thread ("to-thread").
-    ///
-    /// Binds the current jinn session to a freshly created Discord thread under
-    /// the configured `[discord] forum_channel`. Rejected (in-chat error, no
-    /// thread created) when the session has no title, discord is disabled /
-    /// disconnected, or `forum_channel` is unset.
-    ToDiscordThread,
 }
 
 impl std::fmt::Display for Intent {
@@ -589,7 +580,6 @@ impl std::fmt::Display for Intent {
             Intent::TerminalSendKey { label, .. } => {
                 write!(f, "terminal send key ({label})")
             }
-            Intent::ToDiscordThread => write!(f, "to discord thread"),
         }
     }
 }
