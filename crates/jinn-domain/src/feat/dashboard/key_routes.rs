@@ -67,7 +67,7 @@ pub fn attach_dashboard_rows(routes: &KeyRoutes) {
         outcome: RouteOutcome::Action {
             action: "nav-up",
             display: "move up",
-            run: ActionFn::new(|| IntentResult::new_message(DashboardNav::Up)),
+            run: ActionFn::new(|_ctx| IntentResult::new_message(DashboardNav::Up)),
         },
     });
     routes.attach(RouteRow {
@@ -80,7 +80,7 @@ pub fn attach_dashboard_rows(routes: &KeyRoutes) {
         outcome: RouteOutcome::Action {
             action: "nav-down",
             display: "move down",
-            run: ActionFn::new(|| IntentResult::new_message(DashboardNav::Down)),
+            run: ActionFn::new(|_ctx| IntentResult::new_message(DashboardNav::Down)),
         },
     });
     routes.attach(RouteRow {
@@ -93,7 +93,7 @@ pub fn attach_dashboard_rows(routes: &KeyRoutes) {
         outcome: RouteOutcome::Action {
             action: "nav-first",
             display: "move to first",
-            run: ActionFn::new(|| IntentResult::new_message(DashboardNav::First)),
+            run: ActionFn::new(|_ctx| IntentResult::new_message(DashboardNav::First)),
         },
     });
     routes.attach(RouteRow {
@@ -106,7 +106,7 @@ pub fn attach_dashboard_rows(routes: &KeyRoutes) {
         outcome: RouteOutcome::Action {
             action: "nav-last",
             display: "move to last",
-            run: ActionFn::new(|| IntentResult::new_message(DashboardNav::Last)),
+            run: ActionFn::new(|_ctx| IntentResult::new_message(DashboardNav::Last)),
         },
     });
 
@@ -137,6 +137,7 @@ mod tests {
     )]
     use super::attach_dashboard_rows;
     use super::dashboard_scope;
+    use crate::common::slices::key_routes::ActionCtx;
     use crate::common::slices::key_routes::KeyRoutes;
     use crate::common::slices::key_routes::RouteOutcome;
     use crate::protocol::intent::Intent;
@@ -158,7 +159,17 @@ mod tests {
             action,
             "dashboard nav",
         ));
-        let result = routes.action_for(&intent).expect("row is attached");
+        let mut state = crate::common::app_state::AppState::default();
+        let slices = crate::common::slices::Slices::new();
+        let result = routes
+            .action_for(
+                &intent,
+                ActionCtx {
+                    state: &mut state,
+                    slices: &slices,
+                },
+            )
+            .expect("row is attached");
 
         // Then the result carries a DashboardNav message.
         assert_eq!(
@@ -202,7 +213,15 @@ mod tests {
             "nonexistent",
             "nothing",
         ));
-        let result = routes.action_for(&intent);
+        let mut state = crate::common::app_state::AppState::default();
+        let slices = crate::common::slices::Slices::new();
+        let result = routes.action_for(
+            &intent,
+            ActionCtx {
+                state: &mut state,
+                slices: &slices,
+            },
+        );
 
         // Then no route serves it.
         assert!(result.is_none());

@@ -192,8 +192,14 @@ impl IntentHandler {
         // delegated to its slice's action and never reaches the
         // built-in arms. An unregistered dynamic intent resolves to
         // None and falls through to the sweep-reset guard below, which
-        // treats it like any other non-x action.
-        if let Some(mut result) = routes.action_for(intent) {
+        // treats it like any other non-x action. The action runs
+        // against the handler's own borrows (`ActionCtx`): it writes
+        // the same `&mut AppState` guard — never a second lock — and
+        // resolves slice cells through the same registry.
+        if let Some(mut result) = routes.action_for(
+            intent,
+            crate::common::slices::key_routes::ActionCtx { state, slices },
+        ) {
             // Scope transitions apply before the messages publish so a
             // slice that opens itself is on the stack before any bus
             // subscriber could observe a message.

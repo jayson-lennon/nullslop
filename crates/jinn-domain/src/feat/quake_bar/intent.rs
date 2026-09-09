@@ -22,6 +22,7 @@ use super::command::SubmitQuakeBarCommand;
 use super::state::QuakeBarInput;
 use super::state::QuakeBarState;
 use super::state::quake_scope;
+use crate::common::slices::key_routes::ActionCtx;
 use crate::common::slices::key_routes::ActionFn;
 use crate::common::slices::key_routes::BindSite;
 use crate::common::slices::key_routes::InputHook;
@@ -71,7 +72,7 @@ pub fn attach_quake_bar_rows(routes: &KeyRoutes, cell: &TypedCell<QuakeBarState>
         outcome: RouteOutcome::Action {
             action: "open",
             display: "quake bar",
-            run: ActionFn::new(|| {
+            run: ActionFn::new(|_ctx| {
                 IntentResult::empty().with_scope_signal(ScopeSignal::Push(quake_scope()))
             }),
         },
@@ -87,7 +88,7 @@ pub fn attach_quake_bar_rows(routes: &KeyRoutes, cell: &TypedCell<QuakeBarState>
         outcome: RouteOutcome::Action {
             action: "close",
             display: "close quake bar",
-            run: ActionFn::new(|| {
+            run: ActionFn::new(|_ctx| {
                 IntentResult::empty().with_scope_signal(ScopeSignal::PopIf(quake_scope()))
             }),
         },
@@ -102,7 +103,7 @@ pub fn attach_quake_bar_rows(routes: &KeyRoutes, cell: &TypedCell<QuakeBarState>
         outcome: RouteOutcome::Action {
             action: "close",
             display: "close quake bar",
-            run: ActionFn::new(|| {
+            run: ActionFn::new(|_ctx| {
                 IntentResult::empty().with_scope_signal(ScopeSignal::PopIf(quake_scope()))
             }),
         },
@@ -121,7 +122,10 @@ pub fn attach_quake_bar_rows(routes: &KeyRoutes, cell: &TypedCell<QuakeBarState>
         outcome: RouteOutcome::Action {
             action: "submit",
             display: "submit command",
-            run: ActionFn::new(move || handle_submit(&submit_cell)),
+            run: ActionFn::new({
+                let cell = submit_cell.clone();
+                move |ctx| handle_submit(&cell, ctx)
+            }),
         },
     });
 
@@ -145,7 +149,10 @@ pub fn attach_quake_bar_rows(routes: &KeyRoutes, cell: &TypedCell<QuakeBarState>
             outcome: RouteOutcome::Action {
                 action,
                 display,
-                run: ActionFn::new(move || handle_scroll(&cell, action)),
+                run: ActionFn::new({
+                    let cell = cell.clone();
+                    move |ctx| handle_scroll(&cell, action, ctx)
+                }),
             },
         });
     }
@@ -162,7 +169,7 @@ pub fn attach_quake_bar_rows(routes: &KeyRoutes, cell: &TypedCell<QuakeBarState>
             display: "clear input",
             run: ActionFn::new({
                 let cell = cell.clone();
-                move || {
+                move |_ctx| {
                     cell.update(|s| *s = QuakeBarState::default());
                     IntentResult::empty()
                 }
@@ -225,7 +232,7 @@ pub fn register_quake_input_hook(routes: &KeyRoutes, cell: &TypedCell<QuakeBarSt
 /// the text is non-empty — emits a [`SubmitQuakeBarCommand`] so the
 /// [`QuakeBarActor`](super::quake_bar_actor::QuakeBarActor) appends it
 /// to the log. Empty input is a no-op (no command emitted).
-fn handle_submit(cell: &TypedCell<QuakeBarState>) -> IntentResult {
+fn handle_submit(cell: &TypedCell<QuakeBarState>, _ctx: ActionCtx<'_>) -> IntentResult {
     let text = {
         let guard = cell.read();
         guard.input.text.input.trim().to_owned()
@@ -243,7 +250,7 @@ fn handle_submit(cell: &TypedCell<QuakeBarState>) -> IntentResult {
 
 /// Scrolls the command log one line in the direction named by `action`
 /// (`scroll-up` toward older lines, `scroll-down` toward newer).
-fn handle_scroll(cell: &TypedCell<QuakeBarState>, action: &str) -> IntentResult {
+fn handle_scroll(cell: &TypedCell<QuakeBarState>, action: &str, _ctx: ActionCtx<'_>) -> IntentResult {
     cell.update(|s| match action {
         "scroll-up" => s.log.scroll_up(),
         _ => s.log.scroll_down(),
@@ -280,6 +287,7 @@ mod tests {
 
     use crate::feat::quake_bar::state::quake_bar_slot;
 
+
     fn wired() -> (KeyRoutes, jinn_slices::TypedCell<QuakeBarState>) {
         let slices = Slices::new();
         let cell = slices
@@ -299,7 +307,17 @@ mod tests {
 
         // When dispatching the open dynamic intent.
         let intent = Intent::Dynamic(super::quake_intent("open", "quake bar"));
-        let result = routes.action_for(&intent).expect("open row attached");
+        let mut state = crate::common::app_state::AppState::default();
+        let slices = Slices::new();
+        let result = routes
+            .action_for(
+                &intent,
+                crate::common::slices::key_routes::ActionCtx {
+                    state: &mut state,
+                    slices: &slices,
+                },
+            )
+            .expect("open row attached");
 
         // Then the result carries a Push signal for the quake scope.
         assert_eq!(result.scope_signal, Some(ScopeSignal::Push(quake_scope())));
@@ -313,7 +331,17 @@ mod tests {
 
         // When dispatching the close dynamic intent.
         let intent = Intent::Dynamic(super::quake_intent("close", "close quake bar"));
-        let result = routes.action_for(&intent).expect("close row attached");
+        let mut state = crate::common::app_state::AppState::default();
+        let slices = Slices::new();
+        let result = routes
+            .action_for(
+                &intent,
+                crate::common::slices::key_routes::ActionCtx {
+                    state: &mut state,
+                    slices: &slices,
+                },
+            )
+            .expect("close row attached");
 
         // Then the result carries a PopIf signal for the quake scope.
         assert_eq!(result.scope_signal, Some(ScopeSignal::PopIf(quake_scope())));
@@ -330,7 +358,15 @@ mod tests {
         });
 
         // When submitting.
-        let result = handle_submit(&cell);
+        let mut state = crate::common::app_state::AppState::default();
+        let slices = Slices::new();
+        let result = handle_submit(
+            &cell,
+            crate::common::slices::key_routes::ActionCtx {
+                state: &mut state,
+                slices: &slices,
+            },
+        );
 
         // Then a SubmitQuakeBarCommand message was emitted.
         assert_eq!(result.message_names.len(), 1);
@@ -351,7 +387,15 @@ mod tests {
         let (_routes, cell) = wired();
 
         // When submitting.
-        let result = handle_submit(&cell);
+        let mut state = crate::common::app_state::AppState::default();
+        let slices = Slices::new();
+        let result = handle_submit(
+            &cell,
+            crate::common::slices::key_routes::ActionCtx {
+                state: &mut state,
+                slices: &slices,
+            },
+        );
 
         // Then no command was emitted.
         assert!(result.message_names.is_empty());
@@ -395,7 +439,15 @@ mod tests {
             cell.update(|s| s.log.push(format!("line-{i}")));
         }
         let intent = Intent::Dynamic(super::quake_intent("scroll-up", "scroll up"));
-        let _ = routes.action_for(&intent).expect("scroll-up row");
+        let mut state = crate::common::app_state::AppState::default();
+        let slices = Slices::new();
+        let _ = routes.action_for(
+            &intent,
+            crate::common::slices::key_routes::ActionCtx {
+                state: &mut state,
+                slices: &slices,
+            },
+        ).expect("scroll-up row");
         let before = {
             let guard = cell.read();
             guard.log.visible_lines(2).to_vec()
@@ -403,7 +455,15 @@ mod tests {
 
         // When dispatching scroll-down.
         let intent = Intent::Dynamic(super::quake_intent("scroll-down", "scroll down"));
-        let _ = routes.action_for(&intent).expect("scroll-down row");
+        let mut state = crate::common::app_state::AppState::default();
+        let slices = Slices::new();
+        let _ = routes.action_for(
+            &intent,
+            crate::common::slices::key_routes::ActionCtx {
+                state: &mut state,
+                slices: &slices,
+            },
+        ).expect("scroll-down row");
 
         // Then the visible window shifted toward the newest line.
         let after = {

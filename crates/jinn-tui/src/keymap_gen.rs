@@ -325,7 +325,7 @@ mod tests {
             outcome: RouteOutcome::Action {
                 action: "open",
                 display: "quake bar",
-                run: ActionFn::new(|| IntentResult::empty()),
+                run: ActionFn::new(|_ctx| IntentResult::empty()),
             },
         }
     }
@@ -462,7 +462,7 @@ mod tests {
             outcome: RouteOutcome::Action {
                 action: "act",
                 display: "test action",
-                run: ActionFn::new(|| IntentResult::empty()),
+                run: ActionFn::new(|_ctx| IntentResult::empty()),
             },
         });
 
@@ -493,7 +493,7 @@ mod tests {
             outcome: RouteOutcome::Action {
                 action: "act",
                 display: "test action",
-                run: ActionFn::new(|| IntentResult::empty()),
+                run: ActionFn::new(|_ctx| IntentResult::empty()),
             },
         });
 
@@ -523,7 +523,7 @@ mod tests {
             outcome: RouteOutcome::Action {
                 action: "act",
                 display: "test action",
-                run: ActionFn::new(|| IntentResult::empty()),
+                run: ActionFn::new(|_ctx| IntentResult::empty()),
             },
         });
 
@@ -565,7 +565,7 @@ mod tests {
             outcome: RouteOutcome::Action {
                 action: "act",
                 display: "test action",
-                run: ActionFn::new(|| IntentResult::empty()),
+                run: ActionFn::new(|_ctx| IntentResult::empty()),
             },
         });
 
@@ -598,7 +598,7 @@ mod tests {
             outcome: RouteOutcome::Action {
                 action: "act",
                 display: "test action",
-                run: ActionFn::new(|| IntentResult::empty()),
+                run: ActionFn::new(|_ctx| IntentResult::empty()),
             },
         });
 

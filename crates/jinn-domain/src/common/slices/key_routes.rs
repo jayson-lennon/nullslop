@@ -32,6 +32,8 @@ use std::sync::Arc;
 
 use jinn_slices::SliceScopeId;
 
+use crate::common::app_state::AppState;
+use crate::common::slices::Slices;
 use crate::protocol::intent::Intent;
 use crate::protocol::intent::IntentResult;
 
@@ -100,30 +102,49 @@ pub enum RouteOutcome {
     },
 }
 
+/// The handler context a row action runs in.
+///
+/// Actions that touch app state write through `state` — the same
+/// `&mut AppState` guard the intent handler already holds, so an
+/// action never mints a second write capability and never takes a
+/// second lock (a captured `State::write()` would deadlock against
+/// the handler's guard). Actions that resolve slice cells take
+/// `slices`; cell handles captured at attach time remain the
+/// preferred form (the ctx is for state a cell cannot carry).
+#[derive(Debug)]
+pub struct ActionCtx<'a> {
+    /// Mutable application state, borrowed from the intent handler.
+    pub state: &'a mut AppState,
+    /// The slice registry, borrowed from the intent handler.
+    pub slices: &'a Slices,
+}
+
 /// A row action: produces the intent result (messages + optional scope
 /// signal) when its dynamic intent fires.
 ///
 /// A closure, not a bare `fn` pointer: actions may capture the slice's
 /// cell handle (e.g. submit reads and clears the input buffer). The
 /// captured handle is the one registered at slice activation — closure
-/// capture does not mint a second write capability.
+/// capture does not mint a second write capability. State outside the
+/// slice's cells is reached through [`ActionCtx`], lent by the handler
+/// at dispatch time.
 #[derive(Clone)]
-pub struct ActionFn(Arc<dyn Fn() -> IntentResult + Send + Sync>);
+pub struct ActionFn(Arc<dyn Fn(ActionCtx<'_>) -> IntentResult + Send + Sync>);
 
 impl ActionFn {
     /// Wraps a closure or function into a row action.
     #[must_use]
     pub fn new<F>(f: F) -> Self
     where
-        F: Fn() -> IntentResult + Send + Sync + 'static,
+        F: Fn(ActionCtx<'_>) -> IntentResult + Send + Sync + 'static,
     {
         Self(Arc::new(f))
     }
 
-    /// Runs the action.
+    /// Runs the action with the handler's context.
     #[must_use]
-    pub fn run(&self) -> IntentResult {
-        (self.0)()
+    pub fn run(&self, ctx: ActionCtx<'_>) -> IntentResult {
+        (self.0)(ctx)
     }
 }
 
@@ -215,8 +236,11 @@ impl KeyRoutes {
     /// Matches by `(slice, action)` — the dynamic intent's identity.
     /// `None` means no row serves this intent: the handler treats the
     /// intent as inert.
-    #[must_use]
-    pub fn action_for(&self, intent: &Intent) -> Option<IntentResult> {
+    pub fn action_for(
+        &self,
+        intent: &Intent,
+        ctx: ActionCtx<'_>,
+    ) -> Option<IntentResult> {
         let jinn_slices::DynamicIntent {
             slice,
             action,
@@ -236,7 +260,7 @@ impl KeyRoutes {
                 _ => None,
             })
         };
-        Some(run?.run())
+        run.map(|run| run.run(ctx))
     }
 
     /// Returns all attached rows in attach order.
@@ -328,12 +352,15 @@ mod row_store {
 
 #[cfg(test)]
 mod tests {
+    use super::ActionCtx;
     use super::ActionFn;
     use super::BindSite;
     use super::KeyRoutes;
     use super::RouteId;
     use super::RouteOutcome;
     use super::RouteRow;
+    use crate::common::app_state::AppState;
+    use crate::common::slices::Slices;
     use crate::protocol::intent::Intent;
     use crate::protocol::intent::IntentResult;
     use jinn_slices::DynamicIntent;
@@ -354,7 +381,7 @@ mod tests {
             outcome: RouteOutcome::Action {
                 action,
                 display: "test action",
-                run: ActionFn::new(|| IntentResult::empty()),
+                run: ActionFn::new(|_ctx| IntentResult::empty()),
             },
         }
     }
@@ -371,7 +398,15 @@ mod tests {
         routes.attach(row("poke", "<enter>"));
 
         // When dispatching a dynamic intent carrying the row's action.
-        let result = routes.action_for(&dynamic_intent("poke"));
+        let mut state = AppState::default();
+        let slices = Slices::new();
+        let result = routes.action_for(
+            &dynamic_intent("poke"),
+            ActionCtx {
+                state: &mut state,
+                slices: &slices,
+            },
+        );
 
         // Then the row's action ran (empty result, no error).
         assert!(result.is_some());
@@ -384,7 +419,15 @@ mod tests {
         let routes = KeyRoutes::new();
 
         // When dispatching an unregistered dynamic intent.
-        let result = routes.action_for(&dynamic_intent("missing"));
+        let mut state = AppState::default();
+        let slices = Slices::new();
+        let result = routes.action_for(
+            &dynamic_intent("missing"),
+            ActionCtx {
+                state: &mut state,
+                slices: &slices,
+            },
+        );
 
         // Then nothing resolves — the handler will treat it as inert.
         assert!(result.is_none());
@@ -398,7 +441,15 @@ mod tests {
         routes.attach(row("poke", "<enter>"));
 
         // When dispatching a static intent.
-        let result = routes.action_for(&Intent::Quit);
+        let mut state = AppState::default();
+        let slices = Slices::new();
+        let result = routes.action_for(
+            &Intent::Quit,
+            ActionCtx {
+                state: &mut state,
+                slices: &slices,
+            },
+        );
 
         // Then nothing resolves (static intents flow through built-in arms).
         assert!(result.is_none());
