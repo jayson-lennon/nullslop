@@ -8,7 +8,7 @@
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 
-use super::shared::{Pad, RenderContext, pad_entry};
+use super::shared::{Pad, RenderContext, pad_entry, pad_line_to_width};
 
 /// Render a grouped annotation block: a header line, then one line per
 /// citation showing `<title> <url>`.
@@ -24,11 +24,21 @@ pub fn to_lines(
     let muted_style = Style::default().fg(ctx.theme.muted_text);
     let body_style = Style::default().fg(ctx.theme.primary_text);
 
-    // Header line.
-    lines.push(Line::from(Span::styled(
+    // Header line: bright, attention-grabbing bar spanning the full row,
+    // like challenge alerts — sources are the "where did this come from"
+    // record and must stand out from surrounding log text.
+    let mut header_line = Line::from(Span::styled(
         format!("Sources ({})", citations.len()),
-        muted_style,
-    )));
+        Style::default()
+            .fg(ctx.theme.sources_header_fg)
+            .bg(ctx.theme.sources_header_bg),
+    ));
+    pad_line_to_width(
+        &mut header_line,
+        ctx.content_width,
+        Style::default().bg(ctx.theme.sources_header_bg),
+    );
+    lines.push(header_line);
 
     if ctx.is_expanded {
         push_citation_lines(&mut lines, citations, body_style, muted_style);
@@ -183,7 +193,7 @@ mod tests {
     }
 
     #[rstest::rstest]
-    fn header_uses_muted_text_foreground() {
+    fn header_uses_sources_theme_colors() {
         // Given a collapsed annotation entry.
         let ctx = RenderContext {
             content_width: 80,
@@ -200,12 +210,36 @@ mod tests {
         // When rendering.
         let lines = to_lines(&[citation("Source A", "https://example.com/a")], &ctx);
 
-        // Then the hint line uses muted_text as foreground.
-        let hint_line = &lines[2];
-        let has_muted_fg = hint_line
-            .spans
-            .iter()
-            .any(|s| s.style.fg == Some(theme.muted_text));
-        assert!(has_muted_fg, "hint should use muted_text foreground");
+        // Then the header text span uses the sources header background and
+        // foreground from the theme.
+        let header_span = &lines[1].spans[0];
+        assert_eq!(header_span.content, "Sources (1)");
+        assert_eq!(header_span.style.fg, Some(theme.sources_header_fg));
+        assert_eq!(header_span.style.bg, Some(theme.sources_header_bg));
+    }
+
+    #[rstest::rstest]
+    fn header_background_spans_full_row_width() {
+        // Given a collapsed annotation entry rendered at width 80.
+        let ctx = RenderContext {
+            content_width: 80,
+            is_selected: false,
+            is_expanded: false,
+            tool_entry_max_lines: 20,
+            theme: default_theme(),
+            paired_status: None,
+            is_streaming: false,
+            is_waiting_on_subagent: false,
+        };
+        let theme = default_theme();
+
+        // When rendering.
+        let lines = to_lines(&[citation("Source A", "https://example.com/a")], &ctx);
+
+        // Then the header's total width spans the full content width,
+        // padded with the header background so the bar fills the row.
+        assert_eq!(lines[1].width() as u16, 80);
+        let pad_span = lines[1].spans.last().expect("padding span");
+        assert_eq!(pad_span.style.bg, Some(theme.sources_header_bg));
     }
 }
