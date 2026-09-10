@@ -865,6 +865,12 @@ impl ChatEntry {
         matches!(self.kind, ChatEntryKind::Compaction { .. })
     }
 
+    /// Whether this entry is a Sources (annotation) entry.
+    #[must_use]
+    pub fn is_annotation(&self) -> bool {
+        matches!(self.kind, ChatEntryKind::Annotation { .. })
+    }
+
     /// Whether this entry is a user message.
     #[must_use]
     pub fn is_user(&self) -> bool {

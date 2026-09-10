@@ -251,6 +251,10 @@ pub enum Intent {
     ChatEntryJumpNextPinned,
     /// Jump the cursor to the previous (older) pinned entry.
     ChatEntryJumpPrevPinned,
+    /// Jump the cursor to the next (newer) Sources (annotation) entry.
+    ChatEntryJumpNextSources,
+    /// Jump the cursor to the previous (older) Sources (annotation) entry.
+    ChatEntryJumpPrevSources,
     /// Pin the currently selected chat entry.
     ChatEntryPinSelected,
     /// Toggle expand/collapse of the selected tool entry (tool call, tool result, or annotation).
@@ -533,6 +537,8 @@ impl std::fmt::Display for Intent {
             Intent::ChatEntryJumpPrevUserEntry => write!(f, "previous user message"),
             Intent::ChatEntryJumpNextPinned => write!(f, "next pinned entry"),
             Intent::ChatEntryJumpPrevPinned => write!(f, "previous pinned entry"),
+            Intent::ChatEntryJumpNextSources => write!(f, "next sources entry"),
+            Intent::ChatEntryJumpPrevSources => write!(f, "previous sources entry"),
             Intent::ChatEntryPinSelected => write!(f, "pin entry"),
             Intent::ExpandToolEntry => write!(f, "expand tool entry"),
             Intent::ToggleAuditPopup => write!(f, "toggle audit popup"),
