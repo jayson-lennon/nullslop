@@ -223,6 +223,9 @@ pub fn init_with_control_toggle(control_toggle: &str) -> Keymap<KeyEvent, Scope,
             .bind("[u", Intent::ChatEntryJumpPrevUserEntry, KeyCategory::ChatHistory)
             .bind("]p", Intent::ChatEntryJumpNextPinned, KeyCategory::ChatHistory)
             .bind("[p", Intent::ChatEntryJumpPrevPinned, KeyCategory::ChatHistory)
+            // Jump to next/previous Sources (annotation) entry
+            .bind("]s", Intent::ChatEntryJumpNextSources, KeyCategory::ChatHistory)
+            .bind("[s", Intent::ChatEntryJumpPrevSources, KeyCategory::ChatHistory)
             // Session creation
             .bind("n", Intent::SessionNew, KeyCategory::General)
             .bind("N", Intent::SessionNewWithLifecycle, KeyCategory::General)
@@ -1775,6 +1778,62 @@ mod tests {
                 "[p must resolve to ChatEntryJumpPrevPinned; got {action:?}",
             ),
             other => panic!("[p must be a leaf, got branch: {other:?}"),
+        }
+    }
+
+    #[rstest::rstest]
+    fn bracket_s_chord_resolves_to_jump_sources_intents() {
+        // Given the default keymap.
+        use jinn_domain::{Key, KeyEvent, Modifiers};
+        use ratatui_which_key::NodeResult;
+        let keymap = init();
+
+        // When navigating ]s (next sources) in Normal scope.
+        let next_path = [
+            KeyEvent {
+                key: Key::Char(']'),
+                modifiers: Modifiers::none(),
+            },
+            KeyEvent {
+                key: Key::Char('s'),
+                modifiers: Modifiers::none(),
+            },
+        ];
+        let next_result = keymap
+            .navigate(&next_path, &Scope::Normal)
+            .expect("]s path exists");
+
+        // Then it resolves to ChatEntryJumpNextSources.
+        match next_result {
+            NodeResult::Leaf { action } => assert!(
+                matches!(action, Intent::ChatEntryJumpNextSources),
+                "]s must resolve to ChatEntryJumpNextSources; got {action:?}",
+            ),
+            other => panic!("]s must be a leaf, got branch: {other:?}"),
+        }
+
+        // When navigating [s (previous sources) in Normal scope.
+        let prev_path = [
+            KeyEvent {
+                key: Key::Char('['),
+                modifiers: Modifiers::none(),
+            },
+            KeyEvent {
+                key: Key::Char('s'),
+                modifiers: Modifiers::none(),
+            },
+        ];
+        let prev_result = keymap
+            .navigate(&prev_path, &Scope::Normal)
+            .expect("[s path exists");
+
+        // Then it resolves to ChatEntryJumpPrevSources.
+        match prev_result {
+            NodeResult::Leaf { action } => assert!(
+                matches!(action, Intent::ChatEntryJumpPrevSources),
+                "[s must resolve to ChatEntryJumpPrevSources; got {action:?}",
+            ),
+            other => panic!("[s must be a leaf, got branch: {other:?}"),
         }
     }
 
