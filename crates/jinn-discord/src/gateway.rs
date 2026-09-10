@@ -17,7 +17,7 @@ use crate::session_route::{InboundOutcome, classify_inbound, is_forwardable_mess
 use derive_more::Debug;
 use error_stack::Report;
 use jinn_domain::feat::chat_input::protocol::command::{EnqueueUserMessage, SubmitSteeringMessage};
-use jinn_domain::feat::dashboard::status_actor::DiscordStatusUpdate;
+use jinn_domain::feat::discord::status_actor::DiscordStatusUpdate;
 use jinn_domain::feat::discord::{
     BridgeEvent, CreateThreadReason, DiscordConfig, DiscordThreadCreateFailed,
     DiscordThreadCreated, DiscordThreadMap, FinalReply, ForumChannelError, GatewayRequest,
