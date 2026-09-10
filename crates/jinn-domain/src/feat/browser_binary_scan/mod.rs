@@ -10,8 +10,10 @@
 //! `frontend.dashboard` is sole-owned by
 //! [`DashboardActor`](crate::feat::dashboard::dashboard_actor::DashboardActor).
 //! To honour the per-sub-struct ownership rule, this actor does **not** write
-//! to the dashboard. It publishes [`BrowserBinaryVerified`]; the dashboard
-//! owner is the correct place to surface the status.
+//! to the dashboard. It publishes a generic
+//! [`ServiceStatusUpdate`](crate::feat::dashboard::ServiceStatusUpdate)
+//! carrying the display label alongside [`BrowserBinaryVerified`] (the domain
+//! fact); the dashboard owner applies it to the `web-fetch` row.
 
 use std::sync::Arc;
 
@@ -30,6 +32,10 @@ pub mod binary_resolver;
 pub use binary_resolver::{
     BinaryFamily, BinaryLocator, ResolvedBrowser, SystemBinaryLocator, resolve_browser_binary,
 };
+
+/// Dashboard row name for the web-fetch actor — whose Notes column surfaces
+/// the resolved browser backend (Chrome/Chromium/Bundled).
+const WEB_FETCH_ENTRY_NAME: &str = "web-fetch";
 
 /// Dependencies for [`BrowserBinaryScanActor`].
 #[derive(Clone)]
@@ -116,11 +122,22 @@ impl Message<EnvironmentLoaded> for BrowserBinaryScanActor {
                     note = ?resolved.fallback_note,
                     "browser binary resolved"
                 );
-                self.publish(BrowserBinaryVerified {
+                let verified = BrowserBinaryVerified {
                     family: resolved.family,
                     path: resolved.path,
                     version_major: resolved.version_major,
                     fallback_note: resolved.fallback_note,
+                };
+                let label = verified.display_label();
+                self.publish(verified).await;
+                // The web-fetch row's lifecycle is owned by the
+                // actor-lifecycle events (the scan actor IS web-fetch); this
+                // projection only fills the Notes column.
+                self.publish(crate::feat::dashboard::ServiceStatusUpdate {
+                    name: WEB_FETCH_ENTRY_NAME.to_owned(),
+                    description: None,
+                    lifecycle: None,
+                    status_message: Some(label),
                 })
                 .await;
             }
@@ -150,6 +167,49 @@ pub struct BrowserBinaryVerified {
 }
 
 impl crate::common::bus::BusMessage for BrowserBinaryVerified {}
+
+impl BrowserBinaryVerified {
+    /// Builds the dashboard Notes string for the resolved browser binary.
+    ///
+    /// Format: `"<family> <version>"` (or the bundled/undetected variants),
+    /// optionally suffixed with `" — <path>"` when a path is known, and
+    /// optionally prefixed with `"<note>: "` when resolution fell back.
+    #[must_use]
+    pub fn display_label(&self) -> String {
+        let label = match self.family {
+            BinaryFamily::Bundled => "Chromium (bundled, version undetected)".to_owned(),
+            _ => {
+                let family = self.family_display();
+                match &self.version_major {
+                    Some(v) => format!("{family} {v}"),
+                    None => format!(
+                        "{family} {} (version undetected)",
+                        jinn_web_fetch::stealth::CHROME_MAJOR
+                    ),
+                }
+            }
+        };
+
+        let with_path = match &self.path {
+            Some(p) => format!("{label} — {}", p.display()),
+            None => label,
+        };
+
+        match &self.fallback_note {
+            Some(note) => format!("{note}: {with_path}"),
+            None => with_path,
+        }
+    }
+
+    /// Returns the capitalized family name for display.
+    fn family_display(&self) -> &'static str {
+        match self.family {
+            BinaryFamily::Chrome => "Chrome",
+            BinaryFamily::Chromium => "Chromium",
+            BinaryFamily::Bundled => "Bundled",
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests;

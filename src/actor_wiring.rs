@@ -125,7 +125,7 @@ impl ActorSystemBuilder {
         Services,
         Option<kanal::AsyncReceiver<jinn_domain::feat::discord::BridgeEvent>>,
         Option<kanal::AsyncReceiver<jinn_domain::feat::discord::GatewayRequest>>,
-        kanal::Sender<jinn_domain::feat::dashboard::status_actor::DiscordStatusUpdate>,
+        kanal::Sender<jinn_domain::feat::discord::status_actor::DiscordStatusUpdate>,
     ) {
         let ActorSystemBuilderArgs {
             handle,
@@ -210,8 +210,8 @@ impl ActorSystemBuilder {
         // Always spawned FIRST — subscribes to lifecycle events before any
         // other actor fires them, so the dashboard captures every actor.
         // It owns `frontend.dashboard` and is the single sink for all
-        // status sources (generic lifecycle, BrowserBinaryVerified,
-        // DiscordStatusUpdate republished by DiscordStatusActor).
+        // status sources (generic lifecycle events and the generic
+        // ServiceStatusUpdate published by owning features).
         let _dashboard = jinn_domain::feat::dashboard::dashboard_actor::DashboardActor::supervise(
             &root,
             jinn_domain::feat::dashboard::dashboard_actor::DashboardActorDeps {
@@ -232,15 +232,16 @@ impl ActorSystemBuilder {
 
         // ── Discord status actor ───────────────────────────────────────
         // A pure translator: drains the gateway kanal channel and
-        // republishes DiscordStatusUpdate on the bus. The DashboardActor
-        // above consumes it. Spawned after the dashboard actor so its
-        // publications are not missed.
+        // republishes ServiceStatusUpdate on the bus (translated from the
+        // discord connection states). The DashboardActor above consumes it.
+        // Spawned after the dashboard actor so its publications are not
+        // missed.
         let (discord_status_tx, discord_status_rx) =
-            kanal::unbounded::<jinn_domain::feat::dashboard::status_actor::DiscordStatusUpdate>();
+            kanal::unbounded::<jinn_domain::feat::discord::status_actor::DiscordStatusUpdate>();
         let _discord_status =
-            jinn_domain::feat::dashboard::status_actor::DiscordStatusActor::supervise(
+            jinn_domain::feat::discord::status_actor::DiscordStatusActor::supervise(
                 &root,
-                jinn_domain::feat::dashboard::status_actor::DiscordStatusActorDeps {
+                jinn_domain::feat::discord::status_actor::DiscordStatusActorDeps {
                     deps: actor_deps.clone(),
                     status_rx: discord_status_rx.to_async(),
                 },
