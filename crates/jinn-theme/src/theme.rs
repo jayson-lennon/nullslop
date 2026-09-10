@@ -425,14 +425,12 @@ impl ThemeFile {
                 fallback.compaction_block_bg,
                 crate::color::ThemeColor::inner,
             ),
-            sources_header_bg: self.sources_header_bg.map_or(
-                fallback.sources_header_bg,
-                crate::color::ThemeColor::inner,
-            ),
-            sources_header_fg: self.sources_header_fg.map_or(
-                fallback.sources_header_fg,
-                crate::color::ThemeColor::inner,
-            ),
+            sources_header_bg: self
+                .sources_header_bg
+                .map_or(fallback.sources_header_bg, crate::color::ThemeColor::inner),
+            sources_header_fg: self
+                .sources_header_fg
+                .map_or(fallback.sources_header_fg, crate::color::ThemeColor::inner),
             truncation_fg: self
                 .truncation_fg
                 .map_or(fallback.truncation_fg, crate::color::ThemeColor::inner),
