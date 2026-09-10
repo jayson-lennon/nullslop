@@ -1,3 +1,8 @@
+## 2026-09-09 v0.116.1
+
+- Change default "sources" section highlight to light blue.
+- Reduce verbose subcommand help for `jinn install`
+
 ## 2026-09-09 v0.116.0
 
 - Highlight "sources" section when the results of a web search or web fetch come in.
