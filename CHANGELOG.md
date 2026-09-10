@@ -1,3 +1,7 @@
+## 2026-09-09 v0.116.0
+
+- Highlight "sources" section when the results of a web search or web fetch come in.
+
 ## 2026-09-02 v0.115.1
 
 - Number of pruned token display from v0.115.0 now persists across restarts and session reloads.
