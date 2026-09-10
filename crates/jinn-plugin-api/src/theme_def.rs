@@ -32,6 +32,8 @@ pub const THEME_COLOR_SLOTS: &[ThemeColorSlot] = &[
     ThemeColorSlot::ChallengeAlertBg,
     ThemeColorSlot::ChallengeAlertFg,
     ThemeColorSlot::CompactionBlockBg,
+    ThemeColorSlot::SourcesHeaderBg,
+    ThemeColorSlot::SourcesHeaderFg,
     ThemeColorSlot::TruncationFg,
     ThemeColorSlot::PickerActiveMarker,
     ThemeColorSlot::PickerSelectedBg,
@@ -99,6 +101,10 @@ pub enum ThemeColorSlot {
     ChallengeAlertFg,
     /// Compaction block background.
     CompactionBlockBg,
+    /// Sources (annotation) header background (bright).
+    SourcesHeaderBg,
+    /// Sources (annotation) header foreground (dark text on bright bg).
+    SourcesHeaderFg,
     /// Truncation indicator foreground.
     TruncationFg,
     /// Picker active marker.
@@ -169,6 +175,8 @@ impl ThemeColorSlot {
             Self::ChallengeAlertBg => "challenge_alert_bg",
             Self::ChallengeAlertFg => "challenge_alert_fg",
             Self::CompactionBlockBg => "compaction_block_bg",
+            Self::SourcesHeaderBg => "sources_header_bg",
+            Self::SourcesHeaderFg => "sources_header_fg",
             Self::TruncationFg => "truncation_fg",
             Self::PickerActiveMarker => "picker_active_marker",
             Self::PickerSelectedBg => "picker_selected_bg",

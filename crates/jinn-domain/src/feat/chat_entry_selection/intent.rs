@@ -2845,6 +2845,147 @@ mod jump_compaction_tests {
         assert!(result.message_names.is_empty());
     }
 
+    /// Build history user,A,user,B where A and B are Sources (annotation) entries.
+    fn build_two_annotation_history(state: &mut AppState) -> (ChatEntryId, ChatEntryId) {
+        state
+            .active_session_mut()
+            .push_entry(ChatEntry::user("first"));
+        let a_id = {
+            let citation = jinn_provider::UrlCitation {
+                url: "https://example.com/a".to_owned(),
+                title: "Source A".to_owned(),
+                content: None,
+                start_index: None,
+                end_index: None,
+            };
+            state
+                .active_session_mut()
+                .push_entry(ChatEntry::annotation(vec![citation]));
+            state.active_session().history()[1].id.clone()
+        };
+        state
+            .active_session_mut()
+            .push_entry(ChatEntry::user("middle"));
+        let b_id = {
+            let citation = jinn_provider::UrlCitation {
+                url: "https://example.com/b".to_owned(),
+                title: "Source B".to_owned(),
+                content: None,
+                start_index: None,
+                end_index: None,
+            };
+            state
+                .active_session_mut()
+                .push_entry(ChatEntry::annotation(vec![citation]));
+            state.active_session().history()[3].id.clone()
+        };
+        (a_id, b_id)
+    }
+
+    #[rstest::rstest]
+    fn jump_next_moves_to_next_annotation() {
+        // Given history user,A,user,B with the cursor on annotation entry A.
+        let mut state = AppState::default();
+        let (a_id, b_id) = build_two_annotation_history(&mut state);
+        select_at(&mut state, 1);
+        assert_eq!(state.active_session().selected_cursor_id(), Some(&a_id));
+
+        // When handling jump to next annotation entry.
+        let _result = handle_jump_next_entry(
+            &mut state,
+            crate::feat::session::chat_entry::ChatEntry::is_annotation,
+        );
+
+        // Then the cursor moves to annotation entry B.
+        assert_eq!(state.active_session().selected_cursor_id(), Some(&b_id));
+    }
+
+    #[rstest::rstest]
+    fn jump_prev_moves_to_prev_annotation() {
+        // Given history user,A,user,B with the cursor on annotation entry B.
+        let mut state = AppState::default();
+        let (a_id, b_id) = build_two_annotation_history(&mut state);
+        select_at(&mut state, 3);
+        assert_eq!(state.active_session().selected_cursor_id(), Some(&b_id));
+
+        // When handling jump to previous annotation entry.
+        let _result = handle_jump_prev_entry(
+            &mut state,
+            crate::feat::session::chat_entry::ChatEntry::is_annotation,
+        );
+
+        // Then the cursor moves to annotation entry A.
+        assert_eq!(state.active_session().selected_cursor_id(), Some(&a_id));
+    }
+
+    #[rstest::rstest]
+    fn jump_next_noop_at_last_annotation() {
+        // Given the cursor on the last annotation entry B.
+        let mut state = AppState::default();
+        let (_a_id, b_id) = build_two_annotation_history(&mut state);
+        select_at(&mut state, 3);
+
+        // When handling jump to next annotation entry.
+        let result = handle_jump_next_entry(
+            &mut state,
+            crate::feat::session::chat_entry::ChatEntry::is_annotation,
+        );
+
+        // Then the cursor is unchanged (no wrap) and no commands emitted.
+        assert_eq!(state.active_session().selected_cursor_id(), Some(&b_id));
+        assert!(result.message_names.is_empty());
+    }
+
+    #[rstest::rstest]
+    fn jump_prev_noop_at_first_annotation() {
+        // Given the cursor on the first annotation entry A.
+        let mut state = AppState::default();
+        let (a_id, _b_id) = build_two_annotation_history(&mut state);
+        select_at(&mut state, 1);
+
+        // When handling jump to previous annotation entry.
+        let result = handle_jump_prev_entry(
+            &mut state,
+            crate::feat::session::chat_entry::ChatEntry::is_annotation,
+        );
+
+        // Then the cursor is unchanged (no wrap) and no commands emitted.
+        assert_eq!(state.active_session().selected_cursor_id(), Some(&a_id));
+        assert!(result.message_names.is_empty());
+    }
+
+    #[rstest::rstest]
+    fn jump_next_noop_when_history_empty_annotation() {
+        // Given an empty session.
+        let mut state = AppState::default();
+
+        // When handling jump to next annotation entry.
+        let result = handle_jump_next_entry(
+            &mut state,
+            crate::feat::session::chat_entry::ChatEntry::is_annotation,
+        );
+
+        // Then it is a no-op without panic.
+        assert!(state.active_session().selected_cursor_id().is_none());
+        assert!(result.message_names.is_empty());
+    }
+
+    #[rstest::rstest]
+    fn jump_prev_noop_when_history_empty_annotation() {
+        // Given an empty session.
+        let mut state = AppState::default();
+
+        // When handling jump to previous annotation entry.
+        let result = handle_jump_prev_entry(
+            &mut state,
+            crate::feat::session::chat_entry::ChatEntry::is_annotation,
+        );
+
+        // Then it is a no-op without panic.
+        assert!(state.active_session().selected_cursor_id().is_none());
+        assert!(result.message_names.is_empty());
+    }
+
     #[rstest::rstest]
     fn jump_next_returns_no_commands() {
         // Given history with a compaction, cursor on compaction A.

@@ -116,8 +116,8 @@ mod style_map_integration_tests {
         let theme = crate::default_theme();
         // When building the style map.
         let map = theme.style_map();
-        // Then it has one entry per Theme field (41 fields).
-        assert_eq!(map.len(), 42, "style_map should cover all Theme fields");
+        // Then it has one entry per Theme field.
+        assert_eq!(map.len(), 44, "style_map should cover all Theme fields");
     }
 
     #[rstest::rstest]

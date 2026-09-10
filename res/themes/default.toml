@@ -32,6 +32,8 @@ tool_pending_bg = [45, 45, 50]
 challenge_alert_bg = [255, 200, 0]
 challenge_alert_fg = [16, 16, 16]
 compaction_block_bg = [60, 50, 80]
+sources_header_bg = [255, 200, 0]
+sources_header_fg = [16, 16, 16]
 truncation_fg = [83, 83, 83]
 
 # Picker

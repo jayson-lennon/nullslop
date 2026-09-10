@@ -581,6 +581,16 @@ impl IntentHandler {
                     entry.is_pinned()
                 })
             }
+            Intent::ChatEntryJumpNextSources => {
+                feat::chat_entry_selection::intent::handle_jump_next_entry(state, |entry| {
+                    entry.is_annotation()
+                })
+            }
+            Intent::ChatEntryJumpPrevSources => {
+                feat::chat_entry_selection::intent::handle_jump_prev_entry(state, |entry| {
+                    entry.is_annotation()
+                })
+            }
             Intent::ChatEntryPinSelected => {
                 feat::chat_entry_selection::intent::handle_pin_selected(state)
             }

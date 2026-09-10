@@ -64,6 +64,10 @@ pub struct Theme {
     pub challenge_alert_fg: Color,
     /// Compaction summary block background.
     pub compaction_block_bg: Color,
+    /// Sources (annotation) header background — bright, attention-grabbing bar.
+    pub sources_header_bg: Color,
+    /// Sources (annotation) header foreground (dark text on the bright background).
+    pub sources_header_fg: Color,
     /// Tool result truncation indicator foreground.
     pub truncation_fg: Color,
     /// Subagent band background — the padding rows above and below `task`
@@ -171,6 +175,14 @@ impl Theme {
             "compaction_block_bg",
             Style::default().fg(self.compaction_block_bg),
         );
+        m.insert(
+            "sources_header_bg",
+            Style::default().fg(self.sources_header_bg),
+        );
+        m.insert(
+            "sources_header_fg",
+            Style::default().fg(self.sources_header_fg),
+        );
         m.insert("truncation_fg", Style::default().fg(self.truncation_fg));
         m.insert(
             "picker_active_marker",
@@ -272,6 +284,10 @@ pub struct ThemeFile {
     pub challenge_alert_fg: Option<ThemeColor>,
     #[serde(default)]
     pub compaction_block_bg: Option<ThemeColor>,
+    #[serde(default)]
+    pub sources_header_bg: Option<ThemeColor>,
+    #[serde(default)]
+    pub sources_header_fg: Option<ThemeColor>,
     #[serde(default)]
     pub truncation_fg: Option<ThemeColor>,
     #[serde(default)]
@@ -409,6 +425,12 @@ impl ThemeFile {
                 fallback.compaction_block_bg,
                 crate::color::ThemeColor::inner,
             ),
+            sources_header_bg: self
+                .sources_header_bg
+                .map_or(fallback.sources_header_bg, crate::color::ThemeColor::inner),
+            sources_header_fg: self
+                .sources_header_fg
+                .map_or(fallback.sources_header_fg, crate::color::ThemeColor::inner),
             truncation_fg: self
                 .truncation_fg
                 .map_or(fallback.truncation_fg, crate::color::ThemeColor::inner),
@@ -515,6 +537,8 @@ impl ThemeFile {
             challenge_alert_bg: Self::resolve_field(self.challenge_alert_bg),
             challenge_alert_fg: Self::resolve_field(self.challenge_alert_fg),
             compaction_block_bg: Self::resolve_field(self.compaction_block_bg),
+            sources_header_bg: Self::resolve_field(self.sources_header_bg),
+            sources_header_fg: Self::resolve_field(self.sources_header_fg),
             truncation_fg: Self::resolve_field(self.truncation_fg),
             picker_active_marker: Self::resolve_field(self.picker_active_marker),
             picker_selected_bg: Self::resolve_field(self.picker_selected_bg),
@@ -575,6 +599,8 @@ mod tests {
             challenge_alert_bg: None,
             challenge_alert_fg: None,
             compaction_block_bg: None,
+            sources_header_bg: None,
+            sources_header_fg: None,
             truncation_fg: None,
             picker_active_marker: None,
             picker_selected_bg: None,
@@ -640,6 +666,8 @@ mod tests {
             challenge_alert_bg: None,
             challenge_alert_fg: None,
             compaction_block_bg: None,
+            sources_header_bg: None,
+            sources_header_fg: None,
             truncation_fg: None,
             picker_active_marker: None,
             picker_selected_bg: None,
@@ -713,6 +741,8 @@ mod tests {
             challenge_alert_bg: Some(ThemeColor(Color::Rgb(255, 200, 0))),
             challenge_alert_fg: Some(ThemeColor(Color::Rgb(16, 16, 16))),
             compaction_block_bg: Some(ThemeColor(Color::Rgb(60, 50, 80))),
+            sources_header_bg: Some(ThemeColor(Color::Rgb(255, 200, 0))),
+            sources_header_fg: Some(ThemeColor(Color::Rgb(16, 16, 16))),
             truncation_fg: Some(ThemeColor(Color::Rgb(83, 83, 83))),
             picker_active_marker: Some(ThemeColor(Color::Green)),
             picker_selected_bg: Some(ThemeColor(Color::DarkGray)),
@@ -793,6 +823,8 @@ mod tests {
             challenge_alert_bg: None,
             challenge_alert_fg: None,
             compaction_block_bg: None,
+            sources_header_bg: None,
+            sources_header_fg: None,
             truncation_fg: None,
             picker_active_marker: None,
             picker_selected_bg: None,

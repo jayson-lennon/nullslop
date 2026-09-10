@@ -126,6 +126,8 @@ fn slot_color(theme: &jinn_theme::Theme, slot: ThemeColorSlot) -> String {
         ThemeColorSlot::ChallengeAlertBg => theme.challenge_alert_bg,
         ThemeColorSlot::ChallengeAlertFg => theme.challenge_alert_fg,
         ThemeColorSlot::CompactionBlockBg => theme.compaction_block_bg,
+        ThemeColorSlot::SourcesHeaderBg => theme.sources_header_bg,
+        ThemeColorSlot::SourcesHeaderFg => theme.sources_header_fg,
         ThemeColorSlot::TruncationFg => theme.truncation_fg,
         ThemeColorSlot::PickerActiveMarker => theme.picker_active_marker,
         ThemeColorSlot::PickerSelectedBg => theme.picker_selected_bg,
