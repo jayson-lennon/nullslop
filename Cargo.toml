@@ -27,7 +27,7 @@ members = ["crates/*", "plugins/*", "vendor/*"]
 
 
 [workspace.package]
-version = "0.115.1"
+version = "0.116.0"
 edition = "2024"
 publish = false
 
