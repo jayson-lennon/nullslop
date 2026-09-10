@@ -263,7 +263,8 @@ Entries are added or amended **only with human approval**.
 - (ui) The session picker renders tree connectors within the session-name column, not as a row prefix; connectors are excluded from filter matching and never stored in session titles.
 - (plugins) `jinn plugin install-builtins` overwrites all builtin plugin payloads and writes `[plugin.<name>]` entries only for plugins missing from `jinn.toml`.
 - (plugins) Builtin seeding registration is add-only: existing `[plugin.<name>]` entries are never modified or removed by `jinn install` or `jinn plugin install-builtins`.
-- (ui) Annotation (Sources) entries render collapsed by default — header plus a muted expand hint — and toggle via the shared `e` expand keybind, like tool entries and compaction blocks.
+- (ui) Annotation (Sources) entries render collapsed by default — header in theme-tunable sources_header colors plus a muted expand hint — and toggle via the shared `e` expand keybind, like tool entries and compaction blocks.
+- (keybinds) `[` / `]` + `s` jumps the selection to the previous/next Sources (annotation) entry in chat history, clamping at the ends without wrapping.
 - (testing) Default config templates (default_jinn.toml, default_providers.toml) are independent of code defaults: tests guarantee they parse, document every config key, contain no dead keys, and their marked examples uncomment into a valid config.
 - (prompts) Shipped prompts live in `res/prompts`, are embedded at compile time via the `BUNDLED` install catalogue, and `jinn install` seeds them to the user prompts dir, skipping files that already exist unless `--force`.
 - (ui) The quake bar's session section shows both the currently-applied auto-prune token total and the pending accumulation total; the applied total derives from entry context-history at render time, excluding compaction and user-sourced excludes.

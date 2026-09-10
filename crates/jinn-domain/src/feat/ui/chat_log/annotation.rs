@@ -242,4 +242,31 @@ mod tests {
         let pad_span = lines[1].spans.last().expect("padding span");
         assert_eq!(pad_span.style.bg, Some(theme.sources_header_bg));
     }
+
+    #[rstest::rstest]
+    fn hint_stays_muted_when_header_is_bright() {
+        // Given a collapsed annotation entry.
+        let ctx = RenderContext {
+            content_width: 80,
+            is_selected: false,
+            is_expanded: false,
+            tool_entry_max_lines: 20,
+            theme: default_theme(),
+            paired_status: None,
+            is_streaming: false,
+            is_waiting_on_subagent: false,
+        };
+        let theme = default_theme();
+
+        // When rendering.
+        let lines = to_lines(&[citation("Source A", "https://example.com/a")], &ctx);
+
+        // Then the hint line still uses muted_text as foreground.
+        let hint_line = &lines[2];
+        let has_muted_fg = hint_line
+            .spans
+            .iter()
+            .any(|s| s.style.fg == Some(theme.muted_text));
+        assert!(has_muted_fg, "hint should use muted_text foreground");
+    }
 }
