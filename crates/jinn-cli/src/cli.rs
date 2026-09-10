@@ -87,11 +87,7 @@ pub enum Commands {
     },
 
     /// Install default themes, personas, prompts, skills, and prebuilt
-    /// plugins to user directories. Skips any resource that already exists
-    /// unless --force is given. jinn.toml is only created when it does not
-    /// exist yet — an existing jinn.toml is never modified, even with
-    /// --force (use `jinn plugin install-builtins` to register newly
-    /// installed plugins). Plugins activate on the next jinn start.
+    /// plugins to user directories.
     Install {
         /// Overwrite existing resources if they already exist.
         #[arg(long)]
